@@ -1,0 +1,295 @@
+@import "tailwindcss";
+
+/* ── 9Expert Brand Color Tokens ────────────────────────────────── */
+:root {
+  color-scheme: light;
+
+  --9e-blue-primary:  #005CFF;
+  --9e-blue-bright:   #2486FF;
+  --9e-blue-sky:      #48B0FF;
+  --9e-blue-ice:      #F8FAFD;
+  --9e-lime-accent:   #D4F73F;
+  --9e-lime-light:    #E4FF6B;
+  --9e-lime-dark:     #B8D930;
+  --9e-gray-slate:    #808A95;
+  --9e-navy-deep:     #0D1B2A;
+  --9e-text-primary:  #0D1B2A;
+  --9e-text-secondary:#808A95;
+  --9e-bg-light:      #F8FAFD;
+  --9e-radius-md:     12px;
+  --9e-radius-lg:     16px;
+  --9e-shadow-sm:     0 1px 2px rgba(13,27,42,0.05);
+  --9e-shadow-md:     0 4px 12px rgba(13,27,42,0.08);
+  --9e-transition:    200ms cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── LINE Seed Sans TH ───────────────────────────────────────── */
+@font-face {
+  font-family: "LINESeedSansTH";
+  src: url("/fonts/LINESeedSansTH_W_Th.woff2") format("woff2");
+  font-weight: 100 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LINESeedSansTH";
+  src: url("/fonts/LINESeedSansTH_W_Rg.woff2") format("woff2");
+  font-weight: 300 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LINESeedSansTH";
+  src: url("/fonts/LINESeedSansTH_W_Bd.woff2") format("woff2");
+  font-weight: 500 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LINESeedSansTH";
+  src: url("/fonts/LINESeedSansTH_W_He.woff2") format("woff2");
+  font-weight: 700 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LINESeedSansTH";
+  src: url("/fonts/LINESeedSansTH_W_XBd.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Base ─────────────────────────────────────────────────────── */
+html, body {
+  font-family: "LINESeedSansTH", "GoogleSans", system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  background-color: #F8FAFD;
+  color: #0D1B2A;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+}
+
+::selection { background: #48B0FF; color: #0D1B2A; }
+
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0,92,255,0.25);
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────── */
+*::-webkit-scrollbar        { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb  { background: #CBD5E1; border-radius: 99px; }
+*::-webkit-scrollbar-track  { background: transparent; }
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK → LIGHT OVERRIDES
+   แปลง Tailwind dark-theme classes ที่หน้าเก่าใช้อยู่ → light
+   ═══════════════════════════════════════════════════════════════ */
+
+/* พื้นหลังหลัก */
+.bg-\[#0F172B\]        { background-color: #F8FAFD !important; }
+.bg-slate-950          { background-color: #F8FAFD !important; }
+.bg-slate-900          { background-color: #F1F5F9 !important; }
+.bg-slate-800          { background-color: #FFFFFF !important; }
+
+/* Card / Surface — bg-white/5, bg-white/10 → white card */
+.bg-white\/5           { background-color: #FFFFFF !important; }
+.bg-white\/10          { background-color: #FFFFFF !important; }
+.bg-white\/15          { background-color: #F8FAFD !important; }
+.bg-white\/20          { background-color: #EFF6FF !important; }
+
+/* Ring / border */
+.ring-white\/10        { --tw-ring-color: rgba(0,92,255,0.12) !important; }
+.ring-white\/5         { --tw-ring-color: rgba(0,92,255,0.08) !important; }
+.ring-slate-700        { --tw-ring-color: #E2E8F0 !important; }
+.border-white\/10      { border-color: rgba(0,92,255,0.10) !important; }
+.border-white\/5       { border-color: rgba(0,92,255,0.06) !important; }
+
+/* Text — strong contrast for light bg
+   NOTE: .text-white is NOT overridden here because gradient
+   hero sections need real white text. Use inline style instead. */
+.text-slate-100        { color: #0D1B2A !important; }
+.text-slate-200        { color: #1E293B !important; }
+.text-slate-300        { color: #334155 !important; }
+.text-slate-400        { color: #808A95 !important; }
+.text-slate-500        { color: #808A95 !important; }
+
+/* Indigo → 9Expert Blue */
+.bg-indigo-600\/90     { background-color: #005CFF !important; }
+.bg-indigo-600         { background-color: #005CFF !important; }
+.hover\:bg-indigo-600:hover { background-color: #0050E6 !important; }
+.text-indigo-300       { color: #2486FF !important; }
+.text-indigo-400       { color: #005CFF !important; }
+.ring-indigo-400\/40   { --tw-ring-color: rgba(0,92,255,0.30) !important; }
+.focus\:ring-indigo-400\/40:focus { --tw-ring-color: rgba(0,92,255,0.30) !important; }
+.hover\:text-indigo-300:hover { color: #005CFF !important; }
+
+/* Active nav item */
+.bg-white\/10.ring-1   { background-color: #EFF6FF !important; }
+
+/* Topbar dark bg */
+.bg-\[#0F172B\]\/95    { background-color: rgba(248,250,253,0.95) !important; }
+
+/* Emerald online badge */
+.text-emerald-400      { color: #059669 !important; }
+.text-emerald-300      { color: #059669 !important; }
+.ring-\[#0F172B\]      { --tw-ring-color: #FFFFFF !important; }
+.bg-emerald-400        { background-color: #059669 !important; }
+
+/* Red error / danger */
+.border-red-400\/30    { border-color: rgba(239,68,68,0.25) !important; }
+.bg-red-500\/10        { background-color: rgba(239,68,68,0.06) !important; }
+.text-red-200          { color: #DC2626 !important; }
+.text-red-300          { color: #DC2626 !important; }
+
+/* Success */
+.border-emerald-400\/30 { border-color: rgba(16,185,129,0.25) !important; }
+.bg-emerald-500\/10    { background-color: rgba(16,185,129,0.06) !important; }
+.text-emerald-200      { color: #059669 !important; }
+
+/* White text opacity variants — on normal (non-gradient) pages */
+.text-white\/90        { color: #0D1B2A !important; }
+.text-white\/80        { color: #1E293B !important; }
+.text-white\/70        { color: #334155 !important; }
+.text-white\/60        { color: #808A95 !important; }
+.text-white\/50        { color: #808A95 !important; }
+
+/* Dropdown menu dark bg */
+.bg-\[#0F172B\].ring-1 { background-color: #FFFFFF !important; }
+
+/* ── Hover overrides ─────────────────────────────────────────── */
+.hover\:bg-white\/5:hover  { background-color: #F8FAFD !important; }
+.hover\:bg-white\/10:hover { background-color: #F1F5F9 !important; }
+.hover\:bg-white\/15:hover { background-color: #EFF6FF !important; }
+
+/* ── Placeholder text ────────────────────────────────────────── */
+.placeholder\:text-slate-400::placeholder { color: #808A95 !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   FORM INPUTS — Global light-theme overrides
+   ═══════════════════════════════════════════════════════════════ */
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+textarea,
+select {
+  background-color: #FFFFFF !important;
+  color: #0D1B2A !important;
+  border-color: #E2E8F0;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"])::placeholder,
+textarea::placeholder {
+  color: #808A95;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
+textarea:focus,
+select:focus {
+  border-color: #005CFF;
+  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
+  outline: none;
+}
+
+select option {
+  background-color: #FFFFFF;
+  color: #0D1B2A;
+}
+
+/* ── Form labels ─────────────────────────────────────────────── */
+form label,
+section label {
+  color: #0D1B2A;
+  font-weight: 500;
+}
+
+/* ── Utility classes ──────────────────────────────────────────── */
+.surface {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,92,255,0.08);
+  border-radius: var(--9e-radius-lg);
+  box-shadow: var(--9e-shadow-sm);
+}
+.surface-hover { transition: all var(--9e-transition); }
+.surface-hover:hover { transform: translateY(-2px); box-shadow: var(--9e-shadow-md); }
+
+/* ── Input ────────────────────────────────────────────────────── */
+.input-9e {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: var(--9e-radius-md);
+  padding: 0.625rem 1rem;
+  color: #0D1B2A;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all var(--9e-transition);
+}
+.input-9e::placeholder { color: #808A95; }
+.input-9e:focus {
+  border-color: #005CFF;
+  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
+}
+
+/* ── Select ───────────────────────────────────────────────────── */
+.select-9e {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border: 1px solid #E2E8F0;
+  border-radius: var(--9e-radius-md);
+  padding: 0.625rem 1rem;
+  outline: none;
+  transition: all var(--9e-transition);
+}
+.select-9e:focus {
+  border-color: #005CFF;
+  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
+}
+
+/* ── select-dark (ไฟล์เก่าใช้) → light ──────────────────────── */
+.select-dark {
+  background-color: #FFFFFF !important;
+  color: #0D1B2A !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 0.75rem;
+  padding: 0.625rem 1rem;
+}
+.select-dark option { background-color: #FFFFFF; color: #0D1B2A; }
+.select-dark:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
+  border-color: #005CFF !important;
+}
+
+/* ── Cards — ensure white bg with proper shadow ──────────────── */
+section[class*="rounded-2xl"][class*="border"] {
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,92,255,0.10) !important;
+  box-shadow: 0 2px 8px rgba(13,27,42,0.06);
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+}
+section[class*="rounded-2xl"][class*="border"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(13,27,42,0.10);
+}
+
+/* Card section titles */
+section[class*="rounded-2xl"] h3 {
+  color: #0D1B2A !important;
+  font-weight: 600;
+}
+
+/* ── Modal dialog overlay → light theme ──────────────────────── */
+.bg-\[#0F172B\] {
+  background-color: #FFFFFF !important;
+}
+
+/* ── Topbar search focus ──────────────────────────────────────── */
+.topbar-search:focus {
+  border-color: #005CFF !important;
+  box-shadow: 0 0 0 3px rgba(0,92,255,0.12) !important;
+  outline: none;
+}
