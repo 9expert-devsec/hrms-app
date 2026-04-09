@@ -33,6 +33,7 @@ export default function EmployeeCreateForm() {
     address: "",
     gender: "male",
     photoUrl: "",
+    photoPublicId: "",
     emergency: {
       firstName: "",
       lastName: "",
@@ -86,7 +87,7 @@ export default function EmployeeCreateForm() {
       const data = await res.json();
       if (!res.ok || !data?.url)
         throw new Error(data?.error || "upload failed");
-      setForm((f) => ({ ...f, photoUrl: data.url }));
+      setForm((f) => ({ ...f, photoUrl: data.url, photoPublicId: data.public_id || "" }));
     } catch (err) {
       setUploadErr("อัปโหลดไม่สำเร็จ");
       setPreview("");
@@ -97,7 +98,7 @@ export default function EmployeeCreateForm() {
 
   function clearPhoto() {
     setPreview("");
-    setForm((f) => ({ ...f, photoUrl: "" }));
+    setForm((f) => ({ ...f, photoUrl: "", photoPublicId: "" }));
   }
 
   // positions ของแผนก

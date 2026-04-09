@@ -39,6 +39,7 @@ const EmployeeSchema = new Schema(
     address: { type: String },
     gender: { type: String, enum: ["male", "female", "other"] },
     photoUrl: { type: String },
+    photoPublicId: { type: String, default: null },
     empAutoId: { type: Number, unique: true }, // อย่าให้เป็น null
     departmentId: {
       type: Schema.Types.ObjectId,

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import Image from "next/image";
 import { Eye, EyeOff, LogIn, Users, BarChart2, Shield } from "lucide-react";
 
 export default function LoginPage() {
@@ -60,10 +61,15 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex items-center gap-3">
           <div
-            className="h-10 w-10 rounded-xl grid place-items-center"
-            style={{ background: "#005CFF" }}
+            style={{ width: "40px", height: "40px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
-            <span className="text-white font-extrabold text-lg">9</span>
+            <Image
+              src="/logo-9hrms.png"
+              alt="9Expert"
+              width={40}
+              height={40}
+              style={{ objectFit: "contain", width: "100%", height: "100%" }}
+            />
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-extrabold text-white text-base">9Expert</span>
@@ -130,10 +136,15 @@ export default function LoginPage() {
         {/* Mobile logo */}
         <div className="flex lg:hidden items-center gap-2.5 mb-8">
           <div
-            className="h-9 w-9 rounded-xl grid place-items-center"
-            style={{ background: "#005CFF" }}
+            style={{ width: "36px", height: "36px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
-            <span className="text-white font-extrabold">9</span>
+            <Image
+              src="/logo-9hrms.png"
+              alt="9Expert"
+              width={36}
+              height={36}
+              style={{ objectFit: "contain", width: "100%", height: "100%" }}
+            />
           </div>
           <span className="font-extrabold" style={{ color: "#0D1B2A" }}>
             9Expert HRM

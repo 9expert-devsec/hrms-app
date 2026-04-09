@@ -1,9 +1,10 @@
 // src/app/(protected)/dashboard/hrm/orgchart/OrgFlowClient.jsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   MarkerType,
@@ -17,154 +18,387 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import * as htmlToImage from "html-to-image";
+import { Download, Search } from "lucide-react";
 
-/* ----------------- constants & helpers ----------------- */
+/* ================================================================
+   Constants & Helpers
+   ================================================================ */
 const elk = new ELK();
-const NODE_W = 320;
-const NODE_H = 84;
-const GAP_X = 64;
-const GAP_Y = 96;
 
-const TOP_GAP = 60; // ระยะห่างบนสุด (เผื่อ CEO/COO)
-const TOP_PAIR_GAP = 40; // ระยะห่างระหว่าง CEO กับ COO
-
-const FIT_VIEW = {
-  padding: 0.06,           // เว้นขอบนิดหน่อย
-  minZoom: 0.02,           // ยอมซูมออกได้เยอะขึ้น (สำหรับจอเล็ก)
-  maxZoom: 1.4,            // ซูมเข้าได้พอประมาณ
-  includeHiddenNodes: true
+const NODE_SIZES = {
+  ceo:     { width: 280, height: 100 },
+  coo:     { width: 280, height: 100 },
+  dept:    { width: 200, height: 72  },
+  head:    { width: 240, height: 88  },
+  member:  { width: 200, height: 72  },
+  default: { width: 200, height: 72  },
 };
 
-const tagColor = (hex, fb = "#64748b") =>
+const getNodeSize = (type) => NODE_SIZES[type] || NODE_SIZES.default;
+
+/* Shorthand for render (w/h) */
+const SIZE = {
+  ceo:    { w: 280, h: 100 },
+  coo:    { w: 280, h: 100 },
+  dept:   { w: 200, h: 72  },
+  head:   { w: 240, h: 88  },
+  member: { w: 200, h: 72  },
+};
+
+const tagColor = (hex, fb = "#2486FF") =>
   /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex || "") ? hex : fb;
 
 const fullName = (e) =>
   [e.firstName, e.lastName].filter(Boolean).join(" ") || e.nickName || "-";
 
+const initials = (e) => {
+  const f = (e.firstName || "")[0] || "";
+  const l = (e.lastName || "")[0] || "";
+  return (f + l).toUpperCase() || "?";
+};
+
 const avatar = (u) =>
   !u
-    ? "/avatar-default.png"
+    ? null
     : u.startsWith("http") || u.startsWith("data:")
     ? u
     : u.startsWith("/")
     ? u
     : `/${u}`;
 
-const profileUrl = (id) =>
-  // 👉 ถ้าเส้นทางโปรไฟล์จริงของโปรเจ็กต์ต่างจากนี้ ให้แก้ตรงนี้จุดเดียว
-  `/dashboard/hrm/employee-profile?id=${id}`;
+const profileUrl = (id) => `/dashboard/hrm/employee-profile?id=${id}`;
 
-/* ----------------- custom nodes ----------------- */
-function DeptNode({ data }) {
-  const c = tagColor(data.color);
+/* ================================================================
+   Custom Nodes
+   ================================================================ */
+
+/* ---------- Avatar helper ---------- */
+function AvatarCircle({ photoUrl, emp, size, ringColor, bgColor, textColor, fontSize }) {
+  const src = avatar(photoUrl);
   return (
     <div
       style={{
-        width: NODE_W,
+        width: size,
+        height: size,
+        minWidth: size,
+        borderRadius: 9999,
+        border: `2px solid ${ringColor}`,
+        overflow: "hidden",
+        background: bgColor,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={size}
+          style={{ objectFit: "cover", width: size, height: size }}
+        />
+      ) : (
+        <span style={{ color: textColor, fontWeight: 700, fontSize: fontSize || 14 }}>
+          {emp ? initials(emp) : "?"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ---------- CEO Node ---------- */
+function CEONode({ data }) {
+  const highlighted = data._highlighted;
+  return (
+    <div
+      onClick={() => data.empId && window.open(profileUrl(data.empId), "_self")}
+      style={{
+        width: SIZE.ceo.w,
+        height: SIZE.ceo.h,
+        background: "linear-gradient(135deg, #0D1B2A 0%, #1a3a5c 100%)",
+        border: highlighted ? "2px solid #D4F73F" : "2px solid #D4F73F",
+        borderRadius: 20,
+        boxShadow: highlighted
+          ? "0 0 0 4px rgba(212,247,63,0.3), 0 8px 32px rgba(13,27,42,0.35)"
+          : "0 8px 32px rgba(13,27,42,0.35)",
+        cursor: data.empId ? "pointer" : "default",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 16px",
+        gap: 14,
+      }}
+    >
+      <AvatarCircle
+        photoUrl={data.photoUrl}
+        emp={data}
+        size={56}
+        ringColor="#D4F73F"
+        bgColor="#2486FF"
+        textColor="#FFFFFF"
+        fontSize={18}
+      />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#FFFFFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {data.name}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#D4F73F", marginTop: 2 }}>
+          {data.position || "-"}
+        </div>
+        <span
+          style={{
+            display: "inline-block",
+            marginTop: 4,
+            background: "rgba(212,247,63,0.15)",
+            color: "#D4F73F",
+            borderRadius: 99,
+            fontSize: 10,
+            padding: "1px 8px",
+          }}
+        >
+          {data.deptLabel || "Management"}
+        </span>
+      </div>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+    </div>
+  );
+}
+
+/* ---------- COO Node ---------- */
+function COONode({ data }) {
+  const highlighted = data._highlighted;
+  return (
+    <div
+      onClick={() => data.empId && window.open(profileUrl(data.empId), "_self")}
+      style={{
+        width: SIZE.coo.w,
+        height: SIZE.coo.h,
+        background: "linear-gradient(135deg, #0D1B2A 0%, #1a3a5c 100%)",
+        border: highlighted ? "2px solid #D4F73F" : "2px solid #2486FF",
+        borderRadius: 20,
+        boxShadow: highlighted
+          ? "0 0 0 4px rgba(212,247,63,0.3), 0 8px 32px rgba(13,27,42,0.35)"
+          : "0 8px 32px rgba(13,27,42,0.35)",
+        cursor: data.empId ? "pointer" : "default",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 16px",
+        gap: 14,
+      }}
+    >
+      <AvatarCircle
+        photoUrl={data.photoUrl}
+        emp={data}
+        size={56}
+        ringColor="#2486FF"
+        bgColor="#2486FF"
+        textColor="#FFFFFF"
+        fontSize={18}
+      />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#FFFFFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {data.name}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#48B0FF", marginTop: 2 }}>
+          {data.position || "-"}
+        </div>
+        <span
+          style={{
+            display: "inline-block",
+            marginTop: 4,
+            background: "rgba(36,134,255,0.15)",
+            color: "#48B0FF",
+            borderRadius: 99,
+            fontSize: 10,
+            padding: "1px 8px",
+          }}
+        >
+          {data.deptLabel || "Management"}
+        </span>
+      </div>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+    </div>
+  );
+}
+
+/* ---------- Department Node ---------- */
+function DeptNode({ data }) {
+  const highlighted = data._highlighted;
+  const bg = tagColor(data.color);
+  return (
+    <div
+      style={{
+        width: SIZE.dept.w,
+        height: SIZE.dept.h,
+        background: bg,
         borderRadius: 16,
-        background: "#0b1220",
-        border: `2px solid ${c}`,
-        boxShadow: `0 18px 40px -18px ${c}77`,
-        color: "#fff",
+        boxShadow: highlighted
+          ? `0 0 0 4px rgba(212,247,63,0.3), 0 4px 16px ${bg}44`
+          : `0 4px 16px ${bg}44`,
+        border: highlighted ? "2px solid #D4F73F" : "2px solid transparent",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: "0 14px",
         position: "relative",
       }}
     >
-      {/* toggle collapse */}
-      {/* <button
-        onClick={(e) => {
-          e.stopPropagation();
-          data.onToggle?.(data.id);
-        }}
-        title={data.collapsed ? "Expand" : "Collapse"}
-        className="absolute -right-2 -top-2 h-7 w-7 rounded-full bg-white/90 text-slate-700 text-sm font-bold shadow"
-      >
-        {data.collapsed ? "+" : "–"}
-      </button> */}
-
-      <div
-        style={{
-          background: c,
-          height: 36,
-          borderTopLeftRadius: 14,
-          borderTopRightRadius: 14,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 14px",
-          fontWeight: 600,
-        }}
-      >
-        {data.name}
-      </div>
-      <div className="px-4 py-2 text-xs text-slate-300">
-        Department • <span className="font-medium">{data.code}</span>
-      </div>
-
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
-    </div>
-  );
-}
-
-function PersonNode({ data }) {
-  const isHead =
-    data.role === "head" || data.role === "ceo" || data.role === "coo";
-  const c = tagColor(data.deptColor || "#94a3b8");
-
-  return (
-    <div
-      onClick={() => {
-        if (data.empId) window.open(profileUrl(data.empId), "_self");
-      }}
-      title={data.empId ? "เปิดโปรไฟล์" : ""}
-      style={{
-        width: NODE_W,
-        background: "#fff",
-        borderRadius: 16,
-        border: "1px solid rgba(148,163,184,.25)",
-        boxShadow: isHead
-          ? `0 18px 40px -18px ${c}77`
-          : "0 8px 22px rgba(15,23,42,.15)",
-        cursor: data.empId ? "pointer" : "default",
-      }}
-    >
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <span
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 9999,
-            overflow: "hidden",
-            border: "1px solid rgba(148,163,184,.35)",
-            background: "#f1f5f9",
+            background: "rgba(255,255,255,0.2)",
+            color: "#FFFFFF",
+            fontSize: 11,
+            fontWeight: 700,
+            borderRadius: 6,
+            padding: "1px 8px",
           }}
         >
-          <img
-            src={avatar(data.photoUrl)}
-            alt={data.name}
-            width="40"
-            height="40"
-            style={{ objectFit: "cover" }}
-          />
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900 truncate">
-            {data.name}
-          </div>
-          <div className="text-xs text-slate-500 truncate">
-            {data.position || "-"} {data.level ? `• L${data.level}` : ""}
-          </div>
-        </div>
+          {data.code}
+        </span>
       </div>
-
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {data.name}
+      </div>
+      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>
+        {data.memberCount ?? 0} คน
+      </div>
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
     </div>
   );
 }
 
-const nodeTypes = { dept: DeptNode, person: PersonNode };
+/* ---------- Head / Manager Node ---------- */
+function HeadNode({ data }) {
+  const highlighted = data._highlighted;
+  return (
+    <div
+      onClick={() => data.empId && window.open(profileUrl(data.empId), "_self")}
+      style={{
+        width: SIZE.head.w,
+        height: SIZE.head.h,
+        background: "#FFFFFF",
+        border: highlighted ? "2px solid #D4F73F" : "1.5px solid #2486FF",
+        borderRadius: 16,
+        boxShadow: highlighted
+          ? "0 0 0 4px rgba(212,247,63,0.3), 0 4px 12px rgba(36,134,255,0.15)"
+          : "0 4px 12px rgba(36,134,255,0.15)",
+        cursor: data.empId ? "pointer" : "default",
+        display: "flex",
+        alignItems: "center",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      {/* Left accent bar */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: "#2486FF", borderRadius: "4px 0 0 4px" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px 0 18px", flex: 1, minWidth: 0 }}>
+        <AvatarCircle
+          photoUrl={data.photoUrl}
+          emp={data}
+          size={44}
+          ringColor="#2486FF"
+          bgColor="#EFF6FF"
+          textColor="#2486FF"
+          fontSize={14}
+        />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#0D1B2A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {data.name}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 500, color: "#2486FF", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {data.position || "-"}
+          </div>
+          <span
+            style={{
+              display: "inline-block",
+              marginTop: 3,
+              background: "#EFF6FF",
+              color: "#2486FF",
+              fontSize: 10,
+              borderRadius: 99,
+              padding: "1px 8px",
+            }}
+          >
+            หัวหน้า
+          </span>
+        </div>
+      </div>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+    </div>
+  );
+}
 
-/* ----------------- graph builder ----------------- */
+/* ---------- Member Node ---------- */
+function MemberNode({ data }) {
+  const highlighted = data._highlighted;
+  return (
+    <div
+      onClick={() => data.empId && window.open(profileUrl(data.empId), "_self")}
+      style={{
+        width: SIZE.member.w,
+        height: SIZE.member.h,
+        background: "#FFFFFF",
+        border: highlighted ? "2px solid #D4F73F" : "1px solid rgba(36,134,255,0.12)",
+        borderRadius: 12,
+        boxShadow: highlighted
+          ? "0 0 0 4px rgba(212,247,63,0.3), 0 2px 8px rgba(13,27,42,0.06)"
+          : "0 2px 8px rgba(13,27,42,0.06)",
+        cursor: data.empId ? "pointer" : "default",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 12px",
+        gap: 10,
+        transition: "border-color 200ms, box-shadow 200ms",
+      }}
+    >
+      <AvatarCircle
+        photoUrl={data.photoUrl}
+        emp={data}
+        size={36}
+        ringColor="rgba(36,134,255,0.2)"
+        bgColor="#F8FAFD"
+        textColor="#808A95"
+        fontSize={12}
+      />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#0D1B2A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {data.name}
+        </div>
+        <div style={{ fontSize: 11, color: "#808A95", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {data.position || "-"}
+        </div>
+      </div>
+      {data.level && (
+        <span
+          style={{
+            background: "#F8FAFD",
+            color: "#808A95",
+            fontSize: 10,
+            borderRadius: 6,
+            padding: "2px 6px",
+            fontWeight: 600,
+            flexShrink: 0,
+          }}
+        >
+          L{data.level}
+        </span>
+      )}
+      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+    </div>
+  );
+}
+
+const nodeTypes = { ceo: CEONode, coo: COONode, dept: DeptNode, head: HeadNode, member: MemberNode };
+
+/* ================================================================
+   Graph Builder
+   ================================================================ */
 const pickCEO = (emps) =>
   emps.find((e) => /(^|\W)CEO(\W|$)/i.test(e.position || "")) ||
   [...emps].sort((a, b) => (b.level || 0) - (a.level || 0))[0] ||
@@ -179,7 +413,7 @@ function groupByDepartment(deps, emps) {
   const groups = [];
 
   for (const d of deps) {
-    if (String(d.code).toUpperCase() === "MD") continue; // ซ่อน MD
+    if (String(d.code).toUpperCase() === "MD") continue;
     groups.push({ dept: d, members: [] });
   }
   for (const e of emps) {
@@ -217,39 +451,44 @@ function makeGraph({ departments, employees }) {
   if (ceo) {
     nodes.push({
       id: "ceo",
-      type: "person",
+      type: "ceo",
       data: {
-        role: "ceo",
         name: fullName(ceo),
+        firstName: ceo.firstName,
+        lastName: ceo.lastName,
         position: ceo.position,
         level: ceo.level,
         photoUrl: ceo.photoUrl,
         empId: String(ceo._id),
+        deptLabel: "Management",
       },
-      width: NODE_W,
-      height: NODE_H,
+      width: SIZE.ceo.w,
+      height: SIZE.ceo.h,
     });
   }
   if (coo) {
     nodes.push({
       id: "coo",
-      type: "person",
+      type: "coo",
       data: {
-        role: "coo",
         name: fullName(coo),
+        firstName: coo.firstName,
+        lastName: coo.lastName,
         position: coo.position,
         level: coo.level,
         photoUrl: coo.photoUrl,
         empId: String(coo._id),
+        deptLabel: "Management",
       },
-      width: NODE_W,
-      height: NODE_H,
+      width: SIZE.coo.w,
+      height: SIZE.coo.h,
     });
   }
 
   for (const g of groups) {
     const depId = `dep-${g.dept.code}`;
     const depColor = tagColor(g.dept.color);
+    const memberCount = g.members.length + (g.head ? 1 : 0);
 
     nodes.push({
       id: depId,
@@ -259,60 +498,51 @@ function makeGraph({ departments, employees }) {
         name: g.dept.name,
         code: g.dept.code,
         color: depColor,
-        collapsed: false,
-        // toggle จะถูกอัดเพิ่มจากด้านนอกภายหลัง
+        memberCount,
       },
-      width: NODE_W,
-      height: NODE_H,
+      width: SIZE.dept.w,
+      height: SIZE.dept.h,
     });
 
+    // CEO → Department
     if (ceo)
       edges.push({
         id: `e-ceo-${depId}`,
         source: "ceo",
         target: depId,
         type: "smoothstep",
-        style: { stroke: "#93a4b8", strokeWidth: 1.6 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: "#93a4b8",
-          width: 18,
-          height: 18,
-        },
+        style: { stroke: "#2486FF", strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: "#2486FF", width: 16, height: 16 },
       });
 
+    // COO → Department (dashed)
     if (coo)
       edges.push({
         id: `e-coo-${depId}`,
         source: "coo",
         target: depId,
         type: "smoothstep",
-        style: { stroke: "#a3e635", strokeWidth: 1.2, opacity: 0.55 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: "#a3e635",
-          width: 14,
-          height: 14,
-        },
+        style: { stroke: "#48B0FF", strokeWidth: 1.5, strokeDasharray: "6 3" },
       });
 
+    // Head
     if (g.head) {
       const headId = `head-${g.head._id}`;
       nodes.push({
         id: headId,
-        type: "person",
+        type: "head",
         data: {
-          role: "head",
           parentDept: depId,
-          deptColor: depColor,
           name: fullName(g.head),
+          firstName: g.head.firstName,
+          lastName: g.head.lastName,
           position: g.head.position,
           level: g.head.level,
           photoUrl: g.head.photoUrl,
           empId: String(g.head._id),
         },
-        width: NODE_W,
-        height: NODE_H,
+        width: SIZE.head.w,
+        height: SIZE.head.h,
       });
       edges.push({
         id: `e-${depId}-${headId}`,
@@ -320,33 +550,29 @@ function makeGraph({ departments, employees }) {
         target: headId,
         type: "smoothstep",
         data: { parentDept: depId },
-        style: { stroke: depColor, strokeWidth: 1.6 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: depColor,
-          width: 16,
-          height: 16,
-        },
+        style: { stroke: "#2486FF", strokeWidth: 1.5 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: "#2486FF", width: 14, height: 14 },
       });
     }
 
+    // Members
     for (const m of g.members) {
       const memId = `mem-${m._id}`;
       nodes.push({
         id: memId,
-        type: "person",
+        type: "member",
         data: {
-          role: "member",
           parentDept: depId,
-          deptColor: depColor,
           name: fullName(m),
+          firstName: m.firstName,
+          lastName: m.lastName,
           position: m.position,
           level: m.level,
           photoUrl: m.photoUrl,
           empId: String(m._id),
         },
-        width: NODE_W,
-        height: NODE_H,
+        width: SIZE.member.w,
+        height: SIZE.member.h,
       });
       edges.push({
         id: `e-${g.head ? `head-${g.head._id}` : depId}-${memId}`,
@@ -354,13 +580,8 @@ function makeGraph({ departments, employees }) {
         target: memId,
         type: "smoothstep",
         data: { parentDept: depId },
-        style: { stroke: depColor, strokeWidth: 1.2 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: depColor,
-          width: 14,
-          height: 14,
-        },
+        style: { stroke: "rgba(36,134,255,0.4)", strokeWidth: 1 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: "rgba(36,134,255,0.4)", width: 12, height: 12 },
       });
     }
   }
@@ -368,13 +589,17 @@ function makeGraph({ departments, employees }) {
   return { nodes, edges };
 }
 
-/* ----------------- ELK layout ----------------- */
+/* ================================================================
+   ELK Layout
+   ================================================================ */
+const safeNum = (v) => (typeof v === "number" && !isNaN(v) ? v : 0);
+
 async function elkLayout(nodes, edges) {
-  const elkNodes = nodes.map((n) => ({
-    id: n.id,
-    width: n.width || NODE_W,
-    height: n.height || NODE_H,
-  }));
+  /* Build ELK nodes with guaranteed numeric dimensions from type lookup */
+  const elkNodes = nodes.map((n) => {
+    const s = getNodeSize(n.type);
+    return { id: n.id, width: s.width, height: s.height };
+  });
   const elkEdges = edges.map((e) => ({
     id: e.id,
     sources: [e.source],
@@ -386,26 +611,73 @@ async function elkLayout(nodes, edges) {
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": "DOWN",
-      "elk.spacing.nodeNode": `${GAP_X}`,
-      "elk.layered.spacing.nodeNodeBetweenLayers": `${GAP_Y}`,
+      "elk.spacing.nodeNode": "80",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "100",
+      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
-      "elk.padding": `[top=${
-        TOP_GAP + TOP_PAIR_GAP
-      },left=40,bottom=40,right=40]`,
+      "elk.padding": "[top=120,left=40,bottom=40,right=40]",
     },
     children: elkNodes,
     edges: elkEdges,
   };
 
-  const { children } = await elk.layout(g);
-  const pos = new Map(children.map((c) => [c.id, { x: c.x, y: c.y }]));
-  return nodes.map((n) => ({
-    ...n,
-    position: pos.get(n.id) || { x: 0, y: 0 },
-  }));
+  try {
+    const { children } = await elk.layout(g);
+    const posMap = new Map(children.map((c) => [c.id, c]));
+
+    return nodes.map((n) => {
+      const elkNode = posMap.get(n.id);
+      return {
+        ...n,
+        position: {
+          x: safeNum(elkNode?.x),
+          y: safeNum(elkNode?.y),
+        },
+      };
+    });
+  } catch (err) {
+    console.warn("ELK layout failed, using fallback grid:", err);
+    return applyFallbackLayout(nodes);
+  }
 }
 
-/* ----------------- Inner ----------------- */
+/* Fallback: simple layered grid if ELK fails */
+function applyFallbackLayout(nodes) {
+  const order = { ceo: 0, coo: 0, dept: 1, head: 2, member: 3 };
+  const layers = {};
+  for (const n of nodes) {
+    const lvl = order[n.type] ?? 3;
+    if (!layers[lvl]) layers[lvl] = [];
+    layers[lvl].push(n);
+  }
+  return nodes.map((n) => {
+    const lvl = order[n.type] ?? 3;
+    const row = layers[lvl];
+    const idx = row.indexOf(n);
+    const totalWidth = row.length * 260;
+    const startX = -totalWidth / 2;
+    return {
+      ...n,
+      position: { x: startX + idx * 260, y: lvl * 160 },
+    };
+  });
+}
+
+/* ================================================================
+   MiniMap node color
+   ================================================================ */
+const miniMapNodeColor = (node) => {
+  if (node.type === "ceo") return "#D4F73F";
+  if (node.type === "coo") return "#2486FF";
+  if (node.type === "dept") return "#2486FF";
+  if (node.type === "head") return "#EFF6FF";
+  return "#F8FAFD";
+};
+
+/* ================================================================
+   Inner Component
+   ================================================================ */
 function OrgFlowInner({ departments, employees }) {
   const graph = useMemo(
     () => makeGraph({ departments, employees }),
@@ -414,180 +686,188 @@ function OrgFlowInner({ departments, employees }) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-
-  const [collapsed, setCollapsed] = useState({}); // { depId: true }
+  const [highlightId, setHighlightId] = useState(null);
+  const highlightTimer = useRef(null);
   const rf = useReactFlow();
   const containerRef = useRef(null);
+  const searchRef = useRef(null);
 
-  // ฟังก์ชัน refit แบบที่เคยดีงาม
-  const refit = (pad = 0.2) =>
-    new Promise((res) => {
-      setTimeout(() => {
-        try {
-          rf.fitView({ padding: pad, includeHiddenNodes: true });
-        } catch {}
-        res();
-      }, 0);
-    });
-
-  // สร้าง layout ครั้งแรก
+  /* ---------- Initial layout ---------- */
   useEffect(() => {
     let alive = true;
     (async () => {
       const laid = await elkLayout(graph.nodes, graph.edges);
 
-      // จัด CEO/COO ให้อยู่กึ่งกลางแถวบนสุด
+      // Center CEO/COO at top
       const depXs = laid
         .filter((n) => n.id.startsWith("dep-"))
-        .map((n) => n.position.x)
+        .map((n) => safeNum(n.position.x))
         .sort((a, b) => a - b);
-      const midX =
+      const midX = safeNum(
         depXs.length >= 2
           ? (depXs[0] + depXs[depXs.length - 1]) / 2
-          : depXs[0] || 0;
+          : depXs[0] || 0
+      );
 
       for (const n of laid) {
-        if (n.id === "ceo") {
-          n.position = { x: midX - NODE_W - 24, y: 0 };
-        }
-        if (n.id === "coo") {
-          n.position = { x: midX + 24, y: 0 };
-        }
+        if (n.id === "ceo") n.position = { x: midX - SIZE.ceo.w - 24, y: 0 };
+        if (n.id === "coo") n.position = { x: midX + 24, y: 0 };
       }
 
       if (!alive) return;
       setNodes(laid);
       setEdges(graph.edges);
-      await refit(0.18);
+      setTimeout(() => {
+        try { rf.fitView({ padding: 0.15, includeHiddenNodes: true }); } catch {}
+      }, 50);
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph]);
 
-  // inject onToggle & collapsed flag ลงใน dept nodes + ซ่อนลูกเมื่อ collapse
+  /* ---------- Highlight effect ---------- */
   useEffect(() => {
     setNodes((prev) =>
-      prev.map((n) => {
-        if (n.type === "dept") {
-          return {
-            ...n,
-            data: {
-              ...n.data,
-              collapsed: !!collapsed[n.id],
-              onToggle: (id) => setCollapsed((s) => ({ ...s, [id]: !s[id] })),
-            },
-          };
-        }
-        // ถ้าเป็นคน และอยู่ในแผนกที่พับอยู่ -> ซ่อน
-        if (
-          n.type === "person" &&
-          n.data?.parentDept &&
-          collapsed[n.data.parentDept]
-        ) {
-          return { ...n, hidden: true };
-        }
-        return { ...n, hidden: false };
-      })
+      prev.map((n) => ({
+        ...n,
+        data: { ...n.data, _highlighted: n.id === highlightId },
+      }))
     );
+  }, [highlightId, setNodes]);
 
-    setEdges((prev) =>
-      prev.map((e) => {
-        const dep = e.data?.parentDept;
-        if (dep && collapsed[dep]) return { ...e, hidden: true };
-        return { ...e, hidden: false };
-      })
-    );
-  }, [collapsed, setNodes, setEdges]);
-
-  /* ---------- Search: zoom-to-node ---------- */
+  /* ---------- Search people list ---------- */
   const allPeople = useMemo(() => {
     const arr = [];
-    for (const n of nodes) {
-      if (n.type === "person") {
-        arr.push({
-          id: n.id,
-          label: n.data?.name || n.id,
-        });
+    for (const n of graph.nodes) {
+      if (n.type === "ceo" || n.type === "coo" || n.type === "head" || n.type === "member") {
+        arr.push({ id: n.id, label: n.data?.name || n.id });
       }
     }
     return arr.sort((a, b) => a.label.localeCompare(b.label, "th"));
-  }, [nodes]);
+  }, [graph.nodes]);
 
-  const onSearch = (value) => {
-    const node = rf.getNode(value);
-    if (!node) return;
-    // ถ้าคนอยู่ในแผนกที่พับไว้ ให้คลายก่อน
-    const dep = node.data?.parentDept;
-    if (dep && collapsed[dep]) setCollapsed((s) => ({ ...s, [dep]: false }));
-    setTimeout(() => {
-      try {
-        rf.fitView({
-          nodes: [{ id: node.id }],
-          padding: 0.06, // เว้นขอบนิดหน่อย
-          minZoom: 0.02, // ยอมซูมออกได้เยอะขึ้น (สำหรับจอเล็ก)
-          maxZoom: 1.4, // ซูมเข้าได้พอประมาณ
-          includeHiddenNodes: true,
-        });
-      } catch {}
-    }, 50);
-  };
+  const onSearch = useCallback(
+    (value) => {
+      if (!value) return;
+      // match by node id or by name substring
+      const node =
+        rf.getNode(value) ||
+        rf.getNodes().find((n) => n.data?.name?.toLowerCase().includes(value.toLowerCase()));
+      if (!node) return;
 
-  /* ---------- Export PNG (fit ก่อน export) ---------- */
+      // highlight
+      setHighlightId(node.id);
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+      highlightTimer.current = setTimeout(() => setHighlightId(null), 3000);
+
+      // zoom to node
+      setTimeout(() => {
+        try {
+          rf.fitView({
+            nodes: [{ id: node.id }],
+            padding: 0.5,
+            maxZoom: 1.2,
+            duration: 500,
+          });
+        } catch {}
+      }, 50);
+    },
+    [rf]
+  );
+
+  /* ---------- Export PNG ---------- */
   const exportPNG = async () => {
-    await refit(0.12);
+    try {
+      rf.fitView({ padding: 0.12, includeHiddenNodes: true });
+    } catch {}
+    await new Promise((r) => setTimeout(r, 200));
     const el = containerRef.current;
     if (!el) return;
     const dataUrl = await htmlToImage.toPng(el, {
       cacheBust: true,
-      backgroundColor: "#0a1220",
+      backgroundColor: "#F8FAFD",
     });
     const a = document.createElement("a");
     a.href = dataUrl;
-    a.download = "orgchart.png";
+    a.download = "9expert-orgchart.png";
     a.click();
   };
 
   return (
     <div
       ref={containerRef}
-      className="relative h-[78vh] rounded-2xl border border-white/10 overflow-hidden bg-[radial-gradient(#223,1px,transparent_1px)] [background-size:16px_16px]"
+      style={{ height: "80vh", background: "#F8FAFD", borderRadius: 20, overflow: "hidden", position: "relative" }}
     >
-      {/* Toolbar */}
-      <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+      {/* ── Toolbar ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 16,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          background: "#FFFFFF",
+          borderBottom: "1px solid rgba(36,134,255,0.10)",
+          borderRadius: 16,
+          padding: "12px 16px",
+          boxShadow: "0 2px 8px rgba(13,27,42,0.08)",
+        }}
+      >
         {/* Search */}
-        <div className="flex items-center gap-2 bg-white/90 rounded-lg px-2 py-1 text-slate-800 shadow">
+        <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+          <Search size={14} color="#808A95" style={{ position: "absolute", left: 10, pointerEvents: "none" }} />
           <input
-            list="peopleList"
+            ref={searchRef}
+            list="orgPeopleList"
             placeholder="ค้นหาชื่อ…"
-            className="px-2 py-1 text-sm bg-transparent outline-none"
+            style={{
+              width: 220,
+              background: "#F8FAFD",
+              border: "1px solid rgba(36,134,255,0.15)",
+              borderRadius: 10,
+              padding: "8px 14px 8px 30px",
+              fontSize: 13,
+              color: "#0D1B2A",
+              outline: "none",
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") onSearch(e.currentTarget.value);
             }}
           />
-          <button
-            onClick={(e) => {
-              const value = e.currentTarget.previousSibling.value;
-              onSearch(value);
-            }}
-            className="text-sm px-2 py-1 rounded bg-slate-800 text-white"
-          >
-            Go
-          </button>
-          <datalist id="peopleList">
+          <datalist id="orgPeopleList">
             {allPeople.map((p) => (
               <option key={p.id} value={p.id} label={p.label} />
             ))}
           </datalist>
         </div>
 
+        {/* Title */}
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#0D1B2A", whiteSpace: "nowrap" }}>
+          9Expert Org Chart
+        </span>
+
         {/* Export */}
         <button
           onClick={exportPNG}
-          className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-sm shadow"
-          title="Export PNG"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "#2486FF",
+            color: "#FFFFFF",
+            border: "none",
+            borderRadius: 10,
+            padding: "8px 16px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
         >
+          <Download size={14} />
           Export PNG
         </button>
       </div>
@@ -599,20 +879,42 @@ function OrgFlowInner({ departments, employees }) {
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
         nodesDraggable={false}
-        minZoom={FIT_VIEW.minZoom}
-        maxZoom={FIT_VIEW.maxZoom}
+        fitView
+        fitViewOptions={{ padding: 0.15 }}
+        minZoom={0.3}
+        maxZoom={1.5}
+        defaultViewport={{ zoom: 0.7 }}
         panOnScroll
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1f2937" gap={24} />
-        <MiniMap pannable zoomable />
-        <Controls position="bottom-left" />
+        <Background color="#C7D8F5" variant={BackgroundVariant.Dots} gap={24} size={1} />
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor={miniMapNodeColor}
+          maskColor="rgba(248,250,253,0.8)"
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid rgba(36,134,255,0.15)",
+            borderRadius: 12,
+          }}
+        />
+        <Controls
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid rgba(36,134,255,0.15)",
+            borderRadius: 12,
+            boxShadow: "0 2px 8px rgba(13,27,42,0.08)",
+          }}
+        />
       </ReactFlow>
     </div>
   );
 }
 
-/* ----------------- Export with Provider ----------------- */
+/* ================================================================
+   Export with Provider
+   ================================================================ */
 export default function OrgFlowClient({ departments, employees }) {
   return (
     <ReactFlowProvider>

@@ -9,6 +9,22 @@ import Counter from "@/models/Counter";
 import { hash } from "bcryptjs";
 import { uploadFromBuffer } from "@/lib/cloudinary";
 
+export async function GET(req) {
+  try {
+    await dbConnect();
+
+    const items = await Employee.find({})
+      .select("_id empId empAutoId firstName lastName nickName department position level email phone photoUrl departmentId userId")
+      .sort({ department: 1, firstName: 1 })
+      .lean();
+
+    return NextResponse.json({ ok: true, employees: items }, { status: 200 });
+  } catch (err) {
+    console.error("GET /api/employees error:", err);
+    return NextResponse.json({ ok: false, message: err?.message || "Server error" }, { status: 500 });
+  }
+}
+
 export async function POST(req) {
   try {
     await dbConnect();

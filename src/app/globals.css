@@ -1,26 +1,49 @@
 @import "tailwindcss";
 
-/* ── 9Expert Brand Color Tokens ────────────────────────────────── */
+/* ── 9Expert Brand Color Tokens (Updated CI) ─────────────────── */
 :root {
   color-scheme: light;
 
-  --9e-blue-primary:  #005CFF;
-  --9e-blue-bright:   #2486FF;
-  --9e-blue-sky:      #48B0FF;
-  --9e-blue-ice:      #F8FAFD;
-  --9e-lime-accent:   #D4F73F;
-  --9e-lime-light:    #E4FF6B;
-  --9e-lime-dark:     #B8D930;
-  --9e-gray-slate:    #808A95;
-  --9e-navy-deep:     #0D1B2A;
-  --9e-text-primary:  #0D1B2A;
-  --9e-text-secondary:#808A95;
-  --9e-bg-light:      #F8FAFD;
-  --9e-radius-md:     12px;
-  --9e-radius-lg:     16px;
-  --9e-shadow-sm:     0 1px 2px rgba(13,27,42,0.05);
-  --9e-shadow-md:     0 4px 12px rgba(13,27,42,0.08);
-  --9e-transition:    200ms cubic-bezier(0.4,0,0.2,1);
+  /* === 9Expert Brand Colors (Updated CI) === */
+
+  /* Primary Blues — 60% of colored elements */
+  --9e-blue-primary:   #2486FF;  /* ← NOW PRIMARY: logo, headings, main CTA */
+  --9e-blue-secondary: #005CFF;  /* ← NOW SECONDARY: links, interactive, gradient */
+  --9e-blue-sky:       #48B0FF;  /* Highlights, gradients, 30% supporting */
+  --9e-blue-ice:       #F8FAFD;  /* Light backgrounds, card surfaces */
+
+  /* Accent Lime — 10% only */
+  --9e-lime-accent:    #D4F73F;  /* CTA buttons, badges — on dark bg ONLY */
+  --9e-lime-light:     #E4FF6B;  /* Hover states */
+  --9e-lime-dark:      #B8D930;  /* Active/pressed states */
+
+  /* Background & Text */
+  --9e-navy-deep:      #0D1B2A;  /* Dark bg, primary text on light bg */
+  --9e-gray-slate:     #808A95;  /* Secondary text, captions */
+
+  /* Semantic aliases */
+  --9e-text-primary:    #0D1B2A;
+  --9e-text-secondary:  #808A95;
+  --9e-text-on-dark:    #FFFFFF;
+  --9e-text-on-lime:    #0D1B2A;
+  --9e-bg-light:        #F8FAFD;
+  --9e-bg-dark:         #0D1B2A;
+
+  /* CTA — Lime on dark only */
+  --9e-cta-bg:          #D4F73F;
+  --9e-cta-hover:       #E4FF6B;
+  --9e-cta-active:      #B8D930;
+  --9e-cta-text:        #0D1B2A;
+
+  /* Design tokens */
+  --9e-radius-sm:   8px;
+  --9e-radius-md:   12px;
+  --9e-radius-lg:   16px;
+  --9e-radius-xl:   24px;
+  --9e-shadow-sm:   0 1px 2px rgba(13,27,42,0.05);
+  --9e-shadow-md:   0 4px 12px rgba(13,27,42,0.08);
+  --9e-shadow-lg:   0 8px 24px rgba(13,27,42,0.12);
+  --9e-transition:  200ms cubic-bezier(0.4,0,0.2,1);
 }
 
 /* ── LINE Seed Sans TH ───────────────────────────────────────── */
@@ -77,7 +100,7 @@ h1, h2, h3 {
 
 *:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0,92,255,0.25);
+  box-shadow: 0 0 0 3px rgba(36,134,255,0.25);
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────── */
@@ -103,11 +126,11 @@ h1, h2, h3 {
 .bg-white\/20          { background-color: #EFF6FF !important; }
 
 /* Ring / border */
-.ring-white\/10        { --tw-ring-color: rgba(0,92,255,0.12) !important; }
-.ring-white\/5         { --tw-ring-color: rgba(0,92,255,0.08) !important; }
+.ring-white\/10        { --tw-ring-color: rgba(36,134,255,0.12) !important; }
+.ring-white\/5         { --tw-ring-color: rgba(36,134,255,0.08) !important; }
 .ring-slate-700        { --tw-ring-color: #E2E8F0 !important; }
-.border-white\/10      { border-color: rgba(0,92,255,0.10) !important; }
-.border-white\/5       { border-color: rgba(0,92,255,0.06) !important; }
+.border-white\/10      { border-color: rgba(36,134,255,0.10) !important; }
+.border-white\/5       { border-color: rgba(36,134,255,0.06) !important; }
 
 /* Text — strong contrast for light bg
    NOTE: .text-white is NOT overridden here because gradient
@@ -118,15 +141,15 @@ h1, h2, h3 {
 .text-slate-400        { color: #808A95 !important; }
 .text-slate-500        { color: #808A95 !important; }
 
-/* Indigo → 9Expert Blue */
-.bg-indigo-600\/90     { background-color: #005CFF !important; }
-.bg-indigo-600         { background-color: #005CFF !important; }
-.hover\:bg-indigo-600:hover { background-color: #0050E6 !important; }
-.text-indigo-300       { color: #2486FF !important; }
-.text-indigo-400       { color: #005CFF !important; }
-.ring-indigo-400\/40   { --tw-ring-color: rgba(0,92,255,0.30) !important; }
-.focus\:ring-indigo-400\/40:focus { --tw-ring-color: rgba(0,92,255,0.30) !important; }
-.hover\:text-indigo-300:hover { color: #005CFF !important; }
+/* Indigo → 9Expert Primary Blue #2486FF */
+.bg-indigo-600\/90          { background-color: #2486FF !important; }
+.bg-indigo-600              { background-color: #2486FF !important; }
+.hover\:bg-indigo-600:hover { background-color: #1a75f0 !important; }
+.text-indigo-300            { color: #2486FF !important; }
+.text-indigo-400            { color: #2486FF !important; }
+.ring-indigo-400\/40        { --tw-ring-color: rgba(36,134,255,0.30) !important; }
+.focus\:ring-indigo-400\/40:focus { --tw-ring-color: rgba(36,134,255,0.30) !important; }
+.hover\:text-indigo-300:hover { color: #2486FF !important; }
 
 /* Active nav item */
 .bg-white\/10.ring-1   { background-color: #EFF6FF !important; }
@@ -189,8 +212,8 @@ textarea::placeholder {
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
 textarea:focus,
 select:focus {
-  border-color: #005CFF;
-  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
+  border-color: #2486FF;
+  box-shadow: 0 0 0 3px rgba(36,134,255,0.15);
   outline: none;
 }
 
@@ -209,7 +232,7 @@ section label {
 /* ── Utility classes ──────────────────────────────────────────── */
 .surface {
   background: #FFFFFF;
-  border: 1px solid rgba(0,92,255,0.08);
+  border: 1px solid rgba(36,134,255,0.08);
   border-radius: var(--9e-radius-lg);
   box-shadow: var(--9e-shadow-sm);
 }
@@ -230,8 +253,8 @@ section label {
 }
 .input-9e::placeholder { color: #808A95; }
 .input-9e:focus {
-  border-color: #005CFF;
-  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
+  border-color: #2486FF;
+  box-shadow: 0 0 0 3px rgba(36,134,255,0.15);
 }
 
 /* ── Select ───────────────────────────────────────────────────── */
@@ -245,8 +268,8 @@ section label {
   transition: all var(--9e-transition);
 }
 .select-9e:focus {
-  border-color: #005CFF;
-  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
+  border-color: #2486FF;
+  box-shadow: 0 0 0 3px rgba(36,134,255,0.15);
 }
 
 /* ── select-dark (ไฟล์เก่าใช้) → light ──────────────────────── */
@@ -260,14 +283,14 @@ section label {
 .select-dark option { background-color: #FFFFFF; color: #0D1B2A; }
 .select-dark:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0,92,255,0.15);
-  border-color: #005CFF !important;
+  box-shadow: 0 0 0 2px rgba(36,134,255,0.25);
+  border-color: rgba(36,134,255,0.5) !important;
 }
 
 /* ── Cards — ensure white bg with proper shadow ──────────────── */
 section[class*="rounded-2xl"][class*="border"] {
   background-color: #FFFFFF !important;
-  border-color: rgba(0,92,255,0.10) !important;
+  border-color: rgba(36,134,255,0.10) !important;
   box-shadow: 0 2px 8px rgba(13,27,42,0.06);
   transition: all 200ms cubic-bezier(0.4,0,0.2,1);
 }
@@ -289,7 +312,7 @@ section[class*="rounded-2xl"] h3 {
 
 /* ── Topbar search focus ──────────────────────────────────────── */
 .topbar-search:focus {
-  border-color: #005CFF !important;
-  box-shadow: 0 0 0 3px rgba(0,92,255,0.12) !important;
+  border-color: #2486FF !important;
+  box-shadow: 0 0 0 3px rgba(36,134,255,0.12) !important;
   outline: none;
 }

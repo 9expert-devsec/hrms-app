@@ -14,6 +14,7 @@ import {
   Check,
   User,
   Building2,
+  RefreshCw,
 } from "lucide-react";
 
 /* ── design tokens ─────────────────────────────────── */
@@ -44,6 +45,7 @@ export default function DepartmentHeadPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   /* ── toast ─────────────────────────────── */
   const [toast, setToast] = useState(null);
@@ -112,10 +114,10 @@ export default function DepartmentHeadPage() {
     }
   }
 
-  /* Filtered candidates by department */
+  /* Show all level 5-6 candidates from any department */
   const filteredCandidates = useMemo(() => {
     if (!modal) return [];
-    return candidates.filter((c) => c.department === modal.deptCode);
+    return candidates;
   }, [candidates, modal]);
 
   /* ── open modal ────────────────────────── */
@@ -179,6 +181,22 @@ export default function DepartmentHeadPage() {
     }
   }
 
+  /* ── sync from Department.headOfDepartment ── */
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/department-head/sync", { method: "POST" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.message || "Sync failed");
+      showToast(`Sync แล้ว ${j.synced ?? 0} แผนก`);
+      await loadData();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   if (authStatus === "loading") {
     return (
       <div className="flex items-center justify-center py-24">
@@ -190,17 +208,28 @@ export default function DepartmentHeadPage() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }} className="space-y-6">
       {/* ── Header ───────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl"
-          style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
-        >
-          <ShieldCheck size={22} strokeWidth={1.8} />
-        </div>
-        <div>
-          <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>กำหนด Head of Department</h1>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-xl"
+            style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
+          >
+            <ShieldCheck size={22} strokeWidth={1.8} />
+          </div>
+          <div>
+            <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>กำหนด Head of Department</h1>
           <p style={{ color: SLATE, fontSize: 13 }}>ระบุผู้รับผิดชอบอนุมัติการลาของแต่ละแผนก</p>
+          </div>
         </div>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50"
+          style={{ background: ICE, color: NAVY, border: "1px solid rgba(0,92,255,0.12)", cursor: "pointer" }}
+        >
+          {syncing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          Sync จากระบบเดิม
+        </button>
       </div>
 
       {/* ── Table ─────────────────────────────── */}
@@ -381,7 +410,7 @@ export default function DepartmentHeadPage() {
             </div>
 
             <p style={{ color: SLATE, fontSize: 12, marginBottom: 8 }}>
-              แสดงเฉพาะพนักงานแผนก {modal.deptCode} (Level 5-6)
+              แสดงพนักงาน Level 5 ขึ้นไปทุกแผนก
             </p>
 
             {/* Candidates list */}
@@ -439,7 +468,7 @@ export default function DepartmentHeadPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: NAVY, fontSize: 14, fontWeight: 500 }}>{empName}</div>
                         <div style={{ color: SLATE, fontSize: 12 }}>
-                          {emp.position} • Level {emp.level}
+                          {emp.department} • {emp.position} • Level {emp.level}
                         </div>
                       </div>
                       {isSelected && (

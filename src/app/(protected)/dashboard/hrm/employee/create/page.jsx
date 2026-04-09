@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
-import BankSelect from "@/components/BankSelect";
+import BankSelect from "./../../../../../../components/BankSelect";
 import { Eye, EyeOff } from "lucide-react";
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/mongoose";

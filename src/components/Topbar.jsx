@@ -7,18 +7,17 @@ import UserMenu from "./UserMenu";
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 
-const session = await getServerSession(authOptions);
-let livePhoto = null;
-if (session?.user?.email) {
-  await dbConnect();
-  const emp = await Employee.findOne({ email: session.user.email })
-    .select("photoUrl")
-    .lean();
-  livePhoto = emp?.photoUrl || null;
-}
-
 export default async function Topbar() {
   const session = await getServerSession(authOptions);
+
+  let livePhoto = null;
+  if (session?.user?.email) {
+    await dbConnect();
+    const emp = await Employee.findOne({ email: session.user.email })
+      .select("photoUrl")
+      .lean();
+    livePhoto = emp?.photoUrl || null;
+  }
 
   return (
     <>

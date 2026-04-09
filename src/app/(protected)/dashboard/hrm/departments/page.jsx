@@ -66,8 +66,8 @@ export default async function DepartmentsPage() {
     <div className="px-6 py-6 container mx-auto space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Departments</h1>
-          <p className="text-slate-400 text-sm">ข้อมูลแผนกจากฐานข้อมูล</p>
+          <h1 className="text-2xl font-semibold" style={{ color: "#0D1B2A" }}>Departments</h1>
+          <p className="text-sm" style={{ color: "#808A95" }}>ข้อมูลแผนกจากฐานข้อมูล</p>
         </div>
 
         {canEdit && (

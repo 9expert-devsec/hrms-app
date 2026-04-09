@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /d/workspace/projects/9exp-hrms/src/lib/auth*)",
+      "Bash(grep -E \"\\\\.\\(js|ts\\)$\")"
+    ]
+  }
+}

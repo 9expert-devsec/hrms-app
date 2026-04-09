@@ -4,6 +4,26 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
 
+/* ── design tokens ─────────────────────────────────── */
+const NAVY = "#0D1B2A";
+const BLUE = "#005CFF";
+const SLATE = "#808A95";
+const ICE = "#F8FAFD";
+
+const INPUT_CLS =
+  "mt-1 w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:ring-2 focus:ring-[#005CFF]/30";
+const INPUT_STYLE = {
+  background: "#FFFFFF",
+  border: "1px solid rgba(0,92,255,0.15)",
+  color: NAVY,
+};
+const SECTION = {
+  background: "#FFFFFF",
+  border: "1px solid rgba(0,92,255,0.10)",
+  borderRadius: "16px",
+  boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
+};
+
 export default function DepartmentEditForm({ initial, employeeCount, eligibleHeads = [] }) {
   const router = useRouter();
 
@@ -14,9 +34,13 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
   const [empIdPrefix, setEmpIdPrefix] = useState(initial?.empIdPrefix || "");
   const [description, setDescription] = useState(initial?.description || "");
   const [levels, setLevels] = useState(initial?.allowedLevels || initial?.allowLevels || []);
-  const [positions, setPositions] = useState(initial?.positions || []);
+  const [positions, setPositions] = useState(() =>
+    (initial?.positions || []).map((p) => ({
+      ...p,
+      _key: p._id || `init-${Math.random().toString(36).slice(2, 9)}`,
+    }))
+  );
 
-  // 🆕 หัวหน้าแผนก
   const [headId, setHeadId] = useState(
     initial?.headOfDepartment?._id || initial?.headOfDepartment || ""
   );
@@ -30,7 +54,9 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
   function toggleLevel(lv) {
     setLevels((s) => (s.includes(lv) ? s.filter((x) => x !== lv) : [...s, lv]));
   }
-  function addPosition() { setPositions((s) => [...s, { name: "", level: 1 }]); }
+  function addPosition() {
+    setPositions((s) => [...s, { name: "", level: 1, _key: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }]);
+  }
   function updatePos(i, key, val) { setPositions((s) => s.map((p, idx) => (idx === i ? { ...p, [key]: val } : p))); }
   function removePos(i) { setPositions((s) => s.filter((_, idx) => idx !== i)); }
 
@@ -47,11 +73,10 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
           empIdPrefix: String(empIdPrefix || "").trim(),
           description,
           allowedLevels: [...levels].sort((a, b) => a - b),
-          positions: positions.map((p) => ({
-            name: String(p.name || "").trim(),
-            level: Number(p.level) || 1,
+          positions: positions.map(({ name: n, level: l }) => ({
+            name: String(n || "").trim(),
+            level: Number(l) || 1,
           })),
-          // 🆕 ส่งค่าไปบันทึก
           headOfDepartment: headId || null,
         }),
       });
@@ -86,25 +111,26 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
       {/* header */}
       <div className="flex items-center justify-between">
         {typeof employeeCount === "number" && (
-          <span className="text-sm text-slate-400">
-            Employees in this department: <b className="text-slate-200">{employeeCount}</b>
+          <span className="text-sm" style={{ color: SLATE }}>
+            Employees in this department: <b style={{ color: NAVY }}>{employeeCount}</b>
           </span>
         )}
       </div>
 
       {/* Basic info */}
-      <section className="rounded-2xl bg-white/5 ring-1 ring-white/10 p-5 space-y-4">
+      <section style={SECTION} className="p-5 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <Field label="Name" value={name} onChange={setName} />
           <Field label="Code" value={code} onChange={(v) => setCode(v.toUpperCase())} />
 
-        {/* 🆕 Head of Department */}
+          {/* Head of Department */}
           <div className="md:col-span-2">
             <Label>เลือกหัวหน้าแผนก (เฉพาะ L5–L6)</Label>
             <select
               value={headId}
               onChange={(e) => setHeadId(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
+              className={INPUT_CLS}
+              style={INPUT_STYLE}
             >
               <option value="">— ไม่กำหนด —</option>
               {eligibleHeads.map((u) => (
@@ -122,7 +148,8 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="mt-1 h-11 w-full rounded-xl bg-white/5 ring-1 ring-white/10"
+              className="mt-1 h-11 w-full rounded-xl cursor-pointer"
+              style={{ ...INPUT_STYLE, padding: 4 }}
             />
           </div>
 
@@ -134,26 +161,28 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+              className={INPUT_CLS}
+              style={{ ...INPUT_STYLE, resize: "vertical" }}
             />
           </div>
         </div>
       </section>
 
       {/* Levels */}
-      <section className="rounded-2xl bg-white/5 ring-1 ring-white/10 p-5">
-        <h3 className="text-slate-200 font-medium mb-3">Allowed Levels</h3>
+      <section style={SECTION} className="p-5">
+        <h3 className="font-medium mb-3" style={{ color: NAVY }}>Allowed Levels</h3>
         <div className="flex flex-wrap gap-2">
           {[1, 2, 3, 4, 5, 6].map((lv) => (
             <button
               key={lv}
               type="button"
               onClick={() => toggleLevel(lv)}
-              className={`rounded-xl px-3 py-1.5 ring-1 ${
+              className="rounded-xl px-3.5 py-1.5 text-sm font-semibold transition-all duration-150"
+              style={
                 levels.includes(lv)
-                  ? "bg-indigo-600/90 ring-white/10 text-white"
-                  : "bg-white/5 ring-white/10 text-slate-200"
-              }`}
+                  ? { background: BLUE, color: "#FFFFFF" }
+                  : { background: ICE, color: NAVY, border: "1px solid rgba(0,92,255,0.12)" }
+              }
               title={`Level ${lv}`}
             >
               {lv}
@@ -163,13 +192,14 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
       </section>
 
       {/* Positions */}
-      <section className="rounded-2xl bg-white/5 ring-1 ring-white/10 p-5">
+      <section style={SECTION} className="p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-slate-200 font-medium">Positions</h3>
+          <h3 className="font-medium" style={{ color: NAVY }}>Positions</h3>
           <button
             type="button"
             onClick={addPosition}
-            className="inline-flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 px-3 py-2 text-slate-200 ring-1 ring-white/10"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors duration-150"
+            style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
           >
             <Plus size={16} /> Add
           </button>
@@ -177,7 +207,11 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
 
         <ul className="space-y-3">
           {positions.map((p, i) => (
-            <li key={`${i}-${p.name}-${p.level}`} className="grid grid-cols-12 gap-2 rounded-xl bg-[#0f172b] ring-1 ring-white/10 p-3">
+            <li
+              key={p._key}
+              className="grid grid-cols-12 gap-2 rounded-xl p-3"
+              style={{ background: ICE, border: "1px solid rgba(0,92,255,0.08)" }}
+            >
               <div className="col-span-7">
                 <Field label="Position name" value={p.name} onChange={(v) => updatePos(i, "name", v)} />
               </div>
@@ -186,7 +220,8 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
                 <select
                   value={p.level}
                   onChange={(e) => updatePos(i, "level", Number(e.target.value))}
-                  className="mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
+                  className={INPUT_CLS}
+                  style={INPUT_STYLE}
                 >
                   {[1, 2, 3, 4, 5, 6].map((lv) => (
                     <option key={lv} value={lv}>{lv}</option>
@@ -197,14 +232,15 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
                 <button
                   type="button"
                   onClick={() => removePos(i)}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 px-3 py-2.5 text-red-200 ring-1 ring-red-500/30"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors duration-150"
+                  style={{ background: "rgba(239,68,68,0.08)", color: "#DC2626", border: "1px solid rgba(239,68,68,0.15)" }}
                 >
                   <Trash2 size={16} /> Remove
                 </button>
               </div>
             </li>
           ))}
-          {positions.length === 0 && <li className="text-sm text-slate-400">ยังไม่มีตำแหน่ง</li>}
+          {positions.length === 0 && <li className="text-sm" style={{ color: SLATE }}>ยังไม่มีตำแหน่ง</li>}
         </ul>
       </section>
 
@@ -214,7 +250,8 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
           type="button"
           onClick={() => setConfirmDelete(true)}
           disabled={saving || deleting}
-          className="inline-flex items-center gap-2 rounded-xl bg-red-600/80 hover:bg-red-600 px-4 py-2.5 text-white ring-1 ring-red-400/40 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors duration-150 disabled:opacity-60"
+          style={{ background: "rgba(239,68,68,0.08)", color: "#DC2626", border: "1px solid rgba(239,68,68,0.15)" }}
         >
           {deleting && <Loader2 className="size-4 animate-spin" />} ลบ Department
         </button>
@@ -223,7 +260,8 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
           type="button"
           onClick={() => setConfirmSave(true)}
           disabled={saving || deleting}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 px-4 py-2.5 text-white ring-1 ring-white/10 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60"
+          style={{ background: BLUE, color: "#FFFFFF" }}
         >
           {saving && <Loader2 className="size-4 animate-spin" />} บันทึกการเปลี่ยนแปลง
         </button>
@@ -253,7 +291,7 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
 }
 
 function Label({ children }) {
-  return <label className="text-sm text-slate-300">{children}</label>;
+  return <label className="text-sm font-semibold" style={{ color: NAVY }}>{children}</label>;
 }
 function Field({ label, value, onChange, type = "text" }) {
   return (
@@ -263,7 +301,8 @@ function Field({ label, value, onChange, type = "text" }) {
         type={type}
         value={value ?? ""}
         onChange={(e) => onChange?.(e.target.value)}
-        className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+        className={INPUT_CLS}
+        style={INPUT_STYLE}
       />
     </div>
   );
@@ -271,18 +310,45 @@ function Field({ label, value, onChange, type = "text" }) {
 function ConfirmModal({ open, title, message, confirmText = "ยืนยัน", working = false, onConfirm, onClose }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={() => !working && onClose?.()}>
-      <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-[#0F172B] ring-1 ring-white/10 p-5" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: "rgba(13,27,42,0.6)" }}
+      onClick={() => !working && onClose?.()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-full max-w-md rounded-2xl p-5"
+        style={{
+          background: "#FFFFFF",
+          boxShadow: "0 16px 48px rgba(13,27,42,0.2)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start gap-3">
-          <svg viewBox="0 0 24 24" className="mt-1 size-5 text-amber-400"><path fill="currentColor" d="M11 15h2v2h-2zm0-8h2v6h-2z"/></svg>
+          <AlertTriangle size={20} style={{ color: "#F59E0B", marginTop: 2, flexShrink: 0 }} />
           <div className="flex-1">
-            <h3 className="text-slate-100 font-medium">{title}</h3>
-            <p className="text-slate-400 text-sm mt-1">{message}</p>
+            <h3 className="font-semibold" style={{ color: NAVY }}>{title}</h3>
+            <p className="text-sm mt-1" style={{ color: SLATE }}>{message}</p>
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onClose?.()} disabled={working} className="rounded-xl bg-white/10 hover:bg-white/15 px-4 py-2.5 text-slate-200 ring-1 ring-white/10 disabled:opacity-60">ยกเลิก</button>
-          <button type="button" onClick={onConfirm} disabled={working} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 px-4 py-2.5 text-white ring-1 ring-white/10 disabled:opacity-60">
+          <button
+            type="button"
+            onClick={() => onClose?.()}
+            disabled={working}
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+            style={{ background: ICE, color: NAVY }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={working}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-60"
+            style={{ background: BLUE, color: "#FFFFFF" }}
+          >
             {working && <Loader2 className="size-4 animate-spin" />}{confirmText}
           </button>
         </div>

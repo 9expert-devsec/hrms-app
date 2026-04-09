@@ -4,6 +4,13 @@
 import Link from "next/link";
 import { Crown, Users } from "lucide-react";
 
+/* ── design tokens ─────────────────────────────────── */
+const NAVY = "#0D1B2A";
+const BLUE = "#005CFF";
+const LIME = "#D4F73F";
+const SLATE = "#808A95";
+const ICE = "#F8FAFD";
+
 /* ---------- small helpers ---------- */
 const avatar = (u) =>
   !u ? "/avatar-default.png" : u.startsWith("http") || u.startsWith("data:")
@@ -13,22 +20,34 @@ const avatar = (u) =>
 function PersonCard({ p, badge, highlight = false }) {
   if (!p) {
     return (
-      <div className="rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
-        <div className="text-sm text-slate-400">ยังไม่กำหนด</div>
+      <div
+        className="rounded-2xl p-4"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid rgba(0,92,255,0.10)",
+        }}
+      >
+        <div className="text-sm" style={{ color: SLATE }}>ยังไม่กำหนด</div>
       </div>
     );
   }
   return (
     <Link
       href={`/dashboard/hrm/employee-profile?id=${p._id}`}
-      className={`block rounded-2xl bg-white ring-1 ring-slate-200/60 shadow-sm hover:shadow-md transition-shadow ${
-        highlight ? " outline-indigo-500/70" : ""
-      }`}
+      className="block rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(0,92,255,0.10)",
+        boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
+        textDecoration: "none",
+      }}
       title="เปิดโปรไฟล์"
     >
       <div className="flex items-center gap-3 px-4 py-3">
-        <div className="relative w-10 h-10 rounded-full overflow-hidden ring-1 ring-slate-200 bg-slate-100 shrink-0">
-          {/* ใช้ <img> เพื่อความง่าย/ไม่ผูกกับ next/image */}
+        <div
+          className="relative w-10 h-10 rounded-full overflow-hidden shrink-0"
+          style={{ border: "2px solid rgba(0,92,255,0.10)", background: ICE }}
+        >
           <img
             src={avatar(p.photoUrl)}
             alt={p.name}
@@ -38,16 +57,19 @@ function PersonCard({ p, badge, highlight = false }) {
           />
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900 truncate">
+          <div className="text-sm font-semibold truncate" style={{ color: NAVY }}>
             {p.name}
           </div>
-          <div className="text-xs text-slate-500 truncate">
+          <div className="text-xs truncate" style={{ color: SLATE }}>
             {p.position || "-"} {p.level ? `• L${p.level}` : ""}
           </div>
         </div>
         {badge && (
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 text-xs px-2 py-0.5">
-            <Crown size={14} />
+          <span
+            className="ml-auto inline-flex items-center gap-1 rounded-full text-xs px-2.5 py-0.5 font-semibold shrink-0"
+            style={{ background: LIME, color: NAVY }}
+          >
+            <Crown size={13} />
             {badge}
           </span>
         )}
@@ -64,9 +86,19 @@ export default function MyTeamClient({ data }) {
     <div className="space-y-8">
       {/* viewer */}
       {viewer && (
-        <section className="rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
+        <section
+          className="rounded-2xl p-4"
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid rgba(0,92,255,0.10)",
+            boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden ring-1 ring-white/20 bg-slate-800">
+            <div
+              className="relative w-12 h-12 rounded-full overflow-hidden shrink-0"
+              style={{ border: "2px solid rgba(0,92,255,0.12)", background: ICE }}
+            >
               <img
                 src={avatar(viewer.photoUrl)}
                 alt={viewer.name}
@@ -76,8 +108,8 @@ export default function MyTeamClient({ data }) {
               />
             </div>
             <div className="min-w-0">
-              <div className="text-slate-100 font-semibold">{viewer.name}</div>
-              <div className="text-slate-400 text-sm">
+              <div className="font-semibold" style={{ color: NAVY }}>{viewer.name}</div>
+              <div className="text-sm" style={{ color: SLATE }}>
                 {viewer.position || "-"} {viewer.level ? `• L${viewer.level}` : ""}
               </div>
             </div>
@@ -92,22 +124,28 @@ export default function MyTeamClient({ data }) {
         return (
           <section
             key={d._id}
-            className="rounded-2xl ring-1 ring-white/10 overflow-hidden bg-[#0f172b]"
+            className="rounded-2xl overflow-hidden"
+            style={{
+              border: "1px solid rgba(0,92,255,0.10)",
+              boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
+            }}
           >
-            {/* dept header */}
+            {/* dept header — 9Expert Blue banner */}
             <div
               className="px-5 py-4"
               style={{
-                background: d.color || "#334155",
-                boxShadow: `inset 0 -1px 0 rgba(0,0,0,.15)`,
+                background: BLUE,
               }}
             >
               <div className="flex items-center justify-between">
-                <div className="text-white font-semibold">
+                <div className="font-semibold" style={{ color: "#FFFFFF" }}>
                   {d.name}
-                  <span className="opacity-80 font-normal"> • {d.code}</span>
+                  <span style={{ opacity: 0.7, fontWeight: 400 }}> • {d.code}</span>
                 </div>
-                <div className="text-amber-50/90 text-xs inline-flex items-center gap-1">
+                <div
+                  className="text-xs inline-flex items-center gap-1"
+                  style={{ color: "rgba(255,255,255,0.85)" }}
+                >
                   <Users size={14} />
                   {members.length + (d.head ? 1 : 0)} คน
                 </div>
@@ -115,10 +153,16 @@ export default function MyTeamClient({ data }) {
             </div>
 
             {/* head & members */}
-            <div className="p-5 space-y-5">
+            <div
+              className="p-5 space-y-5"
+              style={{ background: NAVY }}
+            >
               <div>
-                <div className="text-slate-300 text-sm mb-2 flex items-center gap-2">
-                  <Crown size={16} className="text-amber-400" />
+                <div
+                  className="text-sm mb-2 flex items-center gap-2"
+                  style={{ color: "rgba(255,255,255,0.6)" }}
+                >
+                  <Crown size={16} style={{ color: LIME }} />
                   Head of Department
                 </div>
                 <PersonCard
@@ -129,9 +173,16 @@ export default function MyTeamClient({ data }) {
               </div>
 
               <div>
-                <div className="text-slate-300 text-sm mb-2">Members</div>
+                <div
+                  className="text-sm mb-2"
+                  style={{ color: "rgba(255,255,255,0.6)" }}
+                >
+                  Members
+                </div>
                 {members.length === 0 ? (
-                  <div className="text-sm text-slate-400">ยังไม่มีสมาชิก</div>
+                  <div className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>
+                    ยังไม่มีสมาชิก
+                  </div>
                 ) : (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {members.map((m) => (

@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
@@ -441,17 +442,21 @@ export default function Sidebar() {
           >
             <div
               style={{
-                height: "34px",
-                width: "34px",
-                borderRadius: "10px",
-                background: BLUE,
-                display: "grid",
-                placeItems: "center",
+                width: collapsed ? "40px" : "34px",
+                height: collapsed ? "40px" : "34px",
                 flexShrink: 0,
-                boxShadow: "0 2px 10px rgba(0,92,255,0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <span style={{ color: "#FFF", fontWeight: 800, fontSize: "15px" }}>9</span>
+              <Image
+                src="/logo-9hrms.png"
+                alt="9Expert"
+                width={collapsed ? 40 : 34}
+                height={collapsed ? 40 : 34}
+                style={{ objectFit: "contain", width: "100%", height: "100%" }}
+              />
             </div>
             {!collapsed && (
               <div style={{ lineHeight: 1.2 }}>

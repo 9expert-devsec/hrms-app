@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import BankSelect from "@/components/BankSelect";
+import BankSelect from "./../../../../../../components/BankSelect";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
 const BANKS = [
@@ -128,14 +128,13 @@ export default function EmployeeEditForm({
     setSavingEmp(true);
     try {
       let photoUrl = employee.photoUrl || "";
+      let photoPublicId = employee.photoPublicId || "";
 
-      // ใน EmployeeEditForm.jsx (ฟังก์ชัน saveEmployee)
       if (photoFile) {
         const fd = new FormData();
         fd.append("file", photoFile);
         const up = await fetch("/api/upload", { method: "POST", body: fd });
 
-        // ✨ กัน response ไม่ใช่ JSON
         const uj = await up.json().catch(async () => {
           const txt = await up.text().catch(() => "");
           return { error: txt || "Upload failed" };
@@ -145,6 +144,7 @@ export default function EmployeeEditForm({
           throw new Error(uj?.error || "Upload failed");
         }
         photoUrl = uj.url;
+        photoPublicId = uj.public_id || "";
       }
 
       // map positionId -> position name + level
@@ -179,6 +179,7 @@ export default function EmployeeEditForm({
           bankBranch: bankBranch || "",
         },
         photoUrl,
+        photoPublicId,
       };
 
       const res = await fetch(`/api/employees/${employee._id}`, {

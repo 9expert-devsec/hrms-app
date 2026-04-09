@@ -34,7 +34,7 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
 
   if (!viewer) {
     return (
-      <div className="px-6 py-6 container mx-auto text-slate-200">
+      <div className="px-6 py-6 container mx-auto" style={{ color: "#808A95" }}>
         ไม่พบข้อมูลพนักงานของผู้ใช้ที่ล็อกอิน
       </div>
     );
@@ -64,7 +64,7 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
 
   if (deptIds.length === 0) {
     return (
-      <div className="px-6 py-6 container mx-auto text-slate-200">
+      <div className="px-6 py-6 container mx-auto" style={{ color: "#808A95" }}>
         คุณยังไม่ได้สังกัดแผนก และไม่ได้เป็นหัวหน้าแผนกใด
       </div>
     );
@@ -124,8 +124,8 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
 
   return (
     <div className="px-6 py-6 container mx-auto">
-      <h1 className="text-2xl font-semibold text-slate-100 mb-2">My Team</h1>
-      <p className="text-slate-400 mb-4">
+      <h1 className="text-2xl font-semibold mb-2" style={{ color: "#0D1B2A" }}>My Team</h1>
+      <p className="mb-4" style={{ color: "#808A95", fontSize: 14 }}>
         แสดงแผนกของคุณ และแผนกที่คุณเป็นหัวหน้า พร้อมสมาชิกทั้งหมด
       </p>
       <MyTeamClient data={JSON.parse(JSON.stringify(payload))} />
