@@ -1,89 +1,109 @@
 // src/lib/authOptions.js
 import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
+import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import Employee from "@/models/Employee";
 
 export const authOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
+  pages: { signIn: "/login" },
   providers: [
     CredentialsProvider({
+      id: "credentials",
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "text" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      authorize: async (credentials) => {
-        await dbConnect();
-        const user = await User.findOne({ email: credentials.email }).lean();
-        if (!user) return null;
-        const ok = await compare(credentials.password, user.passwordHash);
-        if (!ok) return null;
-        return {
-          _id: user._id.toString(),
-          email: user.email,
-          role: user.role || "employee",
-          employeeId: user.employeeId ? user.employeeId.toString() : null,
-        };
+      async authorize(credentials) {
+        try {
+          const { email, password } = credentials ?? {};
+          if (!email || !password) return null;
+
+          await dbConnect();
+
+          const user = await User.findOne({ email }).lean();
+          if (!user) return null;
+          if (user.status && user.status !== "active") return null;
+
+          const ok = await bcrypt.compare(password, user.passwordHash || "");
+          if (!ok) {
+            User.updateOne(
+              { _id: user._id },
+              { $inc: { failedLoginCount: 1 } }
+            ).exec();
+            return null;
+          }
+
+          // Update last login / reset failed count
+          User.updateOne(
+            { _id: user._id },
+            { $set: { lastLoginAt: new Date(), failedLoginCount: 0 } }
+          ).exec();
+
+          // Resolve employee record
+          let emp = null;
+          if (user.employeeId) {
+            emp = await Employee.findById(user.employeeId)
+              .select("firstName lastName nickName empAutoId department photoUrl")
+              .lean();
+          }
+          if (!emp) {
+            emp = await Employee.findOne({ email })
+              .select("firstName lastName nickName empAutoId department photoUrl")
+              .lean();
+          }
+
+          const displayName =
+            emp?.firstName || emp?.lastName
+              ? `${emp?.firstName ?? ""} ${emp?.lastName ?? ""}`.trim()
+              : user.name || email.split("@")[0];
+
+          return {
+            id: String(user._id),
+            name: displayName,
+            email: user.email,
+            role: user.role,
+            employeeId: emp?._id ? String(emp._id) : null,
+            empAutoId: emp?.empAutoId || null,
+            department: emp?.department || null,
+            image: emp?.photoUrl ?? null,
+            photoUrl: emp?.photoUrl ?? null,
+          };
+        } catch (err) {
+          console.error("authorize error:", err.message);
+          return null;
+        }
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      await dbConnect();
-
-      // ครั้งแรกหลัง authorize()
       if (user) {
-        token.uid = user._id;
-        token.id = user._id;
-        token.email = user.email;
-        token.role = user.role || "employee";
-        token.employeeId = user.employeeId || null;
+        token.uid = user.id;
+        token.role = user.role;
+        token.employeeId = user.employeeId ?? null;
+        token.empAutoId = user.empAutoId ?? null;
+        token.department = user.department ?? null;
+        token.name = user.name || token.name;
+        token.picture = user.image ?? null;
+        token.photoUrl = user.photoUrl ?? user.image ?? null;
       }
-
-      // ถ้าไม่มี employeeId → หาให้ด้วย userId ก่อน แล้วค่อย fallback email (ไม่สนตัวพิมพ์)
-      if (!token.employeeId) {
-        const empByUser = await Employee.findOne({ userId: token.uid })
-          .select("_id empAutoId department photoUrl")
-          .lean();
-
-        let emp = empByUser;
-        if (!emp && token.email) {
-          const safe = (token.email || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          emp = await Employee.findOne({ email: new RegExp(`^${safe}$`, "i") })
-            .select("_id empAutoId department photoUrl")
-            .lean();
-        }
-
-        if (emp?._id) {
-          token.employeeId = emp._id.toString();
-          token.empAutoId = emp.empAutoId ?? null;
-          token.department = emp.department ?? null;
-          token.photoUrl = emp.photoUrl ?? null;
-        }
-      } else {
-        const emp = await Employee.findById(token.employeeId)
-          .select("empAutoId department photoUrl")
-          .lean();
-        token.empAutoId = emp?.empAutoId ?? null;
-        token.department = emp?.department ?? null;
-        token.photoUrl = emp?.photoUrl ?? null;
-      }
-
       return token;
     },
-
     async session({ session, token }) {
-      session.user.id = token.uid || token.id || token.sub; // ⬅️ สำคัญ
+      session.user.id = token.uid || token.sub;
       session.user.email = token.email;
       session.user.role = token.role || "employee";
+      session.user.employeeId = token.employeeId ?? null;
       session.user.empAutoId = token.empAutoId ?? null;
       session.user.department = token.department ?? null;
+      session.user.name = token.name || session.user.name;
+      session.user.image = token.picture ?? null;
       session.user.photoUrl = token.photoUrl ?? null;
-      session.user.employeeId = token.employeeId ?? null;
       return session;
     },
   },
-  pages: { signIn: "/login" },
 };
