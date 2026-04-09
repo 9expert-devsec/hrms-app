@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -66,6 +66,20 @@ function fmtDateShort(d) {
 }
 
 export default function LeaveDocumentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ color: "#808A95", fontSize: "14px" }}>กำลังโหลดเอกสาร...</div>
+        </div>
+      }
+    >
+      <LeaveDocumentContent />
+    </Suspense>
+  );
+}
+
+function LeaveDocumentContent() {
   const searchParams = useSearchParams();
   const leaveId = searchParams.get("id");
 
