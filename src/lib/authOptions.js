@@ -4,6 +4,13 @@ import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import Employee from "@/models/Employee";
+import { getRoleByKey, getHeadOfDepartmentIds } from "@/lib/rbac/resolveRole";
+import { RBAC_VERSION } from "@/lib/rbac/version";
+
+// Permissions are resolved ONCE, at sign-in, and carried on the JWT (as in
+// genesis-lab). A role change, or becoming a department head, applies at the
+// user's next sign-in. The middleware reads these fields straight off the
+// token, so jwt() must copy every one of them.
 
 export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -56,6 +63,12 @@ export const authOptions = {
               .lean();
           }
 
+          const role = await getRoleByKey(user.role);
+          const headOfDepartmentIds = await getHeadOfDepartmentIds({
+            userId: user._id,
+            employeeId: emp?._id,
+          });
+
           const displayName =
             emp?.firstName || emp?.lastName
               ? `${emp?.firstName ?? ""} ${emp?.lastName ?? ""}`.trim()
@@ -66,6 +79,13 @@ export const authOptions = {
             name: displayName,
             email: user.email,
             role: user.role,
+            roleKey: user.role,
+            roleName: role.name,
+            roleColor: role.color,
+            isSuperadmin: role.isSuperadmin,
+            // null = superadmin (allow all); never ship the full key list.
+            pages: role.isSuperadmin ? null : role.pages,
+            headOfDepartmentIds,
             employeeId: emp?._id ? String(emp._id) : null,
             empAutoId: emp?.empAutoId || null,
             department: emp?.department || null,
@@ -84,6 +104,13 @@ export const authOptions = {
       if (user) {
         token.uid = user.id;
         token.role = user.role;
+        token.rbac = RBAC_VERSION;
+        token.roleKey = user.roleKey;
+        token.roleName = user.roleName ?? null;
+        token.roleColor = user.roleColor ?? null;
+        token.isSuperadmin = user.isSuperadmin === true;
+        token.pages = user.pages ?? null;
+        token.headOfDepartmentIds = user.headOfDepartmentIds ?? [];
         token.employeeId = user.employeeId ?? null;
         token.empAutoId = user.empAutoId ?? null;
         token.department = user.department ?? null;
@@ -97,6 +124,13 @@ export const authOptions = {
       session.user.id = token.uid || token.sub;
       session.user.email = token.email;
       session.user.role = token.role || "employee";
+      session.user.rbac = token.rbac ?? null;
+      session.user.roleKey = token.roleKey ?? token.role ?? null;
+      session.user.roleName = token.roleName ?? null;
+      session.user.roleColor = token.roleColor ?? null;
+      session.user.isSuperadmin = token.isSuperadmin === true;
+      session.user.pages = token.pages ?? null;
+      session.user.headOfDepartmentIds = token.headOfDepartmentIds ?? [];
       session.user.employeeId = token.employeeId ?? null;
       session.user.empAutoId = token.empAutoId ?? null;
       session.user.department = token.department ?? null;

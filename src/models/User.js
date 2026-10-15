@@ -6,11 +6,12 @@ const UserSchema = new Schema(
     name: String,
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    role: {
-      type: String,
-      enum: ["superadmin","hr","it","payroll","manager","employee"],
-      default: "employee",
-    },
+    // Role key (see src/lib/rbac). No enum: roles are data now; the round-8
+    // editor validates keys against the roles collection.
+    role: { type: String, default: "employee", trim: true, lowercase: true },
+    // Linked Employee. Already written by POST /api/employees; it was being
+    // stripped because the schema lacked it.
+    employeeId: { type: Schema.Types.ObjectId, ref: "Employee" },
     status: { type: String, enum: ["active","suspended"], default: "active" },
     lastLoginAt: Date,
     failedLoginCount: { type: Number, default: 0 },
