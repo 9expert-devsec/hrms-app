@@ -6,7 +6,6 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { Eye, EyeOff, LogIn, Mail, Lock } from "lucide-react";
-import LoginGreeting from "./LoginGreeting";
 
 // Only same-origin paths. "//host" and "/\host" are protocol-relative in
 // browsers, so both would be open redirects.
@@ -109,10 +108,6 @@ export default function LoginClient() {
               <br />
               <span className="text-9e-lime">Management System</span>
             </h1>
-
-            <div className="mt-6">
-              <LoginGreeting />
-            </div>
           </div>
           <div className="grow-[4]" />
 
