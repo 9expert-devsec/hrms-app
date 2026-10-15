@@ -334,3 +334,69 @@ section[class*="rounded-2xl"] h3 {
   box-shadow: 0 0 0 3px rgba(36,134,255,0.12) !important;
   outline: none;
 }
+
+/* ── Login: aurora panel (original CSS, no JS) ────────────────────
+   Two stacked repeating gradients — a navy "stripe" layer and a CI colour
+   band — blurred; the ::after copy is difference-blended and drifts slowly.
+   Lime is a thin band on purpose: it is the 10% accent. */
+.hr-aurora {
+  --hr-aurora-stripe: repeating-linear-gradient(100deg, var(--9e-navy) 0%, var(--9e-navy) 7%, transparent 10%, transparent 12%, var(--9e-navy) 16%);
+  --hr-aurora-colour: repeating-linear-gradient(100deg, var(--9e-action) 10%, var(--9e-brand) 15%, var(--9e-air) 20%, var(--9e-brand) 25%, var(--9e-lime) 28%, var(--9e-action) 31%);
+  position: absolute;
+  inset: -10px;
+  pointer-events: none;
+  background-image: var(--hr-aurora-stripe), var(--hr-aurora-colour);
+  background-size: 300% 200%;
+  background-position: 50% 50%;
+  filter: blur(10px);
+  opacity: 0.55;
+  mask-image: radial-gradient(ellipse at 100% 0%, black 10%, transparent 70%);
+}
+.hr-aurora::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--hr-aurora-stripe), var(--hr-aurora-colour);
+  background-size: 200% 100%;
+  background-attachment: fixed;
+  mix-blend-mode: difference;
+  animation: hr-aurora 60s linear infinite;
+  will-change: background-position;
+}
+@keyframes hr-aurora {
+  from { background-position: 50% 50%, 50% 50%; }
+  to   { background-position: 350% 50%, 350% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hr-aurora::after { animation: none; }
+}
+
+/* Keeps white / lime text readable wherever a bright band drifts by */
+.hr-aurora-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(13,27,42,0.85) 0%, rgba(13,27,42,0.55) 45%, rgba(13,27,42,0) 75%);
+}
+
+/* ── Login: form panel surface ─────────────────────────────────── */
+.hr-login-surface {
+  background-color: var(--9e-ice);
+  background-image:
+    radial-gradient(ellipse 60% 50% at 0% 100%, color-mix(in srgb, var(--9e-air) 12%, transparent), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 100% 0%, color-mix(in srgb, var(--9e-brand) 8%, transparent), transparent 70%);
+}
+/* Thin diagonal hairlines in the bottom-right corner — a quiet echo of the aurora */
+.hr-login-hairlines {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  height: 260px;
+  pointer-events: none;
+  background-image:
+    linear-gradient(120deg, transparent calc(55% - 1px), color-mix(in srgb, var(--9e-lime) 70%, transparent) 55%, transparent calc(55% + 1px)),
+    linear-gradient(120deg, transparent calc(68% - 1px), color-mix(in srgb, var(--9e-air) 35%, transparent) 68%, transparent calc(68% + 1px)),
+    linear-gradient(120deg, transparent calc(80% - 1px), color-mix(in srgb, var(--9e-air) 22%, transparent) 80%, transparent calc(80% + 1px));
+  mask-image: radial-gradient(ellipse at 100% 100%, black 20%, transparent 75%);
+}
