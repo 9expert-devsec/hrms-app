@@ -52,3 +52,8 @@ export async function requireAnyPageApi(pageKeys = []) {
 export function requirePageApi(pageKey) {
   return requireAnyPageApi([pageKey]);
 }
+
+/** Route-handler guard for superadmin-only endpoints (no registry key). */
+export function requireSuperadminApi() {
+  return requireAnyPageApi([null]);
+}

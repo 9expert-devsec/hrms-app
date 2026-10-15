@@ -2,11 +2,17 @@ import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import Employee from "@/models/Employee";
 import bcrypt from "bcryptjs";
+import { requireSuperadminApi } from "@/lib/rbac/guard";
 
 export const runtime = "nodejs";
 
+// Creates a login with any role, so it is superadmin-only — the same as its
+// only caller, /dashboard/admin/register. It used to have no auth check.
 export async function POST(req) {
   try {
+    const gate = await requireSuperadminApi();
+    if (gate.res) return gate.res;
+
     const { name, email, password, role = "employee" } = await req.json();
     if (!email || !password) {
       return Response.json({ error: "email/password required" }, { status: 400 });
