@@ -1,19 +1,20 @@
 // src/app/api/leave/[id]/approve/route.js
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePageApi } from "@/lib/rbac/guard";
+import { canActOnHodStep, canActOnHrStep } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
 import LeaveBalance from "@/models/LeaveBalance";
 
 export async function POST(req, { params }) {
   try {
-    await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    // leave_approve resolves through canOpenPage → canOpenLeaveApproval.
+    const gate = await requirePageApi("leave_approve");
+    if (gate.res) return gate.res;
+    const { session } = gate;
 
-    const role = session.user.role || "employee";
+    await dbConnect();
     const approverId = session.user.id || session.user._id || session.user.sub;
 
     const { id } = await params;
@@ -31,9 +32,10 @@ export async function POST(req, { params }) {
       return NextResponse.json({ ok: false, message: "action ต้องเป็น approve หรือ reject" }, { status: 400 });
     }
 
-    // CASE A — HOD/Manager approval (Step 1): pending → hod_approved or rejected
+    // CASE A — HOD step: pending → hod_approved or rejected. The head of the
+    // employee's department, scope_leave_all_depts, or superadmin.
     if (leave.status === "pending") {
-      if (!["hod", "manager"].includes(role)) {
+      if (!(await canActOnHodStep(session.user, leave.employeeId))) {
         return NextResponse.json({ ok: false, message: "ขั้นตอนนี้ต้องอนุมัติโดยหัวหน้าแผนก" }, { status: 403 });
       }
 
@@ -51,9 +53,10 @@ export async function POST(req, { params }) {
         leave.rejectedAt = new Date();
       }
 
-    // CASE B — HR/Superadmin approval (Step 2): hod_approved → approved or rejected
+    // CASE B — HR step: hod_approved → approved or rejected.
+    // scope_leave_hr_step (or superadmin).
     } else if (leave.status === "hod_approved") {
-      if (!["hr", "superadmin"].includes(role)) {
+      if (!canActOnHrStep(session.user)) {
         return NextResponse.json({ ok: false, message: "ขั้นตอนนี้ต้องอนุมัติโดย HR" }, { status: 403 });
       }
 

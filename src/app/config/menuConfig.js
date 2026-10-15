@@ -1,77 +1,47 @@
 // src/app/config/menuConfig.js
+//
+// Every link carries the `pageKey` of src/lib/rbac/pages.js; the sidebar shows
+// it when canOpenPage(session.user, pageKey) is true. Groups left with no
+// visible children are hidden.
+//
+// Links whose page does not exist yet were removed (RBAC round 5). Restore
+// each one, with a new registry key, when its page is built:
+//   /dashboard/assets/my-devices        /dashboard/attendance/me
+//   /dashboard/payroll/mypayslip        /dashboard/hr/recruit-onboard
+//   /dashboard/hr/offboard              /dashboard/hr/policy
+//   /dashboard/hr/reports               /dashboard/payroll/calc
+//   /dashboard/payroll/slips            /dashboard/payroll/bonus
+//   /dashboard/payroll/benefits         /dashboard/performance/kpi
+//   /dashboard/performance/forms        /dashboard/performance/feedback360
+//   /dashboard/performance/promotion    /dashboard/assets
+//   /dashboard/assets/borrow            /dashboard/assets/maintenance
+//   /dashboard/assets/audit             /dashboard/assets/reports
+//   /dashboard/exit/interview           /dashboard/exit/checklist
+//   /dashboard/exit/archive             /dashboard/settings/users
+//   /dashboard/settings/workflows       /dashboard/settings/integrations
+//   /dashboard/settings/policy-audit
 import {
   LayoutDashboard,
   UserCircle2,
-  Laptop,
   CalendarCheck2,
   Clock4,
-  FileSpreadsheet,
   Users,
   Network,
-  BriefcaseBusiness,
-  LogOut,
   ShieldCheck,
-  BarChart3,
   ClipboardList,
-  ClipboardCheck,
   CalendarDays,
-  Upload,
-  Wallet,
-  BadgeDollarSign,
-  HeartPulse,
-  LineChart,
-  ListChecks,
-  MessageSquareMore,
-  ArrowBigUpDash,
-  GraduationCap,
-  BookmarkCheck,
-  Dumbbell,
-  Target,
-  ClipboardSignature,
-  ScanSearch,
-  Wrench,
-  PackageSearch,
-  Boxes,
-  Settings,
   UserCog,
   Building2,
-  GitBranch,
-  Cable,
-  FileLock2,
-  Home,
-  FolderTree,
   FileText,
-  Calendar,
-  Mail,
-  CalendarClock,
-  CalendarPlus,
+  CalendarRange,
   FilePlus,
   CheckSquare,
-  CalendarRange,
   Timer,
   Clock,
   AlarmClock,
   BarChart2,
   CalendarOff,
 } from "lucide-react";
-
-/** ปรับชื่อ role ตรงนี้ให้ตรงกับระบบของคุณ */
-export const ROLES = {
-  EMPLOYEE: "employee",
-  MANAGER: "manager",
-  HR: "hr",
-  PAYROLL: "payroll",
-  ADMIN: "superadmin", // ในโปรเจกต์คุณใช้ superadmin
-  EXEC: "executive",
-  IT: "it",
-};
-
-const ALL = Object.values(ROLES);
-const HR_ADMIN = [ROLES.HR, ROLES.ADMIN];
-const ADMIN_ONLY = [ROLES.ADMIN];
-const HR_ADMIN_PAYROLL = [ROLES.HR, ROLES.ADMIN, ROLES.PAYROLL];
-const MGMT_ROLES = [ROLES.MANAGER, ROLES.EXEC, ROLES.HR, ROLES.ADMIN];
-const IT_ADMIN = [ROLES.IT , ROLES.ADMIN , ROLES.HR, ROLES.PAYROLL];
 
 export const menuConfig = [
   {
@@ -85,6 +55,7 @@ export const menuConfig = [
         label: "Dashboards",
         href: "/dashboard",
         icon: LayoutDashboard,
+        pageKey: "dashboard",
       },
 
       {
@@ -92,56 +63,30 @@ export const menuConfig = [
         type: "group",
         label: "พนักงาน (Employee)",
         icon: Users,
-        roles: ALL,
         children: [
           {
             key: "emp-profile",
             type: "link",
             icon: UserCircle2,
-            roles: ALL,
             label: "โปรไฟล์ของฉัน",
             href: "/dashboard/hrm/employee-profile",
+            pageKey: "self_profile",
           },
           {
             key: "emp-my-team",
             type: "link",
             icon: Users,
-            roles: ALL,
             label: "ทีมของฉัน",
             href: "/dashboard/hrm/employee-my-team",
-          },
-          {
-            key: "emp.asset.mine",
-            type: "link",
-            icon: Laptop,
-            roles: ALL,
-            label: "อุปกรณ์ของฉัน",
-            href: "/dashboard/assets/my-devices",
+            pageKey: "self_team",
           },
           // {
           //   key: "emp.leave.request",
           //   type: "link",
           //   icon: CalendarCheck2,
-          //   roles: ALL,
           //   label: "ขอ/ตรวจสอบการลา",
           //   href: "/dashboard/leave/request",
           // },
-          {
-            key: "emp.attendance",
-            type: "link",
-            icon: Clock4,
-            roles: ALL,
-            label: "ดูเวลาทำงาน (Attendance)",
-            href: "/dashboard/attendance/me",
-          },
-          {
-            key: "emp.payslip",
-            type: "link",
-            icon: FileSpreadsheet,
-            roles: ALL,
-            label: "สลิปเงินเดือน",
-            href: "/dashboard/payroll/mypayslip",
-          },
         ],
       },
       {
@@ -149,55 +94,22 @@ export const menuConfig = [
         type: "group",
         label: "HR / Admin",
         icon: ShieldCheck,
-        roles: HR_ADMIN,
         children: [
           {
             key: "hr.employee.list",
             type: "link",
             icon: Users,
-            roles: HR_ADMIN,
             label: "ข้อมูลพนักงาน",
             href: "/dashboard/hrm/employee",
+            pageKey: "employees",
           },
           {
             key: "hr.orgchart",
             type: "link",
             icon: Network,
-            roles: HR_ADMIN,
             label: "โครงสร้างองค์กร (Org Chart)",
             href: "/dashboard/hrm/orgchart",
-          },
-          {
-            key: "hr.recruit",
-            type: "link",
-            icon: BriefcaseBusiness,
-            roles: HR_ADMIN,
-            label: "การสรรหา & Onboarding",
-            href: "/dashboard/hr/recruit-onboard",
-          },
-          {
-            key: "hr.offboard",
-            type: "link",
-            icon: LogOut,
-            roles: HR_ADMIN,
-            label: "การลาออก & Offboarding",
-            href: "/dashboard/hr/offboard",
-          },
-          {
-            key: "hr.policy",
-            type: "link",
-            icon: ShieldCheck,
-            roles: HR_ADMIN,
-            label: "การตั้งค่า HR Policy",
-            href: "/dashboard/hr/policy",
-          },
-          {
-            key: "hr.reports",
-            type: "link",
-            icon: BarChart3,
-            roles: HR_ADMIN,
-            label: "รายงานองค์กร",
-            href: "/dashboard/hr/reports",
+            pageKey: "orgchart",
           },
         ],
       },
@@ -206,71 +118,70 @@ export const menuConfig = [
         type: "group",
         label: "เวลา & การทำงาน",
         icon: Clock4,
-        roles: ALL,
         children: [
           {
             key: "time.clock",
             type: "link",
             icon: Timer,
-            roles: ALL,
             label: "บันทึกเวลา",
             href: "/dashboard/attendance/clock",
+            pageKey: "self_clock",
           },
           {
             key: "time.my-attendance",
             type: "link",
             icon: CalendarDays,
-            roles: ALL,
             label: "เวลาทำงานของฉัน",
             href: "/dashboard/attendance/my-attendance",
+            pageKey: "self_attendance",
           },
           {
             key: "time.ot",
             type: "link",
             icon: Clock,
-            roles: ALL,
             label: "แจ้ง OT",
             href: "/dashboard/attendance/ot",
+            pageKey: "self_ot",
           },
           {
             key: "time.ot-approve",
             type: "link",
             icon: CheckSquare,
-            roles: [ROLES.ADMIN, ROLES.HR, ROLES.MANAGER, "hod"],
             label: "อนุมัติ OT",
             href: "/dashboard/attendance/ot-approve",
+            pageKey: "ot_approve",
           },
           {
             key: "time.shifts",
             type: "link",
             icon: AlarmClock,
-            roles: HR_ADMIN,
             label: "รูปแบบเวลาทำงาน",
             href: "/dashboard/attendance/shifts",
+            pageKey: "shifts",
           },
           {
             key: "time.assign-shift",
             type: "link",
             icon: UserCog,
-            roles: HR_ADMIN,
             label: "กำหนดเวลาพนักงาน",
             href: "/dashboard/attendance/assign-shift",
+            pageKey: "shift_assign",
           },
           {
             key: "time.report",
             type: "link",
             icon: BarChart2,
-            roles: [ROLES.ADMIN, ROLES.HR, ROLES.MANAGER, "hod"],
             label: "รายงานเวลาทำงาน",
             href: "/dashboard/attendance/report",
+            pageKey: "attendance_report",
           },
           {
             key: "time.holidays",
             type: "link",
             icon: CalendarOff,
-            roles: HR_ADMIN,
             label: "วันหยุด",
             href: "/dashboard/attendance/holidays",
+            pageKey: "holidays",
           },
         ],
       },
@@ -279,219 +190,56 @@ export const menuConfig = [
         type: "group",
         label: "การลา",
         icon: CalendarCheck2,
-        roles: ALL,
         children: [
           {
             key: "leave.request",
             type: "link",
             icon: FilePlus,
-            roles: ALL,
             label: "ขอลา",
             href: "/dashboard/leave/request",
+            pageKey: "self_leave_request",
           },
           {
             key: "leave.history",
             type: "link",
             icon: ClipboardList,
-            roles: ALL,
             label: "ประวัติการลา",
             href: "/dashboard/leave/history",
+            pageKey: "self_leave_history",
           },
           {
             key: "leave.balance",
             type: "link",
             icon: CalendarDays,
-            roles: ALL,
             label: "วันลาคงเหลือ",
             href: "/dashboard/leave/balance",
+            pageKey: "self_leave_balance",
           },
           {
+            // Also shown to department heads: canOpenPage applies
+            // canOpenLeaveApproval to this key.
             key: "leave.approve",
             type: "link",
             icon: CheckSquare,
-            roles: [ROLES.ADMIN, ROLES.HR, ROLES.MANAGER, "hod"],
             label: "อนุมัติการลา",
             href: "/dashboard/leave/approve",
+            pageKey: "leave_approve",
           },
           {
             key: "leave.calendar",
             type: "link",
             icon: CalendarRange,
-            roles: ALL,
             label: "ปฏิทินการลา",
             href: "/dashboard/leave/calendar",
+            pageKey: "leave_calendar",
           },
           {
             key: "leave.document",
             type: "link",
             icon: FileText,
-            roles: ALL,
             label: "เอกสารการลา",
             href: "/dashboard/leave/document",
-          },
-        ],
-      },
-      {
-        key: "payroll",
-        type: "group",
-        label: "เงินเดือน & ค่าตอบแทน",
-        icon: Wallet,
-        roles: HR_ADMIN_PAYROLL,
-        children: [
-          {
-            key: "payroll.calc",
-            type: "link",
-            icon: Wallet,
-            roles: HR_ADMIN_PAYROLL,
-            label: "คำนวณเงินเดือน",
-            href: "/dashboard/payroll/calc",
-          },
-          {
-            key: "payroll.slip",
-            type: "link",
-            icon: FileSpreadsheet,
-            roles: HR_ADMIN_PAYROLL,
-            label: "Slip เงินเดือน",
-            href: "/dashboard/payroll/slips",
-          },
-          {
-            key: "payroll.bonus",
-            type: "link",
-            icon: BadgeDollarSign,
-            roles: HR_ADMIN_PAYROLL,
-            label: "โบนัส/เบี้ยเลี้ยง",
-            href: "/dashboard/payroll/bonus",
-          },
-          {
-            key: "payroll.benefit",
-            type: "link",
-            icon: HeartPulse,
-            roles: HR_ADMIN_PAYROLL,
-            label: "สวัสดิการ & ประกันสังคม",
-            href: "/dashboard/payroll/benefits",
-          },
-        ],
-      },
-      {
-        key: "perf",
-        type: "group",
-        label: "การประเมินผล",
-        icon: LineChart,
-        roles: MGMT_ROLES,
-        children: [
-          {
-            key: "perf.kpi",
-            type: "link",
-            icon: LineChart,
-            roles: MGMT_ROLES,
-            label: "KPI / OKR",
-            href: "/dashboard/performance/kpi",
-          },
-          {
-            key: "perf.form",
-            type: "link",
-            icon: ListChecks,
-            roles: MGMT_ROLES,
-            label: "แบบประเมินผล",
-            href: "/dashboard/performance/forms",
-          },
-          {
-            key: "perf.feedback",
-            type: "link",
-            icon: MessageSquareMore,
-            roles: MGMT_ROLES,
-            label: "Feedback & 360°",
-            href: "/dashboard/performance/feedback360",
-          },
-          {
-            key: "perf.promotion",
-            type: "link",
-            icon: ArrowBigUpDash,
-            roles: MGMT_ROLES,
-            label: "ประวัติเลื่อนตำแหน่ง",
-            href: "/dashboard/performance/promotion",
-          },
-        ],
-      },
-      {
-        key: "asset",
-        type: "group",
-        label: "สินทรัพย์ & อุปกรณ์",
-        icon: Boxes,
-        roles: IT_ADMIN,
-        children: [
-          {
-            key: "asset.list",
-            type: "link",
-            icon: Boxes,
-            roles: IT_ADMIN,
-            label: "รายการอุปกรณ์ทั้งหมด",
-            href: "/dashboard/assets",
-          },
-          {
-            key: "asset.borrow",
-            type: "link",
-            icon: ClipboardSignature,
-            roles: IT_ADMIN,
-            label: "เบิก-คืนอุปกรณ์",
-            href: "/dashboard/assets/borrow",
-          },
-          {
-            key: "asset.maintenance",
-            type: "link",
-            icon: Wrench,
-            roles: IT_ADMIN,
-            label: "แจ้งซ่อม/บำรุง",
-            href: "/dashboard/assets/maintenance",
-          },
-          {
-            key: "asset.audit",
-            type: "link",
-            icon: ScanSearch,
-            roles: IT_ADMIN,
-            label: "ตรวจนับ (Audit / Scan QR)",
-            href: "/dashboard/assets/audit",
-          },
-          {
-            key: "asset.report",
-            type: "link",
-            icon: PackageSearch,
-            roles: IT_ADMIN,
-            label: "รายงานอุปกรณ์",
-            href: "/dashboard/assets/reports",
-          },
-        ],
-      },
-      {
-        key: "exit",
-        type: "group",
-        label: "การลาออก (Exit)",
-        icon: MessageSquareMore,
-        roles: HR_ADMIN,
-        children: [
-          {
-            key: "exit.interview",
-            type: "link",
-            icon: MessageSquareMore,
-            roles: HR_ADMIN,
-            label: "Exit Interview",
-            href: "/dashboard/exit/interview",
-          },
-          {
-            key: "exit.checklist",
-            type: "link",
-            icon: ListChecks,
-            roles: HR_ADMIN,
-            label: "Checklist การคืนอุปกรณ์",
-            href: "/dashboard/exit/checklist",
-          },
-          {
-            key: "exit.archive",
-            type: "link",
-            icon: FileLock2,
-            roles: HR_ADMIN,
-            label: "เก็บข้อมูลพนักงานเก่า",
-            href: "/dashboard/exit/archive",
+            pageKey: "self_leave_document",
           },
         ],
       },
@@ -500,55 +248,22 @@ export const menuConfig = [
         type: "group",
         label: "การตั้งค่า (System Settings)",
         icon: UserCog,
-        roles: HR_ADMIN,
         children: [
-          {
-            key: "settings.rbac",
-            type: "link",
-            icon: UserCog,
-            roles: HR_ADMIN,
-            label: "ผู้ใช้ & สิทธิ์ (RBAC)",
-            href: "/dashboard/settings/users",
-          },
           {
             key: "settings.org",
             type: "link",
             icon: Building2,
-            roles: HR_ADMIN,
             label: "แผนก/ตำแหน่ง",
             href: "/dashboard/hrm/departments",
-          },
-          {
-            key: "settings.workflow",
-            type: "link",
-            icon: GitBranch,
-            roles: HR_ADMIN,
-            label: "Workflow อนุมัติ",
-            href: "/dashboard/settings/workflows",
-          },
-          {
-            key: "settings.integration",
-            type: "link",
-            icon: Cable,
-            roles: HR_ADMIN,
-            label: "Integration (Email/SSO/Scanner/…)",
-            href: "/dashboard/settings/integrations",
-          },
-          {
-            key: "settings.policylog",
-            type: "link",
-            icon: Settings,
-            roles: HR_ADMIN,
-            label: "Policy & Audit Log",
-            href: "/dashboard/settings/policy-audit",
+            pageKey: "departments",
           },
           {
             key: "settings.hod",
             type: "link",
             icon: UserCog,
-            roles: HR_ADMIN,
             label: "กำหนด HOD",
             href: "/dashboard/settings/department-head",
+            pageKey: "hod_settings",
           },
         ],
       },
@@ -557,3 +272,17 @@ export const menuConfig = [
     ],
   },
 ];
+
+/**
+ * The menu as `user` may see it: links filtered by `isAllowed(user, pageKey)`
+ * (pass canOpenPage), groups with no remaining children dropped.
+ */
+export function filterMenu(nodes, user, isAllowed) {
+  return nodes.flatMap((node) => {
+    if (node.type === "group") {
+      const children = filterMenu(node.children ?? [], user, isAllowed);
+      return children.length ? [{ ...node, children }] : [];
+    }
+    return isAllowed(user, node.pageKey) ? [node] : [];
+  });
+}

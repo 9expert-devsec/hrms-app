@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic";
 
 import dbConnect from "@/lib/mongoose";
-import { requireSessionPage } from "@/lib/authz";
+import { requirePage } from "@/lib/rbac/guard";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import MyTeamClient from "./MyTeamClient";
@@ -16,7 +16,7 @@ const fullName = (e) =>
   [e?.firstName, e?.lastName].filter(Boolean).join(" ") || e?.nickName || "-";
 
 export default async function EmployeeMyTeamPage({ searchParams }) {
-  const session = await requireSessionPage();
+  const session = await requirePage("self_team");
   await dbConnect();
 
   // Next.js รุ่นใหม่: searchParams เป็น Promise

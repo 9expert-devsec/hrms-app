@@ -4,11 +4,11 @@ export const dynamic = "force-dynamic";
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
-import { requireSessionPage } from "@/lib/authz";
+import { requirePage } from "@/lib/rbac/guard";
 import OrgFlowClient from "./OrgFlowClient";
 
 export default async function OrgChartPage() {
-  await requireSessionPage();
+  await requirePage("orgchart");
   await dbConnect();
 
   const deps = await Department.find({})

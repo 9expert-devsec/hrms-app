@@ -3,13 +3,16 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { RBAC_VERSION } from "@/lib/rbac/access";
 import LoginClient from "./LoginClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   const session = await getServerSession(authOptions);
-  if (session) redirect("/dashboard");
+  // A session from before RBAC must sign in again (the middleware sends it
+  // here); bouncing it to /dashboard would loop.
+  if (session?.user?.rbac === RBAC_VERSION) redirect("/dashboard");
 
   return (
     <Suspense

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import SignatureDisplay from "./../../../../../components/SignatureDisplay";
 import AttachmentViewer, { hasAttachments } from "./../../../../../components/AttachmentViewer";
+import { canAccess } from "@/lib/rbac/access";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -102,8 +103,8 @@ function DocumentList() {
   const [statusFilter, setStatusFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
 
-  const role = session?.user?.role || "employee";
-  const isAdmin = ["superadmin", "hr"].includes(role);
+  // Everyone's documents, not just one's own.
+  const isAdmin = canAccess(session?.user, "scope_leave_documents_all");
 
   async function load() {
     setLoading(true);

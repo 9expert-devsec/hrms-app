@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { canAccess } from "@/lib/rbac/access";
 import {
   CheckSquare,
   Loader2,
@@ -47,8 +48,6 @@ const STATUS_BADGE = {
   rejected: { bg: "#FEE2E2", color: "#991B1B", label: "ไม่อนุมัติ" },
 };
 
-const ALLOWED_ROLES = ["superadmin", "hr", "manager", "hod"];
-
 function fmtDate(d) {
   if (!d) return "-";
   return new Date(d).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
@@ -79,15 +78,16 @@ export default function OTApprovePage() {
   const [submitting, setSubmitting] = useState(false);
 
   /* ── auth guard ──────────────────────── */
-  const role = session?.user?.role || "employee";
+  // Registry check (src/lib/rbac); the middleware already enforces it.
+  const allowed = canAccess(session?.user, "ot_approve");
 
   useEffect(() => {
     if (authStatus === "loading") return;
     if (!session) { router.replace("/login"); return; }
-    if (!ALLOWED_ROLES.includes(role)) {
+    if (!allowed) {
       router.replace("/403");
     }
-  }, [session, authStatus, router, role]);
+  }, [session, authStatus, router, allowed]);
 
   /* ── fetch OT requests ───────────────── */
   const load = useCallback(async () => {
@@ -105,10 +105,10 @@ export default function OTApprovePage() {
   }, []);
 
   useEffect(() => {
-    if (authStatus === "authenticated" && ALLOWED_ROLES.includes(role)) {
+    if (authStatus === "authenticated" && allowed) {
       load();
     }
-  }, [authStatus, role, load]);
+  }, [authStatus, allowed, load]);
 
   /* ── filtered by tab ─────────────────── */
   const filtered = useMemo(() => {

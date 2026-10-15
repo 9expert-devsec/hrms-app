@@ -4,6 +4,11 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
+  canAccess,
+  canOpenLeaveApproval,
+  isAnyHead,
+} from "@/lib/rbac/access";
+import {
   ShieldCheck,
   Clock,
   CheckCircle2,
@@ -68,11 +73,13 @@ export default function LeaveApprovePage() {
   const [signature, setSignature] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  /* ── role-based config ─────────────────── */
-  const role = session?.user?.role || "employee";
-  // superadmin can act as both HOD and HR
-  const isHOD = ["hod", "manager", "superadmin"].includes(role);
-  const isHR  = ["hr", "superadmin"].includes(role);
+  /* ── permission-based config (src/lib/rbac) ── */
+  const user = session?.user;
+  const allowed = canOpenLeaveApproval(user);
+  // HOD step: departments the user heads, or every department with
+  // scope_leave_all_depts. HR step: scope_leave_hr_step. Superadmin: both.
+  const isHOD = isAnyHead(user) || canAccess(user, "scope_leave_all_depts");
+  const isHR  = canAccess(user, "scope_leave_hr_step");
 
   const TABS = useMemo(() => {
     const tabs = [];
@@ -98,10 +105,10 @@ export default function LeaveApprovePage() {
   useEffect(() => {
     if (authStatus === "loading") return;
     if (!session) { router.replace("/login"); return; }
-    if (!["superadmin", "hr", "manager", "hod"].includes(role)) {
+    if (!allowed) {
       router.replace("/403");
     }
-  }, [session, authStatus, router, role]);
+  }, [session, authStatus, router, allowed]);
 
   /* ── fetch data ────────────────────────── */
   async function load() {

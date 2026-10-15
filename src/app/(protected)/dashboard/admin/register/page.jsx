@@ -1,14 +1,8 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions"; // ต้องตั้ง alias ให้ใช้ได้ตามที่แก้ไป
-import { redirect } from "next/navigation";
-import { requireRolePage } from "@/lib/authz";
+import { requireSuperadminPage } from "@/lib/rbac/guard";
 import AdminRegisterForm from "./AdminRegisterForm";
 
 export default async function AdminRegisterPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
-  if (session.user?.role !== "superadmin") redirect("/403"); // Admin only
-  
-  await requireRolePage(["superadmin"]); // ไม่มีสิทธิ์ → redirect /403
+  // Not in the registry (orphan page): superadmin only.
+  await requireSuperadminPage();
   return <AdminRegisterForm />;
 }

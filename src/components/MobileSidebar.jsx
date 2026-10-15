@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { Fragment, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { X, LogOut, LogIn, User } from "lucide-react";
 import { useSession, signOut, signIn } from "next-auth/react";
+import { menuConfig, filterMenu } from "@/app/config/menuConfig";
+import { canOpenPage } from "@/lib/rbac/access";
 
 export default function MobileSidebar({ open, onClose }) {
   const { data, status } = useSession();
   const user = data?.user;
+  // Top-level children of the MAIN group, filtered by the registry.
+  const menu = useMemo(
+    () => filterMenu(menuConfig, user, canOpenPage).flatMap((n) => n.children ?? []),
+    [user]
+  );
 
   // ล็อก scroll เมื่อเมนูเปิด
   useEffect(() => {
@@ -108,60 +115,31 @@ export default function MobileSidebar({ open, onClose }) {
                 Login
               </Link>
             </li>
-            <li>
-              <Link
-                href="/dashboard"
-                onClick={onClose}
-                className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300"
-              >
-                Dashboard
-              </Link>
-            </li>
-
-            {/* Example group */}
-            <li className="mt-2 px-3 pt-3 text-xs uppercase tracking-wider text-slate-400/80 border-t border-white/10">
-              HRM
-            </li>
-            <li>
-              <Link
-                href="/dashboard/hrm/employee"
-                onClick={onClose}
-                className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300"
-              >
-                Employee
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/dashboard/hrm/employee-profile"
-                onClick={onClose}
-                className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300"
-              >
-                Employee Profile
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/dashboard/hrm/attendance"
-                onClick={onClose}
-                className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300"
-              >
-                Attendance
-              </Link>
-            </li>
-
-            <li className="mt-2 px-3 pt-3 text-xs uppercase tracking-wider text-slate-400/80 border-t border-white/10">
-              System
-            </li>
-            <li>
-              <Link
-                href="/dashboard/settings"
-                onClick={onClose}
-                className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300"
-              >
-                Settings
-              </Link>
-            </li>
+            {/* Same registry-filtered menu as the desktop Sidebar */}
+            {menu.map((node) =>
+              node.type === "group" ? (
+                <Fragment key={node.key}>
+                  <li className="mt-2 px-3 pt-3 text-xs uppercase tracking-wider text-slate-400/80 border-t border-white/10">
+                    {node.label}
+                  </li>
+                  {node.children
+                    .filter((child) => child.type === "link")
+                    .map((child) => (
+                      <li key={child.key}>
+                        <Link href={child.href} onClick={onClose} className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300">
+                          {child.label}
+                        </Link>
+                      </li>
+                    ))}
+                </Fragment>
+              ) : (
+                <li key={node.key}>
+                  <Link href={node.href} onClick={onClose} className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300">
+                    {node.label}
+                  </Link>
+                </li>
+              )
+            )}
           </ul>
         </nav>
 

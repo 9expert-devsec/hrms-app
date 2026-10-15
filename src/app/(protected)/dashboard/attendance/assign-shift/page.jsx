@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { canAccess } from "@/lib/rbac/access";
 import {
   Users,
   Search,
@@ -65,15 +66,16 @@ export default function AssignShiftPage() {
   const [saving, setSaving] = useState(false);
 
   /* ── auth guard ──────────────────────── */
-  const role = session?.user?.role || "employee";
+  // Registry check (src/lib/rbac); the middleware already enforces it.
+  const allowed = canAccess(session?.user, "shift_assign");
 
   useEffect(() => {
     if (authStatus === "loading") return;
     if (!session) { router.replace("/login"); return; }
-    if (!["superadmin", "hr"].includes(role)) {
+    if (!allowed) {
       router.replace("/403");
     }
-  }, [session, authStatus, router, role]);
+  }, [session, authStatus, router, allowed]);
 
   /* ── fetch data ──────────────────────── */
   async function load() {
@@ -100,10 +102,10 @@ export default function AssignShiftPage() {
   }
 
   useEffect(() => {
-    if (authStatus === "authenticated" && ["superadmin", "hr"].includes(role)) {
+    if (authStatus === "authenticated" && allowed) {
       load();
     }
-  }, [authStatus, role]);
+  }, [authStatus, allowed]);
 
   /* ── derived data ────────────────────── */
   const assignmentMap = useMemo(() => {

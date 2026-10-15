@@ -2,7 +2,8 @@ import Link from "next/link";
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department"; // ✅ ดึงสีจาก department
-import { requireSessionPage } from "@/lib/authz";
+import { requirePage } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import EmployeeGroupsClient from "./EmployeeGroupsClient";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,8 @@ const DEPT_LABEL = {
 const DEPT_ORDER = ["MD","EX","HR","AC","IT","TR","MK","SD","AM","ME","FM"];
 
 export default async function EmployeeIndexPage() {
-  const session = await requireSessionPage();
-  const role = session.user.role;
-  const canCreate = role !== "employee";
+  const session = await requirePage("employees");
+  const canCreate = canAccess(session.user, "employees");
 
   await dbConnect();
 

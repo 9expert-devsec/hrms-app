@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { canAccess } from "@/lib/rbac/access";
 import {
   CalendarOff,
   Plus,
@@ -103,13 +104,14 @@ export default function HolidaysPage() {
   const fileRef = useRef(null);
 
   /* ── auth guard ──────────────────────── */
-  const role = session?.user?.role || "employee";
+  // Registry check (src/lib/rbac); the middleware already enforces it.
+  const allowed = canAccess(session?.user, "holidays");
 
   useEffect(() => {
     if (authStatus === "loading") return;
     if (!session) { router.replace("/login"); return; }
-    if (!["superadmin", "hr"].includes(role)) router.replace("/403");
-  }, [session, authStatus, router, role]);
+    if (!allowed) router.replace("/403");
+  }, [session, authStatus, router, allowed]);
 
   /* ── fetch holidays ──────────────────── */
   const load = useCallback(async () => {
@@ -127,8 +129,8 @@ export default function HolidaysPage() {
   }, [year]);
 
   useEffect(() => {
-    if (authStatus === "authenticated" && ["superadmin", "hr"].includes(role)) load();
-  }, [authStatus, role, load]);
+    if (authStatus === "authenticated" && allowed) load();
+  }, [authStatus, allowed, load]);
 
   /* ── group by month ──────────────────── */
   const grouped = useMemo(() => {

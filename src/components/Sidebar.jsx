@@ -12,7 +12,8 @@ import {
   PanelLeftClose,
   PanelRightOpen,
 } from "lucide-react";
-import { menuConfig } from "@/app/config/menuConfig";
+import { menuConfig, filterMenu } from "@/app/config/menuConfig";
+import { canOpenPage } from "@/lib/rbac/access";
 
 /* ── 9Expert Brand tokens ─────────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -27,11 +28,6 @@ const COLLAPSE_KEY = "sb:collapsed";
 const EMPLOYEE_KEY = "emp";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
-function canSee(roles, role) {
-  if (!roles || roles.length === 0) return true;
-  if (!role) return false;
-  return roles.includes(role);
-}
 function isActivePath(pathname, href) {
   if (!href) return false;
   return pathname === href || pathname.startsWith(href + "/");
@@ -147,7 +143,6 @@ function RecursiveNode({
   pathname,
   open,
   setOpen,
-  role,
 }) {
   const paddingLeft = collapsed ? 0 : Math.min(depth * 12, 32);
 
@@ -164,7 +159,8 @@ function RecursiveNode({
   }
 
   if (node.type === "group") {
-    const children = node.children?.filter((n) => canSee(n.roles, role)) ?? [];
+    // Already filtered by filterMenu (see Sidebar below).
+    const children = node.children ?? [];
     const opened = !!open[node.key];
     const toggle = () => setOpen((s) => ({ ...s, [node.key]: !opened }));
     const Icon = node.icon;
@@ -289,7 +285,6 @@ function RecursiveNode({
                 pathname={pathname}
                 open={open}
                 setOpen={setOpen}
-                role={role}
               />
             ))}
           </ul>
@@ -334,7 +329,6 @@ function RecursiveNode({
                   pathname={pathname}
                   open={open}
                   setOpen={setOpen}
-                  role={role}
                 />
               ))}
             </ul>
@@ -349,7 +343,7 @@ function RecursiveNode({
 /* ── Sidebar ───────────────────────────────────────────────────── */
 export default function Sidebar() {
   const { data: session } = useSession();
-  const role = session?.user?.role ?? "employee";
+  const user = session?.user;
   const pathname = usePathname();
 
   const [open, setOpen] = useState({});
@@ -377,15 +371,9 @@ export default function Sidebar() {
     } catch {}
   }, [open, collapsed]);
 
-  const items = useMemo(() => {
-    return menuConfig
-      .filter((n) => canSee(n.roles, role))
-      .map((n) =>
-        n.type === "group" && n.children
-          ? { ...n, children: n.children.filter((c) => canSee(c.roles, role)) }
-          : n,
-      );
-  }, [role]);
+  // Registry-driven: a link shows when canOpenPage(user, pageKey) is true;
+  // empty groups disappear.
+  const items = useMemo(() => filterMenu(menuConfig, user, canOpenPage), [user]);
 
   return (
     <aside
@@ -550,7 +538,6 @@ export default function Sidebar() {
                       pathname={pathname}
                       open={open}
                       setOpen={setOpen}
-                      role={role}
                     />
                   ))}
                 </ul>

@@ -1,14 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import dbConnect from "@/lib/mongoose";
-import { requireSessionPage } from "@/lib/authz";
+import { requirePage } from "@/lib/rbac/guard";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import DepartmentEditForm from "./DepartmentEditForm";
 
 export default async function DepartmentEditPage({ params }) {
   const { id } = await params; // ✅ ต้อง await
-  await requireSessionPage();
+  await requirePage("departments");
   await dbConnect();
 
   const dept = await Department.findById(id)

@@ -1,11 +1,12 @@
 export const dynamic = "force-dynamic";
 
-import { requireSessionPage } from "@/lib/authz";
+import { requireSuperadminPage } from "@/lib/rbac/guard";
 import ApprovalClient from "./ApprovalClient";
 
 export default async function LeaveApprovalPage() {
   // ต้องล็อกอินก่อน
-  await requireSessionPage();
+  // Not in the registry (orphan page): superadmin only.
+  await requireSuperadminPage();
 
   return (
     <div className="px-6 py-6">

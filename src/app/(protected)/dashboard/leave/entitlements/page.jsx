@@ -2,12 +2,13 @@
 export const dynamic = "force-dynamic";
 
 import dbConnect from "@/lib/mongoose";
-import { requireSessionPage } from "@/lib/authz";
+import { requireSuperadminPage } from "@/lib/rbac/guard";
 import Employee from "@/models/Employee";
 import EntitlementsClient from "./EntitlementsClient";
 
 export default async function LeaveEntitlementsPage() {
-  await requireSessionPage();
+  // Not in the registry (orphan page): superadmin only.
+  await requireSuperadminPage();
   await dbConnect();
 
   // รายชื่อพนักงาน (เอาเฉพาะ active ก็ได้ถ้ามีฟิลด์)

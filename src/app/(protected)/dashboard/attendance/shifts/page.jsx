@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { canAccess } from "@/lib/rbac/access";
 import {
   Clock,
   Plus,
@@ -62,15 +63,16 @@ export default function ShiftsPage() {
   });
 
   /* ── auth guard ──────────────────────── */
-  const role = session?.user?.role || "employee";
+  // Registry check (src/lib/rbac); the middleware already enforces it.
+  const allowed = canAccess(session?.user, "shifts");
 
   useEffect(() => {
     if (authStatus === "loading") return;
     if (!session) { router.replace("/login"); return; }
-    if (!["superadmin", "hr"].includes(role)) {
+    if (!allowed) {
       router.replace("/403");
     }
-  }, [session, authStatus, router, role]);
+  }, [session, authStatus, router, allowed]);
 
   /* ── fetch shifts ────────────────────── */
   async function load() {
@@ -89,10 +91,10 @@ export default function ShiftsPage() {
   }
 
   useEffect(() => {
-    if (authStatus === "authenticated" && ["superadmin", "hr"].includes(role)) {
+    if (authStatus === "authenticated" && allowed) {
       load();
     }
-  }, [authStatus, role]);
+  }, [authStatus, allowed]);
 
   /* ── modal helpers ───────────────────── */
   function openCreate() {

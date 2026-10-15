@@ -1,7 +1,7 @@
 // Server Component
 import Link from "next/link";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePage } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import dbConnect from "@/lib/mongoose";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const DEPT_ORDER = ["MD","EX","HR","AC","IT","TR","MK","SD","AM","FM","ME"];
 
 export default async function DepartmentsPage() {
+  const session = await requirePage("departments");
   await dbConnect();
 
   // ดึงแผนก
@@ -58,9 +59,7 @@ export default async function DepartmentsPage() {
   });
 
   // สิทธิ์
-  const session = await getServerSession(authOptions);
-  const role = session?.user?.role ?? "employee";
-  const canEdit = ["superadmin", "hr"].includes(role);
+  const canEdit = canAccess(session.user, "departments");
 
   return (
     <div className="px-6 py-6 container mx-auto space-y-6">

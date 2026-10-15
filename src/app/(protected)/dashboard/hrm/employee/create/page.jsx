@@ -8,6 +8,7 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import BankSelect from "./../../../../../../components/BankSelect";
 import { Eye, EyeOff } from "lucide-react";
+import { canAccess } from "@/lib/rbac/access";
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/mongoose";
 // import Employee from "@/lib/models/Employee";
@@ -178,7 +179,7 @@ export default function EmployeeCreatePage() {
   const submittedRef = useRef(false);
   const router = useRouter();
   const { data: session } = useSession();
-  const canElevate = ["superadmin", "hr"].includes(session?.user?.role ?? "");
+  const canElevate = canAccess(session?.user, "employees");
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);

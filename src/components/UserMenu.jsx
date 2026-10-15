@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
+import { canAccessPath } from "@/lib/rbac/access";
 import {
   ChevronDown, User as UserIcon, MessageSquare, Inbox,
   UserPlus, LogOut
@@ -55,7 +56,7 @@ export default function UserMenu({ user }) {
           <MenuItem href="/dashboard/hrm/employee-profile" icon={<UserIcon size={16} />} label="Profile" onClick={() => setOpen(false)} />
           <MenuItem href="/dashboard/chat"    icon={<MessageSquare size={16} />} label="Chat"    onClick={() => setOpen(false)} />
           <MenuItem href="/dashboard/inbox"   icon={<Inbox size={16} />} label="Inbox"          onClick={() => setOpen(false)} />
-          {["superadmin", "hr"].includes(user?.role) && (
+          {canAccessPath(user, "/dashboard/admin/register") && (
             <MenuItem href="/dashboard/admin/register" icon={<UserPlus size={16} />} label="Add Account" onClick={() => setOpen(false)} />
           )}
           <hr className="my-1" style={{ borderColor: "rgba(0,92,255,0.08)" }} />

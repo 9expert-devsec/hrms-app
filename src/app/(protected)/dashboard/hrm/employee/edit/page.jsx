@@ -5,13 +5,14 @@ import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import User from "@/models/User";
-import { requireSessionPage } from "@/lib/authz";
+import { requirePage } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import EmployeeEditForm from "./EmployeeEditForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditEmployeePage({ searchParams }) {
-  const session = await requireSessionPage();
+  const session = await requirePage("employees");
   if (!searchParams?.id) {
     return (
       <div className="p-6">
@@ -47,7 +48,7 @@ export default async function EditEmployeePage({ searchParams }) {
     user = await User.findOne({ email: emp.email }).select("_id email role").lean();
   }
 
-  const canAdmin = ["superadmin", "hr"].includes(session.user.role);
+  const canAdmin = canAccess(session.user, "employees");
 
   return (
     <div className="px-6 py-6 container mx-auto space-y-6">

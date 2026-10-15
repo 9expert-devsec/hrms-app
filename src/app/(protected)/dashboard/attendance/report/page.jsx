@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { canAccess } from "@/lib/rbac/access";
 import {
   BarChart2,
   Loader2,
@@ -41,8 +42,6 @@ const INPUT_STYLE = {
   outline: "none",
 };
 
-const ALLOWED_ROLES = ["superadmin", "hr", "manager", "hod"];
-
 export default function AttendanceReportPage() {
   const router = useRouter();
   const { data: session, status: authStatus } = useSession();
@@ -57,13 +56,14 @@ export default function AttendanceReportPage() {
   const [q, setQ] = useState("");
 
   /* ── auth guard ──────────────────────── */
-  const role = session?.user?.role || "employee";
+  // Registry check (src/lib/rbac); the middleware already enforces it.
+  const allowed = canAccess(session?.user, "attendance_report");
 
   useEffect(() => {
     if (authStatus === "loading") return;
     if (!session) { router.replace("/login"); return; }
-    if (!ALLOWED_ROLES.includes(role)) router.replace("/403");
-  }, [session, authStatus, router, role]);
+    if (!allowed) router.replace("/403");
+  }, [session, authStatus, router, allowed]);
 
   /* ── fetch report ────────────────────── */
   const load = useCallback(async () => {
@@ -84,8 +84,8 @@ export default function AttendanceReportPage() {
   }, [month, year, department]);
 
   useEffect(() => {
-    if (authStatus === "authenticated" && ALLOWED_ROLES.includes(role)) load();
-  }, [authStatus, role, load]);
+    if (authStatus === "authenticated" && allowed) load();
+  }, [authStatus, allowed, load]);
 
   /* ── month navigation ────────────────── */
   function prevMonth() {

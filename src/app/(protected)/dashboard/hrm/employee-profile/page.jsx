@@ -1,12 +1,12 @@
 // src/app/(protected)/dashboard/hrm/employee-profile/page.jsx
 import Image from "next/image";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
+import { notFound } from "next/navigation";
+import { requirePage } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
-import { authOptions } from "@/lib/authOptions";
 import CopyBtn from "./CopyBtn";
 import {
   User,
@@ -34,8 +34,7 @@ const fmtDate = (d) =>
 const escapeReg = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export default async function EmployeeProfilePage({ searchParams }) {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  const session = await requirePage("self_profile");
 
   await dbConnect();
 
@@ -63,14 +62,13 @@ export default async function EmployeeProfilePage({ searchParams }) {
 
   if (!e) notFound();
 
-  const role = session.user?.role ?? "employee";
-
   const isSelf =
     String(session.user.employeeId || "") === String(e._id) ||
     session.user.email?.toLowerCase() === e.email?.toLowerCase();
 
-  const canSeeSensitive = isSelf || ["hr", "superadmin"].includes(role);
-  const canEdit = isSelf || ["hr", "superadmin"].includes(role);
+  const canManage = canAccess(session.user, "employees");
+  const canSeeSensitive = isSelf || canManage;
+  const canEdit = isSelf || canManage;
 
   const book = e.privateInfo?.bookbank || e.privateInfo || {};
   const bankAccountName =

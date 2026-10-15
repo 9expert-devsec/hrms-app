@@ -1,7 +1,5 @@
 // src/app/(protected)/dashboard/page.jsx
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
-import { redirect } from "next/navigation";
+import { requirePage } from "@/lib/rbac/guard";
 import {
   Users,
   Building2,
@@ -15,8 +13,7 @@ import {
 const STAT_ICONS = [Users, Building2, CalendarCheck, UserPlus];
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  const session = await requirePage("dashboard");
 
   const firstName = session.user.name?.split(" ")[0] || session.user.name;
   const hour = new Date().getHours();

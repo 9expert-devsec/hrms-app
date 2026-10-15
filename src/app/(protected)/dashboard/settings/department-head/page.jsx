@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { canAccess } from "@/lib/rbac/access";
 import {
   ShieldCheck,
   Users,
@@ -56,15 +57,16 @@ export default function DepartmentHeadPage() {
   }
 
   /* ── role gate ─────────────────────────── */
-  const role = session?.user?.role || "employee";
+  // Registry check (src/lib/rbac); the middleware already enforces it.
+  const allowed = canAccess(session?.user, "hod_settings");
 
   useEffect(() => {
     if (authStatus === "loading") return;
     if (!session) { router.replace("/login"); return; }
-    if (!["superadmin", "hr"].includes(role)) {
+    if (!allowed) {
       router.replace("/403");
     }
-  }, [session, authStatus, router, role]);
+  }, [session, authStatus, router, allowed]);
 
   /* ── fetch data ────────────────────────── */
   async function loadData() {
@@ -93,7 +95,7 @@ export default function DepartmentHeadPage() {
   }
 
   useEffect(() => {
-    if (authStatus !== "loading" && session && ["superadmin", "hr"].includes(role)) {
+    if (authStatus !== "loading" && session && allowed) {
       loadData();
     }
   }, [session, authStatus]); // eslint-disable-line
