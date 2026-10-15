@@ -108,9 +108,9 @@
     @apply font-en;
   }
 
-  p, span {
-    font-family: var(--font-en) !important;
-  }
+  /* genesis-lab's `p, span { font-family … !important }` is deliberately not
+     ported: body already inherits the en stack, and the rule overrode heading
+     fonts on inner spans and could not be undone by any utility. */
 
   /* Focus ring in brand blue */
   *:focus-visible {

@@ -107,9 +107,7 @@ export default function LoginClient() {
             <h1 className="mt-4 text-[40px] leading-[1.15] text-white xl:text-[48px]">
               Human Resource
               <br />
-              <strong className="font-bold text-9e-lime">
-                Management System
-              </strong>
+              <span className="text-9e-lime">Management System</span>
             </h1>
 
             <div className="mt-6">
