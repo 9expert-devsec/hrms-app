@@ -349,8 +349,8 @@ section[class*="rounded-2xl"] h3 {
   background-size: 300% 200%;
   background-position: 50% 50%;
   filter: blur(10px);
-  opacity: 0.55;
-  mask-image: radial-gradient(ellipse at 100% 0%, black 10%, transparent 70%);
+  opacity: 0.9;
+  mask-image: radial-gradient(ellipse 120% 90% at 100% 0%, black 20%, transparent 80%);
 }
 .hr-aurora::after {
   content: "";
@@ -371,12 +371,12 @@ section[class*="rounded-2xl"] h3 {
   .hr-aurora::after { animation: none; }
 }
 
-/* Keeps white / lime text readable wherever a bright band drifts by */
+/* Protects only the lower-left text area from bright drifting bands */
 .hr-aurora-scrim {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, rgba(13,27,42,0.85) 0%, rgba(13,27,42,0.55) 45%, rgba(13,27,42,0) 75%);
+  background: linear-gradient(20deg, rgba(13,27,42,0.80) 0%, rgba(13,27,42,0.45) 35%, rgba(13,27,42,0) 60%);
 }
 
 /* ── Login: form panel surface ─────────────────────────────────── */

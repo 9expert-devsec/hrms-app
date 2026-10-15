@@ -5,34 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  Eye,
-  EyeOff,
-  LogIn,
-  Mail,
-  Lock,
-  Users,
-  BarChart3,
-  ShieldCheck,
-} from "lucide-react";
-
-const features = [
-  {
-    icon: Users,
-    title: "จัดการข้อมูลพนักงานได้ครบถ้วน",
-    desc: "ข้อมูลบุคลากร โครงสร้างองค์กร และประวัติการทำงาน",
-  },
-  {
-    icon: BarChart3,
-    title: "รายงานและ Analytics แบบ Real-time",
-    desc: "สรุปข้อมูลเชิงลึก ช่วยให้การตัดสินใจง่ายขึ้น",
-  },
-  {
-    icon: ShieldCheck,
-    title: "ระบบสิทธิ์ RBAC ปลอดภัยสูง",
-    desc: "กำหนดสิทธิ์ตาม Role พร้อมมาตรฐานความปลอดภัย",
-  },
-];
+import { Eye, EyeOff, LogIn, Mail, Lock } from "lucide-react";
+import LoginGreeting from "./LoginGreeting";
 
 // Only same-origin paths. "//host" and "/\host" are protocol-relative in
 // browsers, so both would be open redirects.
@@ -129,11 +103,14 @@ export default function LoginClient() {
         <div className="hr-aurora" aria-hidden="true" />
         <div className="hr-aurora-scrim" aria-hidden="true" />
 
-        <div className="relative z-10 flex h-full w-full items-center pl-16 pr-10">
-          <div className="max-w-[520px]">
-            <Logo tone="light" />
+        <div className="relative z-10 flex h-full w-full flex-col py-12 pl-16 pr-10">
+          <Logo tone="light" />
 
-            <div className="mt-10 flex items-center gap-3">
+          {/* Uneven spacers sit the text block a little below centre (~55%),
+              leaving the upper area to the aurora */}
+          <div className="grow-[6]" />
+          <div className="max-w-[520px]">
+            <div className="flex items-center gap-3">
               <div className="h-0.5 w-8 rounded-full bg-9e-lime" />
               <p className="text-sm font-semibold tracking-wide text-9e-ice/80">
                 9Expert HRMS
@@ -148,33 +125,17 @@ export default function LoginClient() {
               </strong>
             </h1>
 
-            <p className="mt-5 text-base leading-relaxed text-9e-ice/80">
-              ระบบบริหารทรัพยากรบุคคลภายในองค์กร ครบวงจร ปลอดภัย และใช้งานง่าย
-              เพื่อสนับสนุนการทำงานของทุกทีมใน 9Expert
-            </p>
-
-            <ul className="mt-10 space-y-5">
-              {features.map(({ icon: Icon, title, desc }) => (
-                <li key={title} className="flex items-center gap-4">
-                  {/* bg-white/[0.1], not bg-white/10: the latter is forced to
-                      solid white by the DARK → LIGHT overrides in globals.css */}
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[var(--9e-radius-md)] bg-white/[0.1] ring-1 ring-white/15">
-                    <Icon size={22} className="text-white" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">{title}</p>
-                    <p className="mt-0.5 text-sm text-9e-ice/70">{desc}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-6">
+              <LoginGreeting />
+            </div>
           </div>
-        </div>
+          <div className="grow-[4]" />
 
-        <p className="absolute bottom-8 left-16 z-10 text-xs text-9e-ice/60">
-          © {new Date().getFullYear()} 9Expert Company Limited •
-          สำหรับบุคลากรภายในเท่านั้น
-        </p>
+          <p className="text-xs text-9e-ice/60">
+            © {new Date().getFullYear()} 9Expert Company Limited •
+            สำหรับบุคลากรภายในเท่านั้น
+          </p>
+        </div>
       </section>
 
       {/* ── Right: form panel ────────────────────────────────── */}
