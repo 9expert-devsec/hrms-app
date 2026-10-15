@@ -48,7 +48,9 @@
    the --font-* keys below must NOT reuse those names. */
 @theme {
   --font-heading: var(--font-line-seed), var(--font-google-sans), sans-serif;
-  --font-en:      var(--font-google-sans), sans-serif;
+  /* Deliberate deviation from genesis-lab: Google Sans has no Thai glyphs and
+     HRMS is almost entirely Thai, so LINE Seed covers Thai in the body stack. */
+  --font-en:      var(--font-google-sans), var(--font-line-seed), sans-serif;
   --font-thai:    var(--font-line-seed), sans-serif;
   --font-sans:    var(--font-google-sans), var(--font-line-seed), sans-serif;
 
