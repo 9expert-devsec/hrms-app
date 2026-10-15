@@ -296,13 +296,13 @@ export default function LeaveRequestPage() {
             <UploadCloud size={24} style={{ color: BLUE }} />
             <span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>คลิกหรือลากไฟล์มาวางที่นี่</span>
             <span style={{ fontSize: 11, color: SLATE }}>
-              รองรับ: รูปภาพ (JPG, PNG) และเอกสาร (PDF, DOC, DOCX) ขนาดไม่เกิน 10MB ต่อไฟล์
+              รองรับ: รูปภาพ (JPG, PNG, GIF, WEBP) และ PDF ขนาดไม่เกิน 10MB ต่อไฟล์
             </span>
             <input
               type="file"
               className="hidden"
               multiple
-              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
               onChange={async (e) => {
                 const files = Array.from(e.target.files || []);
                 e.target.value = "";

@@ -1,32 +1,28 @@
 import cloudinary from "@/lib/cloudinary";
+import { requireSessionAPI } from "@/lib/authz";
+import { checkUpload } from "@/lib/server/uploadRules";
 
 export const runtime = "nodejs";
 
-const IMAGE_EXTS = /\.(jpg|jpeg|png|gif|webp)$/i;
-const DOC_EXTS = /\.(pdf|doc|docx|xls|xlsx)$/i;
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-
+// AUTH-ONLY: any signed-in user attaches files to their own leave request.
 export async function POST(req) {
   try {
+    const gate = await requireSessionAPI();
+    if (gate.res) return gate.res;
+
     const form = await req.formData();
     const file = form.get("file");
-    if (!file || typeof file === "string") {
-      return Response.json({ error: "NO_FILE" }, { status: 400 });
-    }
 
-    const filename = file.name || "";
-    const isImage = IMAGE_EXTS.test(filename);
-    const isDoc = DOC_EXTS.test(filename);
-
-    if (!isImage && !isDoc) {
+    // Image or PDF, at most 10 MB (MIME type and extension must agree).
+    const check = checkUpload(file);
+    if (!check.ok) {
       return Response.json(
-        { error: "INVALID_TYPE", allowed: "JPG, PNG, GIF, WEBP, PDF, DOC, DOCX, XLS, XLSX" },
-        { status: 400 }
+        { error: check.error, allowed: "JPG, PNG, GIF, WEBP, PDF", maxSize: "10MB" },
+        { status: check.status }
       );
     }
-    if (file.size > MAX_SIZE) {
-      return Response.json({ error: "TOO_LARGE", maxSize: "10MB" }, { status: 400 });
-    }
+    const filename = file.name || "";
+    const isImage = check.kind === "image";
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const safeName = filename.replace(/[^a-zA-Z0-9.\-_]/g, "_");

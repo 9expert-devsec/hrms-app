@@ -1,3 +1,5 @@
+// PUBLIC: the forgot-password form is used while signed out. Stub — it only
+// logs the address; no token is created and nothing is sent or revealed.
 export async function POST(req) {
   const { email } = await req.json();
 

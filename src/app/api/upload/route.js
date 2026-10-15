@@ -1,6 +1,8 @@
 // src/app/api/upload/route.js
 import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
+import { requireSessionAPI } from "@/lib/authz";
+import { checkUpload } from "@/lib/server/uploadRules";
 
 export const runtime = "nodejs"; // ต้องใช้ Node runtime เพราะใช้ cloudinary sdk
 
@@ -11,8 +13,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// AUTH-ONLY: employee photo upload from the employee create / edit forms
+// (own profile included); the file only gets used by a guarded save.
 export async function POST(req) {
   try {
+    const gate = await requireSessionAPI();
+    if (gate.res) return gate.res;
+
     // เช็ค env ก่อน (กันเคสค่าหายแล้วขึ้น 500 เงียบ ๆ)
     if (!process.env.CLOUDINARY_CLOUD_NAME ||
         !process.env.CLOUDINARY_API_KEY ||
@@ -26,8 +33,13 @@ export async function POST(req) {
     const form = await req.formData();
     const file = form.get("file"); // ← ต้องชื่อ 'file' ให้ตรงกับฝั่ง client
 
-    if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    // Image or PDF, at most 10 MB (MIME type and extension must agree).
+    const check = checkUpload(file);
+    if (!check.ok) {
+      return NextResponse.json(
+        { error: check.error, allowed: "JPG, PNG, GIF, WEBP, PDF", maxSize: "10MB" },
+        { status: check.status }
+      );
     }
 
     // แปลงไฟล์เป็น buffer
