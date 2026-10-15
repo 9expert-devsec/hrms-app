@@ -1,39 +1,34 @@
 @import "tailwindcss";
 
-/* ── 9Expert Brand Color Tokens (Updated CI) ─────────────────── */
+/* ── 9Expert 2026 CI tokens (ported from genesis-lab) ─────────── */
 :root {
   color-scheme: light;
 
-  /* === 9Expert Brand Colors (Updated CI) === */
+  /* Raw palette — same in every theme */
+  --9e-brand:   #2486FF;  /* Nine Blue — logo, large text, icons. Not small text on white */
+  --9e-action:  #005CFF;  /* Action Blue — links, small text on light, interactive */
+  --9e-air:     #48B0FF;  /* Air Blue — decorative / gradients, dark bg only */
+  --9e-ice:     #F8FAFD;  /* Cloud Base — light background */
+  --9e-lime:    #D4F73F;  /* Signal Lime — CTA / badge / highlight only */
+  --9e-lime-lt: #D8F852;  /* lime hover */
+  --9e-lime-dk: #B8D930;  /* lime pressed */
+  --9e-navy:    #0D1B2A;  /* Deep Navy */
+  --9e-card:    #132638;  /* dark card */
+  --9e-border:  #1A2D42;  /* dark border */
 
-  /* Primary Blues — 60% of colored elements */
-  --9e-blue-primary:   #2486FF;  /* ← NOW PRIMARY: logo, headings, main CTA */
-  --9e-blue-secondary: #005CFF;  /* ← NOW SECONDARY: links, interactive, gradient */
-  --9e-blue-sky:       #48B0FF;  /* Highlights, gradients, 30% supporting */
-  --9e-blue-ice:       #F8FAFD;  /* Light backgrounds, card surfaces */
-
-  /* Accent Lime — 10% only */
-  --9e-lime-accent:    #D4F73F;  /* CTA buttons, badges — on dark bg ONLY */
-  --9e-lime-light:     #E4FF6B;  /* Hover states */
-  --9e-lime-dark:      #B8D930;  /* Active/pressed states */
-
-  /* Background & Text */
-  --9e-navy-deep:      #0D1B2A;  /* Dark bg, primary text on light bg */
-  --9e-gray-slate:     #808A95;  /* Secondary text, captions */
-
-  /* Semantic aliases */
-  --9e-text-primary:    #0D1B2A;
-  --9e-text-secondary:  #808A95;
-  --9e-text-on-dark:    #FFFFFF;
-  --9e-text-on-lime:    #0D1B2A;
-  --9e-bg-light:        #F8FAFD;
-  --9e-bg-dark:         #0D1B2A;
-
-  /* CTA — Lime on dark only */
-  --9e-cta-bg:          #D4F73F;
-  --9e-cta-hover:       #E4FF6B;
-  --9e-cta-active:      #B8D930;
-  --9e-cta-text:        #0D1B2A;
+  /* Semantic (light — HRMS has no dark mode) */
+  --page-bg:         #FFFFFF;
+  --page-bg-muted:   #F8FAFD;
+  --surface:         #FFFFFF;
+  --surface-muted:   #F8FAFD;
+  --surface-border:  rgba(13,27,42,0.12);
+  --surface-raised:  #FFFFFF;
+  --surface-hover:   #F8FAFD;
+  --surface-divider: #F3F4F6;
+  --text-primary:    #0D1B2A;
+  --text-secondary:  #465469;
+  --text-muted:      #5E6A7E;
+  --shadow-color:    13 27 42;
 
   /* Design tokens */
   --9e-radius-sm:   8px;
@@ -46,62 +41,83 @@
   --9e-transition:  200ms cubic-bezier(0.4,0,0.2,1);
 }
 
-/* ── LINE Seed Sans TH ───────────────────────────────────────── */
-@font-face {
-  font-family: "LINESeedSansTH";
-  src: url("/fonts/LINESeedSansTH_W_Th.woff2") format("woff2");
-  font-weight: 100 200;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "LINESeedSansTH";
-  src: url("/fonts/LINESeedSansTH_W_Rg.woff2") format("woff2");
-  font-weight: 300 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "LINESeedSansTH";
-  src: url("/fonts/LINESeedSansTH_W_Bd.woff2") format("woff2");
-  font-weight: 500 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "LINESeedSansTH";
-  src: url("/fonts/LINESeedSansTH_W_He.woff2") format("woff2");
-  font-weight: 700 800;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "LINESeedSansTH";
-  src: url("/fonts/LINESeedSansTH_W_XBd.woff2") format("woff2");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
+/* ── Tailwind theme ──────────────────────────────────────────────
+   Hex literals on purpose: a var() back-reference here would make the
+   emitted --color-* variable point at itself.
+   Fonts: next/font writes --font-google-sans / --font-line-seed on <html>;
+   the --font-* keys below must NOT reuse those names. */
+@theme {
+  --font-heading: var(--font-line-seed), var(--font-google-sans), sans-serif;
+  --font-en:      var(--font-google-sans), sans-serif;
+  --font-thai:    var(--font-line-seed), sans-serif;
+  --font-sans:    var(--font-google-sans), var(--font-line-seed), sans-serif;
+
+  --color-9e-brand:   #2486FF;
+  --color-9e-action:  #005CFF;
+  --color-9e-air:     #48B0FF;
+  --color-9e-ice:     #F8FAFD;
+  --color-9e-lime:    #D4F73F;
+  --color-9e-lime-lt: #D8F852;
+  --color-9e-lime-dk: #B8D930;
+  --color-9e-navy:    #0D1B2A;
+  --color-9e-card:    #132638;
+  --color-9e-border:  #1A2D42;
+
+  --color-9e-slate-dp-50:  #5E6A7E;
+  --color-9e-slate-dp-100: #6E798B;
+  --color-9e-slate-dp-200: #7E8898;
+  --color-9e-slate-dp-300: #8E97A5;
+  --color-9e-slate-dp-400: #9EA6B2;
+  --color-9e-slate-dp-500: #AEB4BE;
+  --color-9e-slate-dp-600: #BFC3CB;
+  --color-9e-slate-dp-700: #CFD2D8;
+  --color-9e-slate-dp-800: #DFE1E5;
+  --color-9e-slate-dp-900: #EFF0F2;
+  --color-9e-slate-dp-950: #F7F8F9;
+
+  --color-9e-slate-lt-50:  #B7C3D4;
+  --color-9e-slate-lt-100: #BEC9D8;
+  --color-9e-slate-lt-200: #C5CFDD;
+  --color-9e-slate-lt-300: #CDD5E1;
+  --color-9e-slate-lt-400: #D4DBE5;
+  --color-9e-slate-lt-500: #DBE1EA;
+  --color-9e-slate-lt-600: #E2E7EE;
+  --color-9e-slate-lt-700: #E9EDF2;
+  --color-9e-slate-lt-800: #F1F3F6;
+  --color-9e-slate-lt-900: #F8F9FB;
+  --color-9e-slate-lt-950: #FBFCFD;
 }
 
-/* ── Base ─────────────────────────────────────────────────────── */
-html, body {
-  font-family: "LINESeedSansTH", "GoogleSans", system-ui, -apple-system, sans-serif;
-  font-weight: 400;
-  background-color: #F8FAFD;
-  color: #0D1B2A;
-  -webkit-font-smoothing: antialiased;
-}
+/* ── Base typography (ported from genesis-lab) ───────────────── */
+@layer base {
+  body {
+    background-color: var(--page-bg-muted);
+    color: var(--text-primary);
+    @apply font-en antialiased;
+  }
 
-h1, h2, h3 {
-  font-weight: 600;
+  /* Headings → LINE Seed Sans TH, locked at bold (700) */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-bold;
+  }
+
+  /* Detail / body text → Google Sans */
+  label, input, select, textarea, button, li, td, th {
+    @apply font-en;
+  }
+
+  p, span {
+    font-family: var(--font-en) !important;
+  }
+
+  /* Focus ring in brand blue */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-9e-brand ring-offset-2;
+    --tw-ring-offset-color: var(--page-bg);
+  }
 }
 
 ::selection { background: #48B0FF; color: #0D1B2A; }
-
-*:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(36,134,255,0.25);
-}
 
 /* ── Scrollbar ────────────────────────────────────────────────── */
 *::-webkit-scrollbar        { width: 6px; height: 6px; }
