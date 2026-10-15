@@ -117,6 +117,16 @@
     @apply outline-none ring-2 ring-9e-brand ring-offset-2;
     --tw-ring-offset-color: var(--page-bg);
   }
+
+  /* Tailwind v4 Preflight no longer gives buttons cursor: pointer */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 ::selection { background: #48B0FF; color: #0D1B2A; }
