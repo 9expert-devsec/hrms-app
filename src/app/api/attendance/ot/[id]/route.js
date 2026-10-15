@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionAPI } from "@/lib/authz";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
+import { otScope } from "@/lib/rbac/scopes";
+import { getOwnEmployee, isEmployeeInScope } from "@/lib/rbac/scopeQueries";
 import OTRequest from "@/lib/models/OTRequest";
-import Employee from "@/models/Employee";
 
 export async function GET(req, { params }) {
   try {
+    const gate = await requireAnyPageApi(["self_ot", "ot_approve"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireSessionAPI();
-    if (res) return res;
 
     const { id } = await params;
     const ot = await OTRequest.findById(id)
@@ -17,13 +21,14 @@ export async function GET(req, { params }) {
 
     if (!ot) return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
 
-    // Employee role: own only
-    const role = session.user?.role;
-    if (!["superadmin", "hr", "manager", "hod"].includes(role)) {
-      const emp = await Employee.findOne({ email: session.user.email }).select("_id").lean();
-      if (!emp || String(ot.employeeId?._id || ot.employeeId) !== String(emp._id)) {
-        return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
-      }
+    // Own request, or one inside the caller's OT approval scope.
+    const ownerId = String(ot.employeeId?._id || ot.employeeId);
+    const emp = await getOwnEmployee(session, "_id");
+    const isOwn = !!emp && String(emp._id) === ownerId;
+    const canApprove =
+      canAccess(session.user, "ot_approve") && (await isEmployeeInScope(otScope(session.user), ownerId));
+    if (!isOwn && !canApprove) {
+      return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
     }
 
     return NextResponse.json({ ok: true, data: ot });
@@ -35,16 +40,18 @@ export async function GET(req, { params }) {
 
 export async function PATCH(req, { params }) {
   try {
+    const gate = await requirePageApi("self_ot");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireSessionAPI();
-    if (res) return res;
 
     const { id } = await params;
     const ot = await OTRequest.findById(id);
     if (!ot) return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
 
     // Must be own request
-    const emp = await Employee.findOne({ email: session.user.email }).select("_id").lean();
+    const emp = await getOwnEmployee(session, "_id");
     if (!emp || String(ot.employeeId) !== String(emp._id)) {
       return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
     }
@@ -69,16 +76,18 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
+    const gate = await requirePageApi("self_ot");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireSessionAPI();
-    if (res) return res;
 
     const { id } = await params;
     const ot = await OTRequest.findById(id);
     if (!ot) return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
 
     // Must be own request
-    const emp = await Employee.findOne({ email: session.user.email }).select("_id").lean();
+    const emp = await getOwnEmployee(session, "_id");
     if (!emp || String(ot.employeeId) !== String(emp._id)) {
       return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
     }

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionAPI, requireRoleAPI } from "@/lib/authz";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import WorkShift from "@/lib/models/WorkShift";
 
 export async function GET(req, { params }) {
   try {
+    const gate = await requireAnyPageApi(["shifts", "shift_assign"]);
+    if (gate.res) return gate.res;
+
     await dbConnect();
-    const { res } = await requireSessionAPI();
-    if (res) return res;
 
     const { id } = await params;
     const shift = await WorkShift.findById(id).lean();
@@ -22,9 +23,11 @@ export async function GET(req, { params }) {
 
 export async function PATCH(req, { params }) {
   try {
+    const gate = await requirePageApi("shifts");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireRoleAPI(["superadmin", "hr"]);
-    if (res) return res;
 
     const { id } = await params;
     const body = await req.json();
@@ -51,9 +54,10 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
+    const gate = await requirePageApi("shifts");
+    if (gate.res) return gate.res;
+
     await dbConnect();
-    const { res } = await requireRoleAPI(["superadmin", "hr"]);
-    if (res) return res;
 
     const { id } = await params;
     const updated = await WorkShift.findByIdAndUpdate(id, { isActive: false }, { new: true });

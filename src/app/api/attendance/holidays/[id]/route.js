@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireRoleAPI } from "@/lib/authz";
+import { requirePageApi } from "@/lib/rbac/guard";
 import Holiday from "@/lib/models/Holiday";
 
 export async function DELETE(req, { params }) {
   try {
+    const gate = await requirePageApi("holidays");
+    if (gate.res) return gate.res;
+
     await dbConnect();
-    const { res } = await requireRoleAPI(["superadmin", "hr"]);
-    if (res) return res;
 
     const { id } = await params;
     const deleted = await Holiday.findByIdAndDelete(id);

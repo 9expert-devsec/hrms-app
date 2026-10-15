@@ -1,14 +1,8 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePageApi } from "@/lib/rbac/guard";
 
 export async function GET(req) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  const gate = await requirePageApi("holidays");
+  if (gate.res) return gate.res;
 
   const { searchParams } = new URL(req.url);
   const year = searchParams.get("year") || new Date().getFullYear();

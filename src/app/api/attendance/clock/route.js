@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionAPI } from "@/lib/authz";
+import { requirePageApi } from "@/lib/rbac/guard";
 import AttendanceRecord from "@/lib/models/AttendanceRecord";
 import EmployeeShift from "@/lib/models/EmployeeShift";
 import WorkShift from "@/lib/models/WorkShift";
@@ -9,9 +9,11 @@ import Employee from "@/models/Employee";
 
 export async function POST(req) {
   try {
+    const gate = await requirePageApi("self_clock");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireSessionAPI();
-    if (res) return res;
 
     const body = await req.json();
     const { action, note, location } = body;

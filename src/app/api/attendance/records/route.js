@@ -1,29 +1,34 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionAPI } from "@/lib/authz";
+import { requireAnyPageApi } from "@/lib/rbac/guard";
+import { attendanceScope } from "@/lib/rbac/scopes";
+import { getOwnEmployee, isEmployeeInScope } from "@/lib/rbac/scopeQueries";
 import AttendanceRecord from "@/lib/models/AttendanceRecord";
 import Holiday from "@/lib/models/Holiday";
-import Employee from "@/models/Employee";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
   try {
+    const gate = await requireAnyPageApi(["self_attendance", "self_clock"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireSessionAPI();
-    if (res) return res;
 
     const url = new URL(req.url);
     const monthParam = Number(url.searchParams.get("month")) || (new Date().getMonth() + 1);
     const yearParam = Number(url.searchParams.get("year")) || new Date().getFullYear();
     const employeeIdParam = url.searchParams.get("employeeId");
 
-    const role = session.user?.role;
-
-    // Resolve target employee
-    let targetId = employeeIdParam;
-    if (!["superadmin", "hr", "manager"].includes(role) || !targetId) {
-      const emp = await Employee.findOne({ email: session.user.email }).select("_id").lean();
+    // Another employee only with scope_attendance_all or as their head;
+    // otherwise always the caller's own records.
+    let targetId =
+      employeeIdParam && (await isEmployeeInScope(attendanceScope(session.user), employeeIdParam))
+        ? employeeIdParam
+        : null;
+    if (!targetId) {
+      const emp = await getOwnEmployee(session, "_id");
       if (!emp) {
         return NextResponse.json({ ok: true, data: { month: `${yearParam}-${String(monthParam).padStart(2, "0")}`, employeeId: null, days: [] } });
       }

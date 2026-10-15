@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireRoleAPI } from "@/lib/authz";
+import { requirePageApi } from "@/lib/rbac/guard";
+import { otScope } from "@/lib/rbac/scopes";
+import { isEmployeeInScope } from "@/lib/rbac/scopeQueries";
 import OTRequest from "@/lib/models/OTRequest";
 import AttendanceRecord from "@/lib/models/AttendanceRecord";
 
 export async function POST(req, { params }) {
   try {
+    const gate = await requirePageApi("ot_approve");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireRoleAPI(["superadmin", "hr", "manager"]);
-    if (res) return res;
 
     const { id } = await params;
     const body = await req.json();
@@ -20,6 +24,11 @@ export async function POST(req, { params }) {
 
     const ot = await OTRequest.findById(id);
     if (!ot) return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
+
+    // Departments the approver heads, or everyone with scope_ot_all.
+    if (!(await isEmployeeInScope(otScope(session.user), ot.employeeId))) {
+      return NextResponse.json({ ok: false, message: "ไม่มีสิทธิ์อนุมัติ OT ของพนักงานคนนี้" }, { status: 403 });
+    }
 
     if (ot.status !== "pending") {
       return NextResponse.json({ ok: false, message: "คำขอนี้ดำเนินการไปแล้ว" }, { status: 400 });

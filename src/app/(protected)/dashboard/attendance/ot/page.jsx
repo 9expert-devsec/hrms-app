@@ -80,7 +80,8 @@ export default function OTPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/attendance/ot", { cache: "no-store" });
+      // Own requests only, even for approvers (see /api/attendance/ot).
+      const res = await fetch("/api/attendance/ot?scope=mine", { cache: "no-store" });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.message || `HTTP ${res.status}`);
       setItems(j.data || []);

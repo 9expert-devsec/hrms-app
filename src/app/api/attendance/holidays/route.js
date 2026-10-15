@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionAPI, requireRoleAPI } from "@/lib/authz";
+import { requirePageApi } from "@/lib/rbac/guard";
 import Holiday from "@/lib/models/Holiday";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,10 @@ function parseCSV(csvText) {
 
 export async function GET(req) {
   try {
+    const gate = await requirePageApi("holidays");
+    if (gate.res) return gate.res;
+
     await dbConnect();
-    const { res } = await requireSessionAPI();
-    if (res) return res;
 
     const url = new URL(req.url);
     const year = Number(url.searchParams.get("year")) || new Date().getFullYear();
@@ -62,9 +63,11 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const gate = await requirePageApi("holidays");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireRoleAPI(["superadmin", "hr"]);
-    if (res) return res;
 
     const contentType = req.headers.get("content-type") || "";
 

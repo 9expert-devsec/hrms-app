@@ -1,22 +1,24 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionAPI, requireRoleAPI } from "@/lib/authz";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import WorkShift from "@/lib/models/WorkShift";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
   try {
+    const gate = await requireAnyPageApi(["shifts", "shift_assign"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireSessionAPI();
-    if (res) return res;
 
     const url = new URL(req.url);
     const showAll = url.searchParams.get("all") === "true";
-    const role = session.user?.role;
-
+    // Inactive shifts too, for the shift-management page only.
     const filter =
-      showAll && ["superadmin", "hr"].includes(role)
+      showAll && canAccess(session.user, "shifts")
         ? {}
         : { isActive: true };
 
@@ -30,9 +32,11 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const gate = await requirePageApi("shifts");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireRoleAPI(["superadmin", "hr"]);
-    if (res) return res;
 
     const body = await req.json();
     const { name, startTime, endTime, lateThresholdMinutes, breakMinutes, isDefault } = body;

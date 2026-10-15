@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionAPI, requireRoleAPI } from "@/lib/authz";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
+import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 import EmployeeShift from "@/lib/models/EmployeeShift";
 import WorkShift from "@/lib/models/WorkShift";
 import Employee from "@/models/Employee";
@@ -9,19 +11,18 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req) {
   try {
-    await dbConnect();
-    const { session, res } = await requireSessionAPI();
-    if (res) return res;
+    // Own shift (self_clock), or anyone's with shift_assign.
+    const gate = await requireAnyPageApi(["self_clock", "shift_assign"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
 
+    await dbConnect();
     const url = new URL(req.url);
     const employeeId = url.searchParams.get("employeeId");
-    const role = session.user?.role;
 
-    let targetId = employeeId;
-
-    // Employee role: own only
-    if (!["superadmin", "hr", "manager"].includes(role) || !targetId) {
-      const emp = await Employee.findOne({ email: session.user.email }).select("_id").lean();
+    let targetId = canAccess(session.user, "shift_assign") ? employeeId : null;
+    if (!targetId) {
+      const emp = await getOwnEmployee(session, "_id");
       if (!emp) return NextResponse.json({ ok: true, data: [] });
       targetId = String(emp._id);
     }
@@ -40,9 +41,11 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const gate = await requirePageApi("shift_assign");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const { session, res } = await requireRoleAPI(["superadmin", "hr"]);
-    if (res) return res;
 
     const { employeeId, shiftId, effectiveDate } = await req.json();
 

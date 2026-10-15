@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePageApi } from "@/lib/rbac/guard";
 import EmployeeShift from "@/lib/models/EmployeeShift";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-    }
+    const gate = await requirePageApi("shift_assign");
+    if (gate.res) return gate.res;
 
     await dbConnect();
 
