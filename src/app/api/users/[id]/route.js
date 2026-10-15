@@ -1,18 +1,15 @@
 // src/app/api/users/[id]/route.js
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import mongoose from "mongoose";
 
 export async function PATCH(req, { params }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return new NextResponse("Unauthorized", { status: 401 });
-
-  if (!["superadmin", "hr", "it"].includes(session.user.role || "")) {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
+  // Called from the employee edit form.
+  const gate = await requirePageApi("employees");
+  if (gate.res) return gate.res;
+  const { session } = gate;
 
   const { id } = params; // userId
   if (!mongoose.isValidObjectId(id)) {

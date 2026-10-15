@@ -8,13 +8,26 @@ import User from "@/models/User";
 import Counter from "@/models/Counter";
 import { hash } from "bcryptjs";
 import { uploadFromBuffer } from "@/lib/cloudinary";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
+import { findRole } from "@/lib/rbac/resolveRole";
+
+// Without `employees`, callers (the shift-assign picker) get no contact data.
+const FULL_FIELDS =
+  "_id empId empAutoId firstName lastName nickName department position level email phone photoUrl departmentId userId";
+const PICKER_FIELDS = "_id empAutoId firstName lastName nickName department position photoUrl";
 
 export async function GET(req) {
   try {
+    // Shared read: the employee screens and the shift-assign picker.
+    const gate = await requireAnyPageApi(["employees", "shift_assign"]);
+    if (gate.res) return gate.res;
+
     await dbConnect();
 
+    const fields = canAccess(gate.session.user, "employees") ? FULL_FIELDS : PICKER_FIELDS;
     const items = await Employee.find({})
-      .select("_id empId empAutoId firstName lastName nickName department position level email phone photoUrl departmentId userId")
+      .select(fields)
       .sort({ department: 1, firstName: 1 })
       .lean();
 
@@ -27,6 +40,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const gate = await requirePageApi("employees");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
 
     const form = await req.formData();
@@ -81,6 +98,20 @@ export async function POST(req) {
       bankCode:        g("privateInfo.bankCode"),
     };
 
+    // --- login role: validated before any write (counter, upload, user) ---
+    // Must be a known key; only a superadmin may grant a superadmin role.
+    const createLogin = g("createLogin").toLowerCase() === "true";
+    const role        = (g("role") || "employee").toLowerCase();
+    if (createLogin) {
+      const roleDef = await findRole(role);
+      if (!roleDef) {
+        return NextResponse.json({ ok:false, message:`ไม่รู้จักบทบาท "${role}"` }, { status:400 });
+      }
+      if (roleDef.isSuperadmin && session.user.isSuperadmin !== true) {
+        return NextResponse.json({ ok:false, message:"เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่กำหนดบทบาทนี้ได้" }, { status:403 });
+      }
+    }
+
     // --- upload photo (optional) ---
     const photoFile = form.get("photo");
     let photoUrl = "";
@@ -109,11 +140,9 @@ export async function POST(req) {
     const empId = `${empIdPrefix}-${String(lastRun + 1).padStart(4, "0")}`;
 
     // --- create user? ---
-    const createLogin     = g("createLogin").toLowerCase() === "true";
     const accountEmail    = g("accountEmail");
     const password        = g("password");
     const passwordConfirm = g("passwordConfirm");
-    const role            = g("role") || "employee";
 
     let createdUser = null;
     if (createLogin) {

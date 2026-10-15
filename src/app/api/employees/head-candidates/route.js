@@ -1,9 +1,15 @@
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import { NextResponse } from "next/server";
+import { requirePageApi } from "@/lib/rbac/guard";
 
 export async function GET(req) {
   try {
+    // Only the HOD settings page picks heads (the department edit form
+    // loads its candidates server-side).
+    const gate = await requirePageApi("hod_settings");
+    if (gate.res) return gate.res;
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);

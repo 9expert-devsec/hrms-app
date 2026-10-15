@@ -20,18 +20,25 @@ function toRole(doc) {
 }
 
 /**
- * Role by key: the `roles` collection first, then SEED_ROLES. An unknown key
+ * Role by key, or null when the key is unknown: the `roles` collection
+ * first, then SEED_ROLES. Use this to VALIDATE a key someone submitted.
+ */
+export async function findRole(key) {
+  const k = typeof key === "string" ? key.trim().toLowerCase() : "";
+  if (!k) return null;
+  const doc = await Role.findOne({ key: k }).lean();
+  if (doc) return toRole(doc);
+  const seed = SEED_ROLES.find((r) => r.key === k);
+  return seed ? toRole(seed) : null;
+}
+
+/**
+ * Role by key for a SIGNED-IN user: like findRole, but an unknown key
  * resolves to the employee role (least privilege) with a warning.
  */
 export async function getRoleByKey(key) {
-  const k = typeof key === "string" ? key.trim().toLowerCase() : "";
-
-  if (k) {
-    const doc = await Role.findOne({ key: k }).lean();
-    if (doc) return toRole(doc);
-    const seed = SEED_ROLES.find((r) => r.key === k);
-    if (seed) return toRole(seed);
-  }
+  const known = await findRole(key);
+  if (known) return known;
 
   console.warn(`[rbac] unknown role key "${key}" — using "${FALLBACK_ROLE_KEY}"`);
   const fallback = await Role.findOne({ key: FALLBACK_ROLE_KEY }).lean();

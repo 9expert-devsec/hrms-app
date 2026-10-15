@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
 import Department from "@/models/Department";
 import mongoose from "mongoose"; // ✅ ใช้ mongoose.isValidObjectId
+import { requirePageApi } from "@/lib/rbac/guard";
 
 export async function PUT(req, { params }) {
   try {
+    // Had no auth check at all.
+    const gate = await requirePageApi("departments");
+    if (gate.res) return gate.res;
+
     await dbConnect();
     const body = await req.json();
 
@@ -40,6 +45,10 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(_req, { params }) {
   try {
+    // Had no auth check at all.
+    const gate = await requirePageApi("departments");
+    if (gate.res) return gate.res;
+
     await dbConnect();
     const doc = await Department.findByIdAndDelete(params.id);
     if (!doc) return NextResponse.json({ message: "Department not found" }, { status: 404 });

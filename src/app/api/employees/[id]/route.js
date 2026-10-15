@@ -1,8 +1,8 @@
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import User from "@/models/User";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import cloudinary from "@/lib/cloudinary";
 
 function escapeReg(s = "") {
@@ -10,8 +10,10 @@ function escapeReg(s = "") {
 }
 
 export async function PUT(req, { params }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return new Response("Unauthorized", { status: 401 });
+  // Own profile (self_profile, self fields) or any employee (employees).
+  const gate = await requireAnyPageApi(["self_profile", "employees"]);
+  if (gate.res) return gate.res;
+  const { session } = gate;
 
   await dbConnect();
 
@@ -19,12 +21,12 @@ export async function PUT(req, { params }) {
   const emp = await Employee.findById(id).lean();
   if (!emp) return new Response("Not found", { status: 404 });
 
-  const role = session.user.role;
+  const canManage = canAccess(session.user, "employees");
   const isSelf =
     String(emp._id) === String(session.user.employeeId || "") ||
     emp.email?.toLowerCase() === session.user.email?.toLowerCase();
 
-  if (!(isSelf || ["superadmin", "hr"].includes(role))) {
+  if (!(isSelf || canManage)) {
     return new Response("Forbidden", { status: 403 });
   }
 
@@ -53,7 +55,7 @@ export async function PUT(req, { params }) {
     "birthday",
   ];
 
-  const allowed = ["superadmin", "hr"].includes(role)
+  const allowed = canManage
     ? [...selfFields, ...adminExtra]
     : selfFields;
 
@@ -85,13 +87,9 @@ export async function PUT(req, { params }) {
  * กันไม่ให้ลบตัวเอง
  */
 export async function DELETE(req, { params }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return new Response("Unauthorized", { status: 401 });
-
-  const role = session.user.role;
-  if (!["superadmin", "hr"].includes(role)) {
-    return new Response("Forbidden", { status: 403 });
-  }
+  const gate = await requirePageApi("employees");
+  if (gate.res) return gate.res;
+  const { session } = gate;
 
   await dbConnect();
 

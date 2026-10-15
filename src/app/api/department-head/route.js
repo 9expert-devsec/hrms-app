@@ -1,15 +1,15 @@
 // src/app/api/department-head/route.js
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import DepartmentHead from "@/models/DepartmentHead";
 
 export async function GET() {
   try {
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const gate = await requirePageApi("hod_settings");
+    if (gate.res) return gate.res;
+    const { session } = gate;
 
     const items = await DepartmentHead.find()
       .populate("userId", "email role")
@@ -27,13 +27,10 @@ export async function GET() {
 export async function POST(req) {
   try {
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const gate = await requirePageApi("hod_settings");
+    if (gate.res) return gate.res;
+    const { session } = gate;
 
-    const role = session.user.role || "employee";
-    if (!["superadmin", "hr"].includes(role)) {
-      return NextResponse.json({ ok: false, message: "ไม่มีสิทธิ์ดำเนินการ" }, { status: 403 });
-    }
 
     const { departmentCode, userId } = await req.json();
     if (!departmentCode || !userId) {

@@ -1,15 +1,15 @@
 // src/app/api/department-head/[departmentCode]/route.js
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePageApi, requireSuperadminApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import DepartmentHead from "@/models/DepartmentHead";
 
 export async function GET(req, { params }) {
   try {
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const gate = await requirePageApi("hod_settings");
+    if (gate.res) return gate.res;
+    const { session } = gate;
 
     const { departmentCode } = await params;
 
@@ -32,13 +32,11 @@ export async function GET(req, { params }) {
 export async function DELETE(req, { params }) {
   try {
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    // DELETE stays superadmin-only, as before.
+    const gate = await requireSuperadminApi();
+    if (gate.res) return gate.res;
+    const { session } = gate;
 
-    const role = session.user.role || "employee";
-    if (role !== "superadmin") {
-      return NextResponse.json({ ok: false, message: "เฉพาะ superadmin เท่านั้น" }, { status: 403 });
-    }
 
     const { departmentCode } = await params;
 

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
+import { profileAccess } from "@/lib/rbac/scopes";
+import { departmentIdOf } from "@/lib/rbac/scopeQueries";
 
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
@@ -66,8 +68,19 @@ export default async function EmployeeProfilePage({ searchParams }) {
     String(session.user.employeeId || "") === String(e._id) ||
     session.user.email?.toLowerCase() === e.email?.toLowerCase();
 
+  // Someone else's profile: employees holders, superadmin, a head of their
+  // department, or a colleague in the same department (ทีมของฉัน links).
+  // Anyone else gets 404, so the page does not confirm the person exists.
+  const access = profileAccess(session.user, {
+    targetEmployeeId: e._id,
+    targetDepartmentId: await departmentIdOf(e),
+    targetDepartmentCode: e.department,
+  });
+  if (!isSelf && !access.canView) notFound();
+
   const canManage = canAccess(session.user, "employees");
-  const canSeeSensitive = isSelf || canManage;
+  // Bank details and emergency contact: owner, employees holders, superadmin.
+  const canSeeSensitive = isSelf || access.canSeePrivate;
   const canEdit = isSelf || canManage;
 
   const book = e.privateInfo?.bookbank || e.privateInfo || {};

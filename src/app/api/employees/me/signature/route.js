@@ -1,28 +1,19 @@
 // src/app/api/employees/me/signature/route.js
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requireSessionApi } from "@/lib/authz";
-import Employee from "@/models/Employee";
-
-async function resolveEmployee(me) {
-  if (!me) return null;
-  return (
-    (await Employee.findOne({
-      $or: [
-        { _id: me.employeeId },
-        { _id: me._id },
-        { userId: me._id },
-        { user: me._id },
-      ],
-    }).lean()) || null
-  );
-}
+import { requireAnyPageApi } from "@/lib/rbac/guard";
+import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 
 export async function GET() {
   try {
+    // The caller's OWN signature: requesters and approvers sign with it.
+    // (This used to treat the guard's return value as the user, so the
+    // lookup matched an arbitrary employee for anyone.)
+    const gate = await requireAnyPageApi(["self_leave_request", "leave_approve"]);
+    if (gate.res) return gate.res;
+
     await dbConnect();
-    const me = await requireSessionApi();
-    const emp = await resolveEmployee(me);
+    const emp = await getOwnEmployee(gate.session, "_id signatureDataUrl signature");
 
     // รองรับได้ทั้ง signatureDataUrl และ signature
     const dataUrl = emp?.signatureDataUrl || emp?.signature || "";

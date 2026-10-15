@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/authOptions";
-import { getServerSession } from "next-auth";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import Department from "@/models/Department";
 
-const ALLOWED_ROLES = ["superadmin", "hr"];
 const LEVEL_SET = new Set([1, 2, 3, 4, 5, 6]);
 
 export async function GET() {
+  // Shared read: department screens, the employee form, the HOD settings.
+  const gate = await requireAnyPageApi(["departments", "employees", "hod_settings"]);
+  if (gate.res) return gate.res;
+
   await dbConnect();
 
   // ดึงข้อมูลเฉพาะที่เกี่ยวกับการสร้างพนักงาน
@@ -23,13 +25,8 @@ export async function GET() {
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-    const role = session?.user?.role;
-    if (!ALLOWED_ROLES.includes(role)) {
-      return new Response(JSON.stringify({ message: "Forbidden" }), {
-        status: 403,
-      });
-    }
+    const gate = await requirePageApi("departments");
+    if (gate.res) return gate.res;
 
     await dbConnect();
     const body = await req.json();
