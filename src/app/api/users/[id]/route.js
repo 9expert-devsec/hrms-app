@@ -23,7 +23,22 @@ export async function PATCH(req, { params }) {
   const body = await req.json().catch(() => ({}));
   const update = {};
 
-  if (body.role) update.role = body.role;
+  // Only a superadmin may CHANGE a role (privilege escalation otherwise).
+  // The employee edit form always sends the current role along with the
+  // email, so an unchanged value is ignored rather than refused.
+  if (body.role !== undefined && body.role !== null && body.role !== "") {
+    const current = await User.findById(id).select("role").lean();
+    if (!current) return new NextResponse("Not found", { status: 404 });
+    if (body.role !== current.role) {
+      if (session.user.isSuperadmin !== true) {
+        return NextResponse.json(
+          { ok: false, message: "เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่เปลี่ยนบทบาทได้" },
+          { status: 403 }
+        );
+      }
+      update.role = body.role;
+    }
+  }
   // (ถ้าจะให้เปลี่ยนอีเมลที่นี่ด้วยก็เพิ่ม validate และ assign ได้)
 
   const doc = await User.findByIdAndUpdate(id, update, { new: true }).lean();
