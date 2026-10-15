@@ -16,34 +16,21 @@ function safeCallbackUrl(raw) {
   return raw;
 }
 
+// 2026 CI logo. File names in genesis-lab do not describe the ink:
+// logo-cloud.png = #F8FAFD knock-out for the navy panel,
+// logo-blue-ink.png = #2486FF ink, light surfaces only.
 function Logo({ tone }) {
+  const onDark = tone === "light";
   return (
-    <div className="flex items-center gap-3">
-      <Image
-        src="/logo-9hrms.png"
-        alt=""
-        width={44}
-        height={44}
-        className="h-11 w-11 object-contain"
-        priority
-      />
-      <div className="flex flex-col leading-tight">
-        <p
-          className={`text-lg font-extrabold ${
-            tone === "light" ? "text-white" : "text-9e-navy"
-          }`}
-        >
-          9Expert
-        </p>
-        <p
-          className={`text-[11px] ${
-            tone === "light" ? "text-9e-ice/70" : "text-[var(--text-muted)]"
-          }`}
-        >
-          Knowledge Provider
-        </p>
-      </div>
-    </div>
+    <Image
+      src={onDark ? "/brand/logo-cloud.png" : "/brand/logo-blue-ink.png"}
+      alt="9Expert"
+      width={960}
+      height={315}
+      className={onDark ? "h-auto w-[180px]" : "h-auto w-[150px]"}
+      sizes={onDark ? "180px" : "150px"}
+      priority
+    />
   );
 }
 
