@@ -18,7 +18,7 @@ import { menuConfig } from "@/app/config/menuConfig";
 const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
 const LIME = "#D4F73F";
-const SLATE = "#808A95";
+const SLATE = "#5E6A7E";
 const BORDER = "rgba(255,255,255,0.06)";
 
 /* ── Keys ──────────────────────────────────────────────────────── */

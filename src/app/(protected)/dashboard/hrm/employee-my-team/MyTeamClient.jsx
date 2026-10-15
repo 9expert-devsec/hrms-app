@@ -8,7 +8,7 @@ import { Crown, Users } from "lucide-react";
 const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
 const LIME = "#D4F73F";
-const SLATE = "#808A95";
+const SLATE = "#5E6A7E";
 const ICE = "#F8FAFD";
 
 /* ---------- small helpers ---------- */

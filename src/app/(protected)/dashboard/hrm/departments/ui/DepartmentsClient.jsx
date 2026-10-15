@@ -42,7 +42,7 @@ export default function DepartmentsClient({ initialItems, canEdit = false }) {
             color: "#0D1B2A",
           }}
         />
-        <Search className="absolute right-3 top-2.5 h-5 w-5" style={{ color: "#808A95" }} />
+        <Search className="absolute right-3 top-2.5 h-5 w-5" style={{ color: "#5E6A7E" }} />
       </div>
 
       {/* Grid */}
@@ -67,12 +67,12 @@ export default function DepartmentsClient({ initialItems, canEdit = false }) {
                     style={{ backgroundColor: d.color || "#005CFF" }}
                     aria-hidden
                   />
-                  <span style={{ color: "#808A95", fontSize: "13px" }}>{d.code}</span>
+                  <span style={{ color: "#5E6A7E", fontSize: "13px" }}>{d.code}</span>
                 </div>
                 <h3 style={{ color: "#0D1B2A", fontWeight: 600, fontSize: "17px" }}>
                   {d.name}
                 </h3>
-                <div style={{ color: "#808A95", fontSize: "13px" }}>
+                <div style={{ color: "#5E6A7E", fontSize: "13px" }}>
                   {Number(d._empCount ?? 0)}{" "}
                   {Number(d._empCount ?? 0) === 1 ? "person" : "people"}
                 </div>
@@ -126,7 +126,7 @@ export default function DepartmentsClient({ initialItems, canEdit = false }) {
               style={{
                 borderRadius: "12px",
                 border: "1px dashed rgba(0,92,255,0.15)",
-                color: "#808A95",
+                color: "#5E6A7E",
               }}
             >
               ไม่พบข้อมูลที่ค้นหา

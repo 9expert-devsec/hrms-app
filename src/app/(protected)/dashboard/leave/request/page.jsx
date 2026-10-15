@@ -24,7 +24,7 @@ const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
 const LIME = "#D4F73F";
 const ICE = "#F8FAFD";
-const SLATE = "#808A95";
+const SLATE = "#5E6A7E";
 const CARD = {
   background: "#FFFFFF",
   border: "1px solid rgba(0,92,255,0.10)",

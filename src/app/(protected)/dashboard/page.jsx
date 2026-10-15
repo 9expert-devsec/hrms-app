@@ -105,13 +105,13 @@ export default async function DashboardPage() {
 
               <div className="relative z-10 flex items-start justify-between">
                 <div>
-                  <p style={{ color: "#808A95", fontSize: "11px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  <p style={{ color: "#5E6A7E", fontSize: "11px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     {s.label}
                   </p>
                   <p style={{ color: "#D4F73F", fontSize: "2.25rem", fontWeight: 600, letterSpacing: "-0.02em", marginTop: "8px", lineHeight: 1 }}>
                     {s.value}
                   </p>
-                  <p style={{ color: "#808A95", fontSize: "12px", marginTop: "4px" }}>
+                  <p style={{ color: "#5E6A7E", fontSize: "12px", marginTop: "4px" }}>
                     {s.sub}
                   </p>
                 </div>
@@ -161,7 +161,7 @@ export default async function DashboardPage() {
                 <h3 style={{ color: "#0D1B2A", fontSize: "14px", fontWeight: 600 }}>
                   {card.title}
                 </h3>
-                <p style={{ color: "#808A95", fontSize: "12px", marginTop: "2px" }}>
+                <p style={{ color: "#5E6A7E", fontSize: "12px", marginTop: "2px" }}>
                   {card.desc}
                 </p>
               </div>

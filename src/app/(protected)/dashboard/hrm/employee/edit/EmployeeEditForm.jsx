@@ -579,7 +579,7 @@ export default function EmployeeEditForm({
 
 /* ---- tiny UI helpers ---- */
 function Label({ children }) {
-  return <label className="text-sm" style={{ color: "#808A95" }}>{children}</label>;
+  return <label className="text-sm" style={{ color: "#5E6A7E" }}>{children}</label>;
 }
 function Input({ label, value, onChange, type = "text", readOnly = false }) {
   return (

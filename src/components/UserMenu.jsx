@@ -39,7 +39,7 @@ export default function UserMenu({ user }) {
           </span>
           <span className="text-xs text-emerald-600 font-medium">online</span>
         </div>
-        <ChevronDown size={18} className="text-[#808A95]" />
+        <ChevronDown size={18} className="text-[#5E6A7E]" />
       </button>
 
       {open && (
@@ -96,7 +96,7 @@ function MenuItem({ href, icon, label, onClick }) {
       }}
       role="menuitem"
     >
-      <span style={{ color: "#808A95" }}>{icon}</span> <span>{label}</span>
+      <span style={{ color: "#5E6A7E" }}>{icon}</span> <span>{label}</span>
     </Link>
   );
 }

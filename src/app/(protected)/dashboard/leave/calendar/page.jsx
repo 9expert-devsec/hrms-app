@@ -13,7 +13,7 @@ import {
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
-const SLATE = "#808A95";
+const SLATE = "#5E6A7E";
 const ICE = "#F8FAFD";
 const CARD = {
   background: "#FFFFFF",

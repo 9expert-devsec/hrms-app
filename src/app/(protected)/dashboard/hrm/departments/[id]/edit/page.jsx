@@ -15,7 +15,7 @@ export default async function DepartmentEditPage({ params }) {
     .lean()
     .populate("headOfDepartment", "_id firstName lastName position level");
 
-  if (!dept) return <div className="p-6" style={{ color: "#808A95" }}>Department not found</div>;
+  if (!dept) return <div className="p-6" style={{ color: "#5E6A7E" }}>Department not found</div>;
 
   const eligible = await Employee.find({ level: { $in: [5, 6] } })
     .select("_id firstName lastName nickName position level")

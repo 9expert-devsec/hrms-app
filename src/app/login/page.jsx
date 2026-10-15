@@ -12,7 +12,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFD" }}>
-          <div style={{ color: "#808A95", fontSize: "14px" }}>กำลังโหลด...</div>
+          <div style={{ color: "#5E6A7E", fontSize: "14px" }}>กำลังโหลด...</div>
         </div>
       }
     >
@@ -87,7 +87,7 @@ function LoginContent() {
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-extrabold text-white text-base">9Expert</span>
-            <span className="text-[11px]" style={{ color: "#808A95" }}>
+            <span className="text-[11px]" style={{ color: "#5E6A7E" }}>
               Knowledge Provider
             </span>
           </div>
@@ -106,7 +106,7 @@ function LoginContent() {
           </h2>
           <p
             className="text-sm leading-relaxed max-w-sm mb-10"
-            style={{ color: "#808A95" }}
+            style={{ color: "#5E6A7E" }}
           >
             ระบบบริหารทรัพยากรบุคคลภายในองค์กร ครบวงจร ปลอดภัย และใช้งานง่าย
           </p>
@@ -121,7 +121,7 @@ function LoginContent() {
               <div
                 key={text}
                 className="flex items-center gap-3 text-sm"
-                style={{ color: "#808A95" }}
+                style={{ color: "#5E6A7E" }}
               >
                 <div
                   className="h-9 w-9 rounded-lg grid place-items-center shrink-0"
@@ -136,7 +136,7 @@ function LoginContent() {
         </div>
 
         {/* Footer */}
-        <p className="text-xs" style={{ color: "#808A95" }}>
+        <p className="text-xs" style={{ color: "#5E6A7E" }}>
           © {new Date().getFullYear()} 9 Expert Company Limited ·
           อย่าหยุดเรียนรู้
         </p>
@@ -174,7 +174,7 @@ function LoginContent() {
             >
               Sign in
             </h1>
-            <p className="text-sm mt-1" style={{ color: "#808A95" }}>
+            <p className="text-sm mt-1" style={{ color: "#5E6A7E" }}>
               Internal system — please use your company account.
             </p>
           </div>
@@ -241,12 +241,12 @@ function LoginContent() {
                   type="button"
                   onClick={() => setShowPw((s) => !s)}
                   className="absolute inset-y-0 right-0 px-3 transition-colors duration-200"
-                  style={{ color: "#808A95" }}
+                  style={{ color: "#5E6A7E" }}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.color = "#005CFF")
                   }
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.color = "#808A95")
+                    (e.currentTarget.style.color = "#5E6A7E")
                   }
                   aria-label={showPw ? "Hide password" : "Show password"}
                 >
@@ -259,7 +259,7 @@ function LoginContent() {
             <div className="flex items-center justify-between">
               <label
                 className="inline-flex items-center gap-2 text-sm"
-                style={{ color: "#808A95" }}
+                style={{ color: "#5E6A7E" }}
               >
                 <input
                   type="checkbox"
@@ -287,7 +287,7 @@ function LoginContent() {
               className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-bold text-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-95 disabled:opacity-60"
               style={{ background: "#D4F73F", color: "#0D1B2A" }}
               onMouseEnter={(e) => {
-                if (!loading) e.currentTarget.style.background = "#E4FF6B";
+                if (!loading) e.currentTarget.style.background = "#D8F852";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "#D4F73F";
@@ -301,7 +301,7 @@ function LoginContent() {
           {/* RBAC note */}
           <p
             className="mt-6 text-xs leading-relaxed"
-            style={{ color: "#808A95" }}
+            style={{ color: "#5E6A7E" }}
           >
             Access is role-based (RBAC). หากคุณยังไม่มีสิทธิ์ โปรดติดต่อ HR/IT
             เพื่อขอเพิ่ม Role ตามตารางหน้าที่ในระบบ

@@ -57,7 +57,7 @@ export default function SignatureDisplay({
             justifyContent: "center",
           }}
         >
-          <span style={{ color: "#808A95", fontSize: 13 }}>Not signed</span>
+          <span style={{ color: "#5E6A7E", fontSize: 13 }}>Not signed</span>
         </div>
       )}
 
@@ -67,7 +67,7 @@ export default function SignatureDisplay({
             display: "flex",
             gap: 12,
             fontSize: 12,
-            color: "#808A95",
+            color: "#5E6A7E",
           }}
         >
           {signerName && <span>{signerName}</span>}

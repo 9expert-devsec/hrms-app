@@ -242,7 +242,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
                 canView={canSeeSensitive}
               />
             ) : (
-              <p style={{ color: "#808A95", fontSize: "14px" }}>
+              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>
                 No emergency contact information available
               </p>
             )}
@@ -256,7 +256,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
             Icon={Lock}
             right={
               !canSeeSensitive && (
-                <span style={{ color: "#808A95", fontSize: "12px" }}>
+                <span style={{ color: "#5E6A7E", fontSize: "12px" }}>
                   Visible to the owner, HR, and Super Admin only
                 </span>
               )
@@ -270,12 +270,12 @@ export default async function EmployeeProfilePage({ searchParams }) {
                   <Info label="Bank name" value={bankName} />
                   <Info label="Branch name" value={bankBranch} />
                 </dl>
-                <p style={{ color: "#808A95", fontSize: "12px", marginTop: "12px" }}>
+                <p style={{ color: "#5E6A7E", fontSize: "12px", marginTop: "12px" }}>
                   Visible to the owner, HR, and Super Admin only
                 </p>
               </>
             ) : (
-              <p style={{ color: "#808A95", fontSize: "14px" }}>
+              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>
                 You do not have access to this information
               </p>
             )}
@@ -303,7 +303,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
                   />
                 </>
               ) : (
-                <p style={{ color: "#808A95", fontSize: "14px" }}>No actions available</p>
+                <p style={{ color: "#5E6A7E", fontSize: "14px" }}>No actions available</p>
               )}
             </div>
           </Card>
@@ -356,7 +356,7 @@ function Info({ label, value, span = false, copyable = false }) {
   const v = value ?? "-";
   return (
     <div className={span ? "sm:col-span-2" : ""}>
-      <dt style={{ color: "#808A95", fontSize: "11px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <dt style={{ color: "#5E6A7E", fontSize: "11px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
         {label}
       </dt>
       <dd className="mt-1 flex items-center gap-2" style={{ color: "#334155" }}>
@@ -379,7 +379,7 @@ function QuickActionLink({ href, label, danger = false, ActionIcon }) {
       }}
     >
       {ActionIcon && (
-        <span style={{ color: danger ? "#DC2626" : "#808A95" }}>
+        <span style={{ color: danger ? "#DC2626" : "#5E6A7E" }}>
           <ActionIcon size={15} strokeWidth={1.8} />
         </span>
       )}
@@ -396,7 +396,7 @@ function EmergencyBlock({ title, data, canView }) {
         style={{
           background: "#F8FAFD",
           border: "1px solid rgba(0,92,255,0.08)",
-          color: "#808A95",
+          color: "#5E6A7E",
         }}
       >
         Visible to the owner, HR, and Super Admin only
@@ -410,7 +410,7 @@ function EmergencyBlock({ title, data, canView }) {
         style={{
           background: "#F8FAFD",
           border: "1px solid rgba(0,92,255,0.08)",
-          color: "#808A95",
+          color: "#5E6A7E",
         }}
       >
         No data

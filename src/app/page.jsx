@@ -96,7 +96,7 @@ export default function HomePage() {
               </span>
               <span
                 className="text-[10px] font-medium"
-                style={{ color: "#808A95" }}
+                style={{ color: "#5E6A7E" }}
               >
                 Knowledge Provider
               </span>
@@ -222,7 +222,7 @@ export default function HomePage() {
           </span>
           <span
             className="mt-0.5"
-            style={{ fontSize: "14px", color: "#808A95" }}
+            style={{ fontSize: "14px", color: "#5E6A7E" }}
           >
             HRMS Portal
           </span>
@@ -265,7 +265,7 @@ export default function HomePage() {
           <p
             className="mt-4 leading-relaxed"
             style={{
-              color: "#808A95",
+              color: "#5E6A7E",
               fontSize: "16px",
               maxWidth: "480px",
             }}
@@ -280,7 +280,7 @@ export default function HomePage() {
               className="px-7 py-3 rounded-xl font-bold text-sm shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
               style={{ background: "#D4F73F", color: "#0D1B2A" }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#E4FF6B")
+                (e.currentTarget.style.background = "#D8F852")
               }
               onMouseLeave={(e) =>
                 (e.currentTarget.style.background = "#D4F73F")
@@ -331,7 +331,7 @@ export default function HomePage() {
                   <p className="text-sm font-bold" style={{ color: "#0D1B2A" }}>
                     {label}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: "#808A95" }}>
+                  <p className="text-xs mt-0.5" style={{ color: "#5E6A7E" }}>
                     {desc}
                   </p>
                 </div>
@@ -347,7 +347,7 @@ export default function HomePage() {
         style={{
           borderTop: "1px solid rgba(0,92,255,0.08)",
           background: "#FFFFFF",
-          color: "#808A95",
+          color: "#5E6A7E",
         }}
       >
         © {new Date().getFullYear()} 9 Expert Company Limited · Internal use

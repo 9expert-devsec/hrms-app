@@ -362,14 +362,14 @@ function MemberNode({ data }) {
         size={36}
         ringColor="rgba(36,134,255,0.2)"
         bgColor="#F8FAFD"
-        textColor="#808A95"
+        textColor="#5E6A7E"
         fontSize={12}
       />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "#0D1B2A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {data.name}
         </div>
-        <div style={{ fontSize: 11, color: "#808A95", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ fontSize: 11, color: "#5E6A7E", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {data.position || "-"}
         </div>
       </div>
@@ -377,7 +377,7 @@ function MemberNode({ data }) {
         <span
           style={{
             background: "#F8FAFD",
-            color: "#808A95",
+            color: "#5E6A7E",
             fontSize: 10,
             borderRadius: 6,
             padding: "2px 6px",
@@ -818,7 +818,7 @@ function OrgFlowInner({ departments, employees }) {
       >
         {/* Search */}
         <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-          <Search size={14} color="#808A95" style={{ position: "absolute", left: 10, pointerEvents: "none" }} />
+          <Search size={14} color="#5E6A7E" style={{ position: "absolute", left: 10, pointerEvents: "none" }} />
           <input
             ref={searchRef}
             list="orgPeopleList"

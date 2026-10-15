@@ -649,7 +649,7 @@ export default function EmployeeCreateForm() {
             <h3 className="text-lg font-semibold" style={{ color: "#0D1B2A" }}>
               ยืนยันการบันทึก
             </h3>
-            <p className="text-sm mt-2" style={{ color: "#808A95" }}>
+            <p className="text-sm mt-2" style={{ color: "#5E6A7E" }}>
               โปรดตรวจสอบความถูกต้องของข้อมูลพนักงานให้เรียบร้อยก่อนดำเนินการต่อ
             </p>
 

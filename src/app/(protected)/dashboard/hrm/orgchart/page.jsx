@@ -22,7 +22,7 @@ export default async function OrgChartPage() {
   return (
     <div className="px-6 py-6">
       <h1 className="text-2xl font-semibold text-[#0D1B2A] mb-1">Org Chart</h1>
-      <p className="text-[#808A95] mb-4">แผนผังโครงสร้างจากข้อมูลจริงในระบบ</p>
+      <p className="text-[#5E6A7E] mb-4">แผนผังโครงสร้างจากข้อมูลจริงในระบบ</p>
       <OrgFlowClient
         departments={JSON.parse(JSON.stringify(deps))}
         employees={JSON.parse(JSON.stringify(emps))}

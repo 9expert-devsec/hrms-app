@@ -20,7 +20,7 @@ import {
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
-const SLATE = "#808A95";
+const SLATE = "#5E6A7E";
 const ICE = "#F8FAFD";
 const CARD = {
   background: "#FFFFFF",
@@ -573,7 +573,7 @@ const thStyle = {
   textAlign: "left",
   fontSize: 13,
   fontWeight: 600,
-  color: "#808A95",
+  color: "#5E6A7E",
   borderBottom: "1px solid rgba(0,92,255,0.08)",
 };
 

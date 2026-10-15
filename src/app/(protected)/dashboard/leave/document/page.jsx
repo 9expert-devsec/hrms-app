@@ -20,7 +20,7 @@ import AttachmentViewer, { hasAttachments } from "./../../../../../components/At
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
-const SLATE = "#808A95";
+const SLATE = "#5E6A7E";
 const ICE = "#F8FAFD";
 const CARD = {
   background: "#FFFFFF",
@@ -70,7 +70,7 @@ export default function LeaveDocumentPage() {
     <Suspense
       fallback={
         <div style={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ color: "#808A95", fontSize: "14px" }}>กำลังโหลดเอกสาร...</div>
+          <div style={{ color: "#5E6A7E", fontSize: "14px" }}>กำลังโหลดเอกสาร...</div>
         </div>
       }
     >

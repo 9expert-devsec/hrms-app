@@ -216,7 +216,7 @@ export default function SignaturePad({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
       />
-      <span style={{ color: "#808A95", fontSize: 12 }}>
+      <span style={{ color: "#5E6A7E", fontSize: 12 }}>
         Please sign within the box
       </span>
       <div style={{ display: "flex", gap: 8 }}>
