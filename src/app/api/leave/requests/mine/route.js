@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireAnyPageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import LeaveRequest from "@/models/LeaveRequest";
@@ -24,9 +23,11 @@ async function resolveEmployeeFromSession(session) {
 }
 
 export async function GET(req) {
+  const gate = await requireAnyPageApi(["self_leave_request", "self_leave_history"]);
+  if (gate.res) return gate.res;
+  const { session } = gate;
+
   await dbConnect();
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const emp = await resolveEmployeeFromSession(session);
   if (!emp?._id) return NextResponse.json({ items: [] });

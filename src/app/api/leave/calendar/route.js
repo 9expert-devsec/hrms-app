@@ -1,15 +1,16 @@
 // src/app/api/leave/calendar/route.js
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requirePageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
 
 export async function GET(req) {
   try {
+    const gate = await requirePageApi("leave_calendar");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
     const month = Number(searchParams.get("month"));

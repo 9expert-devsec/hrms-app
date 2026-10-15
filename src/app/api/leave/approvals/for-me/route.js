@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireSuperadminApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import dbConnect from "@/lib/mongoose";
 import mongoose from "mongoose";
 import LeaveRequest from "@/models/LeaveRequest";
@@ -26,23 +26,20 @@ async function resolveEmployeeFromSession(session) {
   return await Employee.findOne({ $or: or }).lean();
 }
 
-/* ตรวจบทบาท HR แบบกันพลาด */
-function detectIsHR(session, employee) {
-  const rolesRaw = session?.user?.roles ?? session?.user?.role ?? [];
-  const rolesArr = Array.isArray(rolesRaw) ? rolesRaw : (rolesRaw ? [rolesRaw] : []);
-  const roles = rolesArr.map(r => String(r).toLowerCase());
-
-  if (roles.some(r => r === "hr" || (r.includes("human") && r.includes("resource")))) return true;
-
-  const deptName = String(employee?.departmentName || employee?.department || "").toLowerCase();
-  const pos = String(employee?.position || "").toLowerCase();
-  return deptName.includes("hr") || pos.includes("hr");
+/* HR = the HR leave step in the RBAC registry. (This used to read
+   session.user.roles, which is never set, and fell back to any department
+   or position containing "hr".) */
+function detectIsHR(session) {
+  return canAccess(session?.user, "scope_leave_hr_step");
 }
 
 export async function GET(req) {
+  // Orphan page (/dashboard/leave/approval): superadmin only.
+  const gate = await requireSuperadminApi();
+  if (gate.res) return gate.res;
+  const { session } = gate;
+
   await dbConnect();
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const actor = await resolveEmployeeFromSession(session);
   if (!actor?._id) return NextResponse.json({ items: [] });

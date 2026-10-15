@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireSuperadminApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import LeaveRequest from "@/models/LeaveRequest";
 import mongoose from "mongoose";
 
 async function canApproveHOD(session, employee) {
-  const role = session.user?.role || "employee";
-  if (["superadmin","hr"].includes(role)) return false; // HR ไม่ใช่ HOD-phase
+  if (canAccess(session.user, "scope_leave_hr_step")) return false; // HR ไม่ใช่ HOD-phase
   if (!session.user?.employeeId) return false;
   const dep = await Department.findOne({ headOfDepartment: session.user.employeeId }).select("_id").lean();
   if (!dep) return false;
@@ -24,9 +23,12 @@ function injectSign(html, label, name) {
 
 export async function PATCH(req, { params }) {
   try {
+    // Legacy LeaveRequest flow with no caller: superadmin only.
+    const gate = await requireSuperadminApi();
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ message:"Unauthorized" }, { status:401 });
 
     const id = params.id;
     if (!mongoose.isValidObjectId(id)) return NextResponse.json({ message:"Invalid id" }, { status:400 });
@@ -41,7 +43,7 @@ export async function PATCH(req, { params }) {
     }
 
     const emp = await Employee.findById(doc.employeeId).lean();
-    const isHR = ["superadmin","hr"].includes(session.user?.role || "employee");
+    const isHR = canAccess(session.user, "scope_leave_hr_step");
 
     // Phase ตรวจสิทธิ์
     if (doc.status === "pending_hod") {

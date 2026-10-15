@@ -2,8 +2,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireSuperadminApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import LeaveRequest from "@/models/LeaveRequest";
 import Employee from "@/models/Employee";
@@ -35,10 +34,13 @@ async function resolveEmployeeFromSession(session) {
 }
 
 export async function POST(req, ctx) {
+  // Orphan page (/dashboard/leave/approval): superadmin only. It used to
+  // let any signed-in user reject any request.
+  const gate = await requireSuperadminApi();
+  if (gate.res) return gate.res;
+  const { session } = gate;
+
   await dbConnect();
-  const session = await getServerSession(authOptions);
-  if (!session)
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const actor = await resolveEmployeeFromSession(session);
 

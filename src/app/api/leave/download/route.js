@@ -1,9 +1,9 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireAnyPageApi } from "@/lib/rbac/guard";
 
 export async function GET(req) {
-  const session = await getServerSession(authOptions);
-  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // AttachmentViewer on the leave approve and leave document pages.
+  const gate = await requireAnyPageApi(["self_leave_document", "leave_approve"]);
+  if (gate.res) return gate.res;
 
   const { searchParams } = new URL(req.url);
   const url = searchParams.get("url");
@@ -11,8 +11,15 @@ export async function GET(req) {
 
   if (!url) return Response.json({ error: "No URL" }, { status: 400 });
 
-  // Only allow Cloudinary URLs
-  if (!url.includes("cloudinary.com")) {
+  // Only our Cloudinary host. (A substring check let any URL containing
+  // "cloudinary.com" through this server-side fetch.)
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return Response.json({ error: "Invalid URL" }, { status: 400 });
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") {
     return Response.json({ error: "Invalid URL" }, { status: 400 });
   }
 

@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
 // ถ้าทีมคุณมี requireSessionApi แยกสำหรับ API ให้เปลี่ยนเป็น requireSessionApi ได้
-import { requireSessionPage as requireSession } from "@/lib/authz";
+import { requirePageApi } from "@/lib/rbac/guard";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import LeaveRequest from "@/models/LeaveRequest";
@@ -35,8 +35,11 @@ function countDaysInclusive(start, end) {
 /* ---------------- handler ---------------- */
 export async function POST(req) {
   try {
+    const gate = await requirePageApi("self_leave_request");
+    if (gate.res) return gate.res;
+    const me = gate.session;
+
     await dbConnect();
-    const me = await requireSession();
 
     // ---- แยกอ่าน payload ตาม Content-Type ----
     const ct = req.headers.get("content-type") || "";

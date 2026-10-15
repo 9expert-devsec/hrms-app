@@ -1,15 +1,21 @@
 // src/app/api/leave/balance/route.js
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireAnyPageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import LeaveBalance from "@/models/LeaveBalance";
 
 export async function GET(req) {
   try {
+    const gate = await requireAnyPageApi(["self_leave_balance", "self_leave_request"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    // Without a linked employee the default record below would be created
+    // with employeeId null.
+    if (!session.user.employeeId) {
+      return NextResponse.json({ ok: false, message: "ไม่พบข้อมูลพนักงาน" }, { status: 404 });
+    }
 
     const { searchParams } = new URL(req.url);
     const year = Number(searchParams.get("year")) || new Date().getFullYear();

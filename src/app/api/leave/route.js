@@ -1,7 +1,8 @@
 // src/app/api/leave/route.js
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
+import { canOpenLeaveApproval, canAccess } from "@/lib/rbac/access";
+import { leaveListEmployeeIds } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
 import LeaveBalance from "@/models/LeaveBalance";
@@ -24,23 +25,37 @@ function countWorkingDays(start, end) {
 /* ---------- GET ---------- */
 export async function GET(req) {
   try {
+    // Own leaves for the self-service pages; ?scope=all for approvers and
+    // the all-documents scope (see below).
+    const gate = await requireAnyPageApi([
+      "self_leave_history",
+      "self_leave_document",
+      "self_leave_balance",
+      "self_leave_request",
+      "leave_approve",
+    ]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const year = searchParams.get("year");
 
-    const role = session.user.role || "employee";
     const userId = session.user.id || session.user._id || session.user.sub;
     const scope = searchParams.get("scope");
     const filter = {};
 
-    // superadmin/hr สามารถดูทั้งหมดได้เฉพาะเมื่อส่ง scope=all (หน้า approve)
-    // ไม่งั้นทุก role จะเห็นเฉพาะของตัวเอง (หน้า history)
-    if (["superadmin", "hr"].includes(role) && scope === "all") {
-      // no userId filter — see all records
+    // scope=all: approvers (leave_approve or department heads) and holders
+    // of scope_leave_documents_all, narrowed like the pending list — HR step
+    // and all-documents see everyone, otherwise the HOD-step departments.
+    // Anyone else, or no scope=all: the caller's own leaves.
+    const user = session.user;
+    const mayListOthers = canOpenLeaveApproval(user) || canAccess(user, "scope_leave_documents_all");
+    if (scope === "all" && mayListOthers) {
+      const ids = await leaveListEmployeeIds(user); // null = everyone
+      if (ids) filter.employeeId = { $in: ids };
     } else {
       filter.userId = userId;
     }
@@ -70,9 +85,11 @@ export async function GET(req) {
 /* ---------- POST ---------- */
 export async function POST(req) {
   try {
+    const gate = await requirePageApi("self_leave_request");
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 
     // TODO: remove this debug log once userId issue is confirmed fixed
     console.log("POST /api/leave session.user:", JSON.stringify(session.user));

@@ -5,6 +5,8 @@ import dbConnect from "@/lib/mongoose";
 import LeaveRequest from "@/models/LeaveRequest";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
+import { requireAnyPageApi } from "@/lib/rbac/guard";
+import { canSeeLeaveDocument } from "@/lib/rbac/leaveScope";
 
 // ---------- helpers ----------
 const safe = (v, d = "-") =>
@@ -58,6 +60,9 @@ function sigBox(title, sig) {
 // ---------- route ----------
 export async function GET(req, ctx) {
   try {
+    const gate = await requireAnyPageApi(["self_leave_document", "self_leave_request", "leave_approve"]);
+    if (gate.res) return gate.res;
+
     await dbConnect();
 
     // รองรับ Next 13/14: params บางเวอร์ชันเป็น promise
@@ -75,6 +80,12 @@ export async function GET(req, ctx) {
     const emp =
       (doc.employeeId && (await Employee.findById(doc.employeeId).lean())) ||
       {};
+
+    // Signed leave document: owner, a head of the owner's department, the
+    // leave scopes, superadmin. Anyone else gets the same 404 as a bad id.
+    if (!(await canSeeLeaveDocument(gate.session, { employee: emp }))) {
+      return NextResponse.json({ message: "Not found" }, { status: 404 });
+    }
     const dept =
       (emp?.departmentId &&
         (await Department.findById(emp.departmentId).lean())) ||

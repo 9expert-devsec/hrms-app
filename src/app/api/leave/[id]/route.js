@@ -1,17 +1,19 @@
 // src/app/api/leave/[id]/route.js
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireAnyPageApi } from "@/lib/rbac/guard";
+import { canSeeLeaveDocument } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
 
 /* ---------- GET ---------- */
 export async function GET(_req, { params }) {
   try {
+    const gate = await requireAnyPageApi(["self_leave_document", "self_leave_history", "leave_approve"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) {
@@ -19,12 +21,16 @@ export async function GET(_req, { params }) {
     }
 
     const leave = await Leave.findById(id)
-      .populate("employeeId", "firstName lastName department position empId photoUrl")
+      .populate("employeeId", "firstName lastName department departmentId position empId photoUrl")
       .populate("hodApproverId", "email role")
       .populate("hrApproverId", "email role")
       .lean();
 
-    if (!leave) return NextResponse.json({ ok: false, message: "ไม่พบรายการลา" }, { status: 404 });
+    // Owner, a head of the owner's department, the leave scopes, superadmin.
+    // Anyone else gets the same 404 as a missing id.
+    const visible =
+      leave && (await canSeeLeaveDocument(session, { ownerUserId: leave.userId, employee: leave.employeeId }));
+    if (!visible) return NextResponse.json({ ok: false, message: "ไม่พบรายการลา" }, { status: 404 });
 
     return NextResponse.json({ ok: true, leave });
   } catch (err) {
@@ -36,9 +42,11 @@ export async function GET(_req, { params }) {
 /* ---------- PATCH ---------- */
 export async function PATCH(req, { params }) {
   try {
+    const gate = await requireAnyPageApi(["self_leave_request", "self_leave_history"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) {
@@ -87,9 +95,11 @@ export async function PATCH(req, { params }) {
 /* ---------- DELETE ---------- */
 export async function DELETE(_req, { params }) {
   try {
+    const gate = await requireAnyPageApi(["self_leave_request", "self_leave_history"]);
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) {

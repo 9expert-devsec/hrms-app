@@ -5,6 +5,7 @@ import LeaveType from "@/models/LeaveType";
 import LeaveQuota from "@/models/LeaveQuota";
 import LeaveRequest from "@/models/LeaveRequest";
 import { NextResponse } from "next/server";
+import { requireSuperadminApi } from "@/lib/rbac/guard";
 import mongoose from "mongoose";
 
 async function ensureDefaultTypes() {
@@ -23,6 +24,10 @@ async function ensureDefaultTypes() {
 
 export async function GET(req) {
   try {
+    // Orphan page (/dashboard/leave/entitlements): superadmin only.
+    const gate = await requireSuperadminApi();
+    if (gate.res) return gate.res;
+
     await dbConnect();
     await ensureDefaultTypes();
 
@@ -102,6 +107,10 @@ export async function GET(req) {
 
 export async function PUT(req) {
   try {
+    // Orphan page (/dashboard/leave/entitlements): superadmin only.
+    const gate = await requireSuperadminApi();
+    if (gate.res) return gate.res;
+
     await dbConnect();
     const body = await req.json();
     const { employeeId, year, rows } = body || {};
