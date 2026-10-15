@@ -32,6 +32,7 @@ const lineSeed = localFont({
 export const metadata = {
   title: "9Expert HRMS",
   description: "Internal Human Resource Management System — 9Expert Training",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }) {
