@@ -5,40 +5,9 @@ import LeaveRequest from "@/models/LeaveRequest";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import { NextResponse } from "next/server";
-import { requireSessionRoute as _requireSessionRoute } from "@/lib/authz";
-
-// fallback สำหรับโปรเจ็กต์ที่ export ชื่ออื่น
-async function requireSessionRoute(req) {
-  // พยายามดึงจาก "@/lib/authz" ให้ได้สักตัว
-  const authz = await import("@/lib/authz").catch(() => ({}));
-
-  const candidate =
-    (authz &&
-      typeof authz.requireSessionRoute === "function" &&
-      authz.requireSessionRoute) ||
-    (authz &&
-      typeof authz.requireSessionApi === "function" &&
-      authz.requireSessionApi) ||
-    (authz &&
-      typeof authz.requireSession === "function" &&
-      authz.requireSession) ||
-    (authz && typeof authz.getSession === "function" && authz.getSession) ||
-    null;
-
-  if (candidate) {
-    return await candidate(req);
-  }
-
-  // fallback สุดท้าย: next-auth (ถ้ามี)
-  try {
-    const { getServerSession } = await import("next-auth");
-    return await getServerSession();
-  } catch (e) {
-    // ไม่มีอะไรให้ใช้จริง ๆ
-  }
-
-  throw new Error("No session resolver exported from '@/lib/authz'");
-}
+import { requireSuperadminApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
+import { resolveActorEmployee, isHODForEmployee } from "@/lib/approvals/authz";
 
 // สร้าง/แทนที่ signature ของ role ที่กำหนด
 function upsertSignature(arr = [], sig) {
@@ -158,13 +127,18 @@ function renderLeaveDoc(doc) {
 }
 
 export async function POST(req, ctx) {
+  // Orphan page (/dashboard/leave/approval): superadmin only. Before this,
+  // the handler referenced helpers it never imported and always threw.
+  const gate = await requireSuperadminApi();
+  if (gate.res) return gate.res;
+
   await dbConnect();
 
   // รองรับ next 13/14 (params อาจเป็น promise)
   const { id } = (await ctx?.params) || ctx?.params || {};
   if (!id) return NextResponse.json({ message: "Missing id" }, { status: 400 });
 
-  const session = await requireSession(req); // <- ต้องเรียกตัวนี้ให้ได้ session
+  const session = gate.session;
   const actorEmp = await resolveActorEmployee(session);
   if (!actorEmp) {
     return NextResponse.json(
@@ -194,7 +168,7 @@ export async function POST(req, ctx) {
     });
     doc.status = "pending_hr";
   } else if (doc.status === "pending_hr") {
-    if (!isHR(session)) {
+    if (!canAccess(session.user, "scope_leave_hr_step")) {
       return NextResponse.json(
         { message: "Only HR can approve at this step." },
         { status: 403 }

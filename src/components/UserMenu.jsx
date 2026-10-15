@@ -6,7 +6,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { canAccessPath } from "@/lib/rbac/access";
 import {
-  ChevronDown, User as UserIcon, MessageSquare, Inbox,
+  ChevronDown, User as UserIcon,
   UserPlus, LogOut
 } from "lucide-react";
 
@@ -54,8 +54,6 @@ export default function UserMenu({ user }) {
           className="absolute right-0 mt-2 w-60 rounded-xl p-1 z-50"
         >
           <MenuItem href="/dashboard/hrm/employee-profile" icon={<UserIcon size={16} />} label="Profile" onClick={() => setOpen(false)} />
-          <MenuItem href="/dashboard/chat"    icon={<MessageSquare size={16} />} label="Chat"    onClick={() => setOpen(false)} />
-          <MenuItem href="/dashboard/inbox"   icon={<Inbox size={16} />} label="Inbox"          onClick={() => setOpen(false)} />
           {canAccessPath(user, "/dashboard/admin/register") && (
             <MenuItem href="/dashboard/admin/register" icon={<UserPlus size={16} />} label="Add Account" onClick={() => setOpen(false)} />
           )}

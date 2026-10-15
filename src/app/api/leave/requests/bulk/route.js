@@ -1,18 +1,14 @@
 // src/app/api/leave/requests/bulk/route.js
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireSuperadminApi } from "@/lib/rbac/guard";
+import { canAccess } from "@/lib/rbac/access";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import LeaveRequest from "@/models/LeaveRequest";
 import LeaveType from "@/models/LeaveType";
 import mongoose from "mongoose";
 
-async function isHR(session) {
-  const role = session.user?.role || "employee";
-  return ["superadmin","hr"].includes(role);
-}
 async function hodDeptIds(session) {
   if (!session.user?.employeeId) return [];
   const hods = await Department.find({ headOfDepartment: session.user.employeeId }).select("_id").lean();
@@ -21,9 +17,12 @@ async function hodDeptIds(session) {
 
 export async function POST(req) {
   try {
+    // Legacy LeaveRequest flow with no caller: superadmin only.
+    const gate = await requireSuperadminApi();
+    if (gate.res) return gate.res;
+    const { session } = gate;
+
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ message:"Unauthorized" }, { status:401 });
 
     const body = await req.json();
     const action = body?.action; // approve | reject
@@ -44,7 +43,7 @@ export async function POST(req) {
       .lean();
 
     const empMap = new Map(employees.map(e => [e._id.toString(), e]));
-    const canAll = await isHR(session);
+    const canAll = canAccess(session.user, "scope_leave_hr_step");
     const hodIds = canAll ? [] : await hodDeptIds(session);
 
     // ตรวจสิทธิ์รายใบ
