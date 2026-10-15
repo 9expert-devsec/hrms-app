@@ -215,13 +215,21 @@ export default function LoginClient() {
               </div>
             )}
 
+            {/* Hover goes darker: lime-lt is indistinguishable from lime on this
+                light panel. Tailwind v4 lifts via the `translate` property, so
+                that is what transitions; motion-safe drops the lift and icon
+                nudge under reduced motion. */}
             <button
               type="submit"
               disabled={loading}
               aria-busy={loading}
-              className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-[var(--9e-radius-md)] bg-9e-lime text-base font-bold text-9e-navy shadow-[0_8px_20px_-8px_rgb(var(--shadow-color)/0.45)] transition-colors enabled:hover:bg-9e-lime-lt enabled:active:bg-9e-lime-dk disabled:cursor-not-allowed disabled:opacity-70"
+              className="group inline-flex h-14 w-full items-center justify-center gap-2 rounded-[var(--9e-radius-md)] bg-9e-lime text-base font-bold text-9e-navy shadow-[0_8px_20px_-8px_rgb(var(--shadow-color)/0.45)] transition-[background-color,translate,box-shadow] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] enabled:hover:bg-9e-lime-dk enabled:hover:shadow-[0_12px_28px_-8px_rgb(var(--shadow-color)/0.5)] motion-safe:enabled:hover:-translate-y-px enabled:active:bg-9e-lime-dk enabled:active:shadow-[0_8px_20px_-8px_rgb(var(--shadow-color)/0.45)] motion-safe:enabled:active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <LogIn size={18} aria-hidden="true" />
+              <LogIn
+                size={18}
+                aria-hidden="true"
+                className="transition-[translate] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] motion-safe:group-enabled:group-hover:translate-x-0.5"
+              />
               {loading ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
             </button>
           </form>
