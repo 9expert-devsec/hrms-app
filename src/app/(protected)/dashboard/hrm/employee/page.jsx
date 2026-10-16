@@ -6,6 +6,7 @@ import Department from "@/models/Department"; // ✅ ดึงสีจาก de
 import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import EmployeeGroupsClient from "./EmployeeGroupsClient";
+import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function EmployeeIndexPage() {
   // ✅ ดึงรายชื่อพนักงาน (ข้อมูลเบา ๆ)
   const docs = await Employee.find(
     {},
-    "empAutoId firstName lastName nickName department position phone email photoUrl userId"
+    "empAutoId firstName lastName titleTh firstNameTh lastNameTh nickName department position phone email photoUrl userId"
   )
     .sort({ department: 1, lastName: 1, firstName: 1 })
     .lean();
@@ -60,7 +61,8 @@ export default async function EmployeeIndexPage() {
     groups[dept].push({
       id: String(e._id),
       empAutoId: e.empAutoId,
-      name: `${e.firstName} ${e.lastName}`,
+      name: employeeDisplayName(e),
+      nameSearch: employeeNameSearchText(e),
       nickName: e.nickName,
       position: e.position,
       phone: e.phone,

@@ -27,6 +27,12 @@ const EmployeeSchema = new Schema(
   {
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
+    // Thai name (lib/employeeName.js). Optional here so existing records stay
+    // valid; POST /api/employees requires all three, and an edit may not clear
+    // a value once set.
+    titleTh: { type: String, enum: ["นาย", "นาง", "นางสาว"] },
+    firstNameTh: { type: String, trim: true },
+    lastNameTh: { type: String, trim: true },
     nickName: { type: String },
     department: { type: String, required: true }, // เช่น "IT"
     position: { type: String, required: true }, // เช่น "Senior IT Support"

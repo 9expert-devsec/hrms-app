@@ -29,7 +29,8 @@ export default function EmployeeGroupsClient({ groups, order, labels, deptColors
     const out = {};
     Object.entries(groups).forEach(([dept, list]) => {
       const keep = list.filter((e) =>
-        [e.name, e.nickName, String(e.empAutoId), e.position, e.email, e.phone]
+        // nameSearch: Thai + English + nickname (lib/employeeName.js)
+        [e.name, e.nameSearch, e.nickName, String(e.empAutoId), e.position, e.email, e.phone]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(s))
       );

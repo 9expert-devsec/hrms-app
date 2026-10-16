@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
 import NoAccountBadge from "../../../../../../../components/NoAccountBadge";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -142,7 +143,7 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
               {showNoHeadOption && <option value="">— ไม่กำหนด —</option>}
               {eligibleHeads.map((u) => (
                 <option key={u._id} value={u._id}>
-                  {[u.firstName, u.lastName].filter(Boolean).join(" ") || u.nickName || "-"}
+                  {employeeDisplayName(u) || u.nickName || "-"}
                   {u.position ? ` • ${u.position}` : ""} {u.level ? ` • L${u.level}` : ""}
                 </option>
               ))}

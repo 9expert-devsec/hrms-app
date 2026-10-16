@@ -12,7 +12,7 @@ import Employee from "@/models/Employee";
  * Callers must have called dbConnect() first.
  */
 
-export const HEAD_FIELDS = "_id firstName lastName empAutoId userId";
+export const HEAD_FIELDS = "_id firstName lastName firstNameTh lastNameTh empAutoId userId";
 
 /** Thrown for bad input; `status` is the HTTP status to answer with. */
 export class HodError extends Error {
@@ -34,6 +34,8 @@ function toItem(dept) {
           _id: String(head._id),
           firstName: head.firstName ?? "",
           lastName: head.lastName ?? "",
+          firstNameTh: head.firstNameTh ?? "",
+          lastNameTh: head.lastNameTh ?? "",
           empAutoId: head.empAutoId ?? null,
           userId: head.userId ? String(head.userId) : null,
         }
@@ -94,10 +96,17 @@ export async function listHeadCandidates(q = "") {
   const query = String(q || "").trim();
   if (query) {
     const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    match.$or = [{ firstName: regex }, { lastName: regex }, { nickName: regex }, { position: regex }];
+    match.$or = [
+      { firstName: regex },
+      { lastName: regex },
+      { firstNameTh: regex },
+      { lastNameTh: regex },
+      { nickName: regex },
+      { position: regex },
+    ];
   }
   return Employee.find(match)
-    .select("_id firstName lastName nickName empAutoId position level department userId photoUrl")
+    .select("_id firstName lastName firstNameTh lastNameTh nickName empAutoId position level department userId photoUrl")
     .sort({ level: -1, firstName: 1 })
     .lean();
 }

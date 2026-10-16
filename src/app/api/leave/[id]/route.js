@@ -22,7 +22,7 @@ export async function GET(_req, { params }) {
     }
 
     const leave = await Leave.findById(id)
-      .populate("employeeId", "firstName lastName department departmentId position empId photoUrl")
+      .populate("employeeId", "firstName lastName titleTh firstNameTh lastNameTh department departmentId position empId photoUrl")
       .populate("hodApproverId", "email role")
       .populate("hrApproverId", "email role")
       .lean();

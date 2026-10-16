@@ -8,14 +8,15 @@ import Employee from "@/models/Employee";
 import MyTeamClient from "./MyTeamClient";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 const headFields =
-  "_id firstName lastName nickName position level photoUrl";
+  "_id firstName lastName firstNameTh lastNameTh nickName position level photoUrl";
 const empFields =
-  "_id firstName lastName nickName position level photoUrl department departmentId";
+  "_id firstName lastName firstNameTh lastNameTh nickName position level photoUrl department departmentId";
 
-const fullName = (e) =>
-  [e?.firstName, e?.lastName].filter(Boolean).join(" ") || e?.nickName || "-";
+// Thai name when present, else English (lib/employeeName.js)
+const fullName = (e) => employeeDisplayName(e) || e?.nickName || "-";
 
 export default async function EmployeeMyTeamPage({ searchParams }) {
   const session = await requirePage("self_team");

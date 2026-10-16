@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { requireSuperadminApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { resolveActorEmployee, isHODForEmployee } from "@/lib/approvals/authz";
+import { employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 
 // สร้าง/แทนที่ signature ของ role ที่กำหนด
 function upsertSignature(arr = [], sig) {
@@ -44,11 +45,11 @@ function renderLeaveDoc(doc) {
   const emp = doc.employee || {};
   const hov = doc.hod || {};
   const hr = doc.hr || {};
-  const hodName =
-    [hov.firstName, hov.lastName].filter(Boolean).join(" ") || "-";
-  const hrName = [hr.firstName, hr.lastName].filter(Boolean).join(" ") || "-";
-  const empName =
-    [emp.firstName, emp.lastName].filter(Boolean).join(" ") || "-";
+  // Formal document: Thai name with title when complete (lib/employeeName.js).
+  const formal = (e) => employeeFullNameTh(e) || employeeDisplayName(e) || "-";
+  const hodName = formal(hov);
+  const hrName = formal(hr);
+  const empName = formal(emp);
 
   return `<!doctype html>
 <html>

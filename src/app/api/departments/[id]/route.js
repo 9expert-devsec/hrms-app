@@ -40,7 +40,7 @@ export async function PUT(req, { params }) {
 
     const doc = await Department.findByIdAndUpdate(params.id, update, {
       new: true,
-    }).populate("headOfDepartment", "_id firstName lastName position level empAutoId userId");
+    }).populate("headOfDepartment", "_id firstName lastName firstNameTh lastNameTh position level empAutoId userId");
 
     if (!doc) return NextResponse.json({ message: "Department not found" }, { status: 404 });
     return NextResponse.json(doc);

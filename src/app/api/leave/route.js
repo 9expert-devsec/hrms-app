@@ -74,7 +74,7 @@ export async function GET(req) {
     }
 
     const items = await Leave.find(filter)
-      .populate("employeeId", "firstName lastName department position empId photoUrl")
+      .populate("employeeId", "firstName lastName firstNameTh lastNameTh department position empId photoUrl")
       .sort({ createdAt: -1 })
       .lean();
 

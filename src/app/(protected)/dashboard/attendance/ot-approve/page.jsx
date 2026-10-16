@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
 import Avatar from "../../../../../components/Avatar";
+import { employeeDisplayName } from "@/lib/employeeName";
 import {
   CheckSquare,
   Loader2,
@@ -165,7 +166,7 @@ export default function OTApprovePage() {
     const emp = item.employeeId;
     if (!emp || typeof emp !== "object") return { name: "-", dept: "-", pos: "-", photo: null };
     return {
-      name: `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "-",
+      name: employeeDisplayName(emp) || "-",
       dept: emp.department || "-",
       pos: emp.position || "-",
       photo: emp.photoUrl || null,

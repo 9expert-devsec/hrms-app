@@ -30,15 +30,13 @@ export async function GET(req) {
       startDate: { $lte: monthEnd },
       endDate: { $gte: monthStart },
     })
-      .populate("employeeId", "firstName lastName department photoUrl")
+      .populate("employeeId", "firstName lastName firstNameTh lastNameTh department photoUrl")
       .sort({ startDate: 1 })
       .lean();
 
     const result = items.map((item) => ({
       employeeId: item.employeeId?._id,
-      employeeName: item.employeeId
-        ? `${item.employeeId.firstName} ${item.employeeId.lastName}`
-        : "Unknown",
+      employeeName: item.employeeId ? employeeDisplayName(item.employeeId) : "Unknown",
       department: item.employeeId?.department,
       leaveType: item.leaveType,
       startDate: item.startDate,

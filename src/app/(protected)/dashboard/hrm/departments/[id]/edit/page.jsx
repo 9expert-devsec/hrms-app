@@ -13,7 +13,7 @@ export default async function DepartmentEditPage({ params }) {
 
   const dept = await Department.findById(id)
     .lean()
-    .populate("headOfDepartment", "_id firstName lastName position level");
+    .populate("headOfDepartment", "_id firstName lastName firstNameTh lastNameTh position level");
 
   if (!dept) return <div className="p-6" style={{ color: "#5E6A7E" }}>Department not found</div>;
 

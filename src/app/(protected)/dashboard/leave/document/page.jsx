@@ -18,6 +18,7 @@ import SignatureDisplay from "./../../../../../components/SignatureDisplay";
 import AttachmentViewer, { hasAttachments } from "./../../../../../components/AttachmentViewer";
 import { canAccess } from "@/lib/rbac/access";
 import { accountLabel } from "@/lib/deletedAccount";
+import { employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -243,7 +244,7 @@ function DocumentList() {
             <tbody>
               {filtered.map((item) => {
                 const emp = item.employeeId || {};
-                const empName = [emp.firstName, emp.lastName].filter(Boolean).join(" ") || "-";
+                const empName = employeeDisplayName(emp) || "-";
                 const badge = STATUS_BADGE[item.status] || STATUS_BADGE.pending;
 
                 return (
@@ -353,7 +354,8 @@ function DocumentDetail({ id }) {
   }
 
   const emp = leave.employeeId || {};
-  const empName = [emp.firstName, emp.lastName].filter(Boolean).join(" ") || "-";
+  // Formal document: Thai name with title when complete, else the display name.
+  const empName = employeeFullNameTh(emp) || employeeDisplayName(emp) || "-";
 
   return (
     <>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
 import Avatar from "../../../../../components/Avatar";
+import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
 import {
   Users,
   Search,
@@ -137,7 +138,7 @@ export default function AssignShiftPage() {
         }
       }
       if (kw) {
-        const full = `${emp.firstName} ${emp.lastName} ${emp.nickName || ""} ${emp.empAutoId || ""}`.toLowerCase();
+        const full = `${employeeNameSearchText(emp)} ${emp.empAutoId || ""}`.toLowerCase();
         if (!full.includes(kw)) return false;
       }
       return true;
@@ -360,7 +361,7 @@ export default function AssignShiftPage() {
                           )}
                           <div>
                             <p className="font-semibold" style={{ color: NAVY }}>
-                              {emp.firstName} {emp.lastName}
+                              {employeeDisplayName(emp)}
                             </p>
                             {emp.empAutoId && (
                               <p className="text-xs" style={{ color: SLATE }}>
@@ -511,7 +512,7 @@ export default function AssignShiftPage() {
                 )}
                 <div>
                   <p className="font-semibold text-sm" style={{ color: NAVY }}>
-                    {modal.employee.firstName} {modal.employee.lastName}
+                    {employeeDisplayName(modal.employee)}
                   </p>
                   <p className="text-xs" style={{ color: SLATE }}>
                     {modal.employee.department} · {modal.employee.position || ""}

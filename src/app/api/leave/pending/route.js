@@ -5,7 +5,7 @@ import Leave from "@/models/Leave";
 import { requirePageApi } from "@/lib/rbac/guard";
 import { hodStepScope, canActOnHrStep } from "@/lib/rbac/leaveScope";
 
-const POPULATE_FIELDS = "firstName lastName department position empId photoUrl";
+const POPULATE_FIELDS = "firstName lastName firstNameTh lastNameTh department position empId photoUrl";
 
 /**
  * Leaves waiting at one approval step.

@@ -7,6 +7,7 @@ import { canAccess } from "@/lib/rbac/access";
 import { profileAccess } from "@/lib/rbac/scopes";
 import { departmentIdOf, employeeOfUser } from "@/lib/rbac/scopeQueries";
 import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
+import { employeeDisplayName, employeeFullNameTh, employeeNameEn } from "@/lib/employeeName";
 
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
@@ -153,7 +154,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
             >
               <div className="relative h-full w-full overflow-hidden rounded-[13px]">
                 {/* Full photo, top-anchored (no face crop on the profile page). */}
-                <Image src={avatar} alt={e.firstName} fill sizes="112px" className="object-cover object-top" />
+                <Image src={avatar} alt={employeeDisplayName(e)} fill sizes="112px" className="object-cover object-top" />
               </div>
             </div>
             {/* Online dot */}
@@ -169,7 +170,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
               <h1 style={{ color: "#FFFFFF", fontSize: "20px", fontWeight: 600 }}>
-                {e.firstName} {e.lastName}
+                {employeeDisplayName(e)}
               </h1>
               {e.nickName && (
                 <span
@@ -218,6 +219,8 @@ export default async function EmployeeProfilePage({ searchParams }) {
         <div className="xl:col-span-2 space-y-6">
           <Card title="Personal Information" Icon={User}>
             <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <Info label="ชื่อ-นามสกุล (ไทย)" value={employeeFullNameTh(e) || "-"} />
+              <Info label="ชื่อ-นามสกุล (อังกฤษ)" value={employeeNameEn(e) || "-"} />
               <Info label="Phone" value={e.phone} copyable />
               <Info label="Email" value={e.email} copyable />
               <Info label="Birthday" value={fmtDate(e.birthday)} />

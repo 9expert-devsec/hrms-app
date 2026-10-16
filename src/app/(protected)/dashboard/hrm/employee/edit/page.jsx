@@ -8,6 +8,7 @@ import User from "@/models/User";
 import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import EmployeeEditForm from "./EmployeeEditForm";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export default async function EditEmployeePage({ searchParams }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-100">Edit Employee</h1>
-          <p className="text-slate-400 text-sm">{emp.firstName} {emp.lastName}</p>
+          <p className="text-slate-400 text-sm">{employeeDisplayName(emp)}</p>
         </div>
         <Link
           href={`/dashboard/hrm/employee-profile?id=${emp._id}`}

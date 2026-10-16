@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
+import { employeeDisplayName } from "@/lib/employeeName";
 import { permissionsFor, needsRefresh, refreshTokenPermissions } from "@/lib/rbac/sessionPerms";
 import { RBAC_VERSION } from "@/lib/rbac/version";
 import {
@@ -113,14 +114,15 @@ export const authOptions = {
           // The linked employee (Employee.userId — lib/accountLinks.js). No
           // email fallback: an unlinked account has no employee, rather than
           // borrowing whoever shares its email.
-          const emp = await employeeOfUser(user._id, "firstName lastName nickName empAutoId department photoUrl");
+          const emp = await employeeOfUser(
+            user._id,
+            "firstName lastName firstNameTh lastNameTh nickName empAutoId department photoUrl"
+          );
 
           const perms = await permissionsFor({ roleKey: user.role, employeeId: emp?._id });
 
-          const displayName =
-            emp?.firstName || emp?.lastName
-              ? `${emp?.firstName ?? ""} ${emp?.lastName ?? ""}`.trim()
-              : user.name || email.split("@")[0];
+          // Thai name when present, else English (lib/employeeName.js).
+          const displayName = employeeDisplayName(emp) || user.name || email.split("@")[0];
 
           return {
             id: String(user._id),

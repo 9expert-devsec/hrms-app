@@ -7,6 +7,7 @@ import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import { requireAnyPageApi } from "@/lib/rbac/guard";
 import { canSeeLeaveDocument } from "@/lib/rbac/leaveScope";
+import { employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 
 // ---------- helpers ----------
 const safe = (v, d = "-") =>
@@ -109,7 +110,8 @@ export async function GET(req, ctx) {
     const rows = [
       [
         "พนักงาน",
-        [emp.firstName, emp.lastName].filter(Boolean).join(" ") || "-",
+        // Formal document: Thai name with title when complete.
+        employeeFullNameTh(emp) || employeeDisplayName(emp) || "-",
       ],
       ["ประเภทลา", safe(doc.typeCode)],
       ["ตำแหน่ง", safe(emp.position)],
@@ -184,7 +186,8 @@ export async function GET(req, ctx) {
               dataUrl: sigEmployee.signatureDataUrl || sigEmployee.dataUrl,
               byName:
                 sigEmployee.byName ||
-                [emp.firstName, emp.lastName].filter(Boolean).join(" "),
+                employeeFullNameTh(emp) ||
+                employeeDisplayName(emp),
               at: sigEmployee.signedAt || sigEmployee.at,
             }
           )}

@@ -113,6 +113,8 @@ export async function GET(req) {
         _id: "$emp._id",
         firstName: "$emp.firstName",
         lastName: "$emp.lastName",
+        firstNameTh: "$emp.firstNameTh",
+        lastNameTh: "$emp.lastNameTh",
         position: "$emp.position",
         departmentId: "$emp.departmentId",
       },

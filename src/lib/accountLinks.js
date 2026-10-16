@@ -7,6 +7,7 @@ import { assertAssignableRole, countActiveSuperadmins, RoleError } from "@/lib/r
 import { linkActionBlock, accountDeleteBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
 import { AccountError, newAccountPassword } from "@/lib/accounts";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 /**
  * Employee ↔ account links. Employee.userId is THE link and it is one-to-one:
@@ -30,7 +31,9 @@ const sameEmail = (a, b) => String(a || "").trim().toLowerCase() === String(b ||
 
 async function loadEmployee(employeeId) {
   if (!mongoose.isValidObjectId(employeeId)) throw new AccountError("ไม่พบพนักงาน", 404);
-  const emp = await Employee.findById(employeeId).select("_id email firstName lastName userId").lean();
+  const emp = await Employee.findById(employeeId)
+    .select("_id email firstName lastName firstNameTh lastNameTh userId")
+    .lean();
   if (!emp) throw new AccountError("ไม่พบพนักงาน", 404);
   return emp;
 }
@@ -137,7 +140,7 @@ export async function createAccountForEmployee(employeeId, { email, role } = {},
   }
 
   const { tempPassword, fields } = await newAccountPassword();
-  const name = [emp.firstName, emp.lastName].filter(Boolean).join(" ").trim() || accountEmail;
+  const name = employeeDisplayName(emp) || accountEmail;
   const user = await User.create({ name, email: accountEmail, role: roleKey, status: "active", ...fields });
   try {
     await claimLink(emp, user._id);

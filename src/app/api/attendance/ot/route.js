@@ -50,7 +50,7 @@ export async function GET(req) {
     }
 
     const data = await OTRequest.find(filter)
-      .populate("employeeId", "firstName lastName empAutoId department position photoUrl")
+      .populate("employeeId", "firstName lastName firstNameTh lastNameTh empAutoId department position photoUrl")
       .sort({ date: -1 })
       .lean();
 

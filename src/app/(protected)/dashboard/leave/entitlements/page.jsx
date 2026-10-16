@@ -5,6 +5,7 @@ import dbConnect from "@/lib/mongoose";
 import { requireSuperadminPage } from "@/lib/rbac/guard";
 import Employee from "@/models/Employee";
 import EntitlementsClient from "./EntitlementsClient";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 export default async function LeaveEntitlementsPage() {
   // Not in the registry (orphan page): superadmin only.
@@ -13,12 +14,12 @@ export default async function LeaveEntitlementsPage() {
 
   // รายชื่อพนักงาน (เอาเฉพาะ active ก็ได้ถ้ามีฟิลด์)
   const emps = await Employee.find({})
-    .select("_id firstName lastName nickName position level department departmentId photoUrl")
+    .select("_id firstName lastName firstNameTh lastNameTh nickName position level department departmentId photoUrl")
     .lean();
 
   const employees = emps.map((e) => ({
     _id: String(e._id),
-    name: [e.firstName, e.lastName].filter(Boolean).join(" ") || e.nickName || "-",
+    name: employeeDisplayName(e) || e.nickName || "-",
     position: e.position || "",
     level: e.level || null,
     photoUrl: e.photoUrl || "",

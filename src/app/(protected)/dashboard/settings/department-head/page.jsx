@@ -17,6 +17,7 @@ import {
   Check,
   User,
 } from "lucide-react";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -30,7 +31,8 @@ const CARD = {
   boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
 };
 
-const fullName = (e) => [e?.firstName, e?.lastName].filter(Boolean).join(" ").trim() || "-";
+// Thai name when present, else English (lib/employeeName.js)
+const fullName = (e) => employeeDisplayName(e) || "-";
 
 /**
  * Settings › กำหนด HOD. Heads live in Department.headOfDepartment (an

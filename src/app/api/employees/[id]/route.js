@@ -4,6 +4,7 @@ import User from "@/models/User";
 import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import cloudinary from "@/lib/cloudinary";
+import { thaiNameError } from "@/lib/employeeName";
 
 export async function PUT(req, { params }) {
   // Own profile (self_profile, self fields) or any employee (employees).
@@ -32,6 +33,9 @@ export async function PUT(req, { params }) {
   const selfFields = [
     "firstName",
     "lastName",
+    "titleTh",
+    "firstNameTh",
+    "lastNameTh",
     "nickName",
     "phone",
     "address",
@@ -58,6 +62,21 @@ export async function PUT(req, { params }) {
   const update = {};
   for (const k of allowed) {
     if (payload[k] !== undefined) update[k] = payload[k];
+  }
+
+  // Thai name: optional on edit (existing staff are filled in over time), but
+  // a stored value may not be cleared and the title must be one of the three.
+  const thaiSent = Object.fromEntries(
+    ["titleTh", "firstNameTh", "lastNameTh"].filter((k) => k in update).map((k) => [k, update[k]])
+  );
+  const thaiError = thaiNameError(thaiSent, { mode: "edit", current: emp });
+  if (thaiError) {
+    return new Response(JSON.stringify({ ok: false, message: thaiError }), { status: 400 });
+  }
+  for (const k of Object.keys(thaiSent)) {
+    const v = typeof update[k] === "string" ? update[k].trim() : "";
+    if (v) update[k] = v;
+    else delete update[k]; // empty on a record that never had one: leave it unset
   }
   update.updatedAt = new Date();
 

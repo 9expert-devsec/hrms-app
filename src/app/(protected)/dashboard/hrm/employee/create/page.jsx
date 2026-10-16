@@ -10,6 +10,7 @@ import BankSelect from "./../../../../../../components/BankSelect";
 import RoleSelect from "./../../../../../../components/RoleSelect";
 import TempPasswordDialog from "./../../../../../../components/TempPasswordDialog";
 import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
+import { TITLES_TH, employeeFullNameTh } from "@/lib/employeeName";
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/mongoose";
 // import Employee from "@/lib/models/Employee";
@@ -195,6 +196,10 @@ export default function EmployeeCreatePage() {
   // --- ฟอร์มข้อมูลพนักงาน ---
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  // Thai name — required for a new employee (lib/employeeName.js)
+  const [titleTh, setTitleTh] = useState("");
+  const [firstNameTh, setFirstNameTh] = useState("");
+  const [lastNameTh, setLastNameTh] = useState("");
   const [nickName, setNickName] = useState("");
   const [dateOfJoin, setDateOfJoin] = useState("");
   const [phone, setPhone] = useState("");
@@ -318,6 +323,9 @@ export default function EmployeeCreatePage() {
 
   // validate ขั้นแรก
   const isFirstStepValid =
+    TITLES_TH.includes(titleTh) &&
+    firstNameTh.trim() &&
+    lastNameTh.trim() &&
     firstName.trim() &&
     lastName.trim() &&
     selectedDepId &&
@@ -357,6 +365,9 @@ export default function EmployeeCreatePage() {
         setSubmitting(true);
 
         const fd = new FormData();
+        fd.append("titleTh", titleTh);
+        fd.append("firstNameTh", firstNameTh.trim());
+        fd.append("lastNameTh", lastNameTh.trim());
         fd.append("firstName", firstName.trim());
         fd.append("lastName", lastName.trim());
         fd.append("nickName", nickName.trim());
@@ -505,9 +516,42 @@ export default function EmployeeCreatePage() {
               ข้อมูลพื้นฐาน (จำเป็น)
             </h2>
 
+            {/* Thai name (required) — above the English name */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="text-sm text-slate-300">คำนำหน้าชื่อ</label>
+                <select
+                  className="mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
+                  value={titleTh}
+                  onChange={(e) => setTitleTh(e.target.value)}
+                >
+                  <option value="">-- เลือก --</option>
+                  {TITLES_TH.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-slate-300">ชื่อ (ไทย)</label>
+                <input
+                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  value={firstNameTh}
+                  onChange={(e) => setFirstNameTh(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-300">นามสกุล (ไทย)</label>
+                <input
+                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  value={lastNameTh}
+                  onChange={(e) => setLastNameTh(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm text-slate-300">ชื่อ</label>
+                <label className="text-sm text-slate-300">ชื่อ (อังกฤษ)</label>
                 <input
                   className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
                   value={firstName}
@@ -515,7 +559,7 @@ export default function EmployeeCreatePage() {
                 />
               </div>
               <div>
-                <label className="text-sm text-slate-300">นามสกุล</label>
+                <label className="text-sm text-slate-300">นามสกุล (อังกฤษ)</label>
                 <input
                   className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
                   value={lastName}
@@ -867,10 +911,8 @@ export default function EmployeeCreatePage() {
                   <div className="mt-4 text-sm text-slate-300 space-y-1">
                     <div>
                       ชื่อ-สกุล:{" "}
-                      <b>
-                        {firstName} {lastName}
-                      </b>{" "}
-                      ({nickName || "-"})
+                      <b>{employeeFullNameTh({ titleTh, firstNameTh, lastNameTh }) || "-"}</b>{" "}
+                      / {firstName} {lastName} ({nickName || "-"})
                     </div>
                     <div>
                       แผนก/ตำแหน่ง:{" "}

@@ -16,7 +16,7 @@ export default async function OrgChartPage() {
     .lean();
 
   const emps = await Employee.find({})
-    .select("_id firstName lastName nickName position level department departmentId photoUrl")
+    .select("_id firstName lastName firstNameTh lastNameTh nickName position level department departmentId photoUrl")
     .lean();
 
   return (

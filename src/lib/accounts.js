@@ -9,6 +9,7 @@ import { countActiveSuperadmins, listRoles } from "@/lib/rbac/roles";
 import { accountActionBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
 import { isLocked } from "@/lib/loginLockout";
+import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
 
 /**
  * Account administration for the users page (registry key users_manage).
@@ -126,7 +127,7 @@ export async function listUsers() {
   ]);
 
   const emps = await Employee.find({ userId: { $in: users.map((u) => u._id) } })
-    .select("_id firstName lastName empAutoId userId email")
+    .select("_id firstName lastName firstNameTh lastNameTh nickName empAutoId userId email")
     .lean();
   const empByUser = new Map(emps.map((e) => [String(e.userId), e]));
   const roleByKey = new Map(roles.map((r) => [r.key, r]));
@@ -151,7 +152,8 @@ export async function listUsers() {
           ? {
               _id: String(emp._id),
               empAutoId: emp.empAutoId ?? null,
-              name: [emp.firstName, emp.lastName].filter(Boolean).join(" ").trim(),
+              name: employeeDisplayName(emp),
+              nameSearch: employeeNameSearchText(emp),
               emailMismatch:
                 String(emp.email || "").trim().toLowerCase() !== String(u.email || "").trim().toLowerCase(),
             }

@@ -25,6 +25,7 @@ import SignaturePad from "../../../../../components/SignaturePad";
 import Avatar from "../../../../../components/Avatar";
 import SignatureDisplay from "../../../../../components/SignatureDisplay";
 import AttachmentViewer, { hasAttachments } from "../../../../../components/AttachmentViewer";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -248,7 +249,7 @@ export default function LeaveApprovePage() {
         <div className="space-y-3">
           {items.map((item) => {
             const emp = item.employeeId || {};
-            const empName = [emp.firstName, emp.lastName].filter(Boolean).join(" ") || "-";
+            const empName = employeeDisplayName(emp) || "-";
             const badge = STATUS_BADGE[item.status] || STATUS_BADGE.pending;
 
             return (
@@ -422,7 +423,7 @@ export default function LeaveApprovePage() {
             {/* Leave summary */}
             {(() => {
               const emp = modal.item.employeeId || {};
-              const empName = [emp.firstName, emp.lastName].filter(Boolean).join(" ") || "-";
+              const empName = employeeDisplayName(emp) || "-";
               return (
                 <div
                   className="rounded-xl p-4 mb-4 space-y-1"

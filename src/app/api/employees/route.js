@@ -11,6 +11,7 @@ import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
 import { newAccountPassword } from "@/lib/accounts";
+import { thaiNameError } from "@/lib/employeeName";
 import { tooLargeRequest } from "@/lib/server/uploadRules";
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/uploadLimits";
 
@@ -19,8 +20,8 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 // Without `employees`, callers (the shift-assign picker) get no contact data.
 const FULL_FIELDS =
-  "_id empId empAutoId firstName lastName nickName department position level email phone photoUrl departmentId userId";
-const PICKER_FIELDS = "_id empAutoId firstName lastName nickName department position photoUrl";
+  "_id empId empAutoId firstName lastName titleTh firstNameTh lastNameTh nickName department position level email phone photoUrl departmentId userId";
+const PICKER_FIELDS = "_id empAutoId firstName lastName titleTh firstNameTh lastNameTh nickName department position photoUrl";
 
 export async function GET(req) {
   try {
@@ -89,6 +90,13 @@ export async function POST(req) {
 
     if (!firstName || !lastName || !dateOfJoin || !phone || !email || !birthday || !address)
       return NextResponse.json({ ok:false, message:"ข้อมูลจำเป็นไม่ครบ" }, { status:400 });
+
+    // Thai title / first / last name: required for a new employee (lib/employeeName.js).
+    const titleTh     = g("titleTh");
+    const firstNameTh = g("firstNameTh");
+    const lastNameTh  = g("lastNameTh");
+    const thaiError = thaiNameError({ titleTh, firstNameTh, lastNameTh }, { mode: "create" });
+    if (thaiError) return NextResponse.json({ ok:false, message:thaiError }, { status:400, headers:NO_STORE });
 
     const emergency = {
       firstName: g("emergency.firstName"),
@@ -177,6 +185,9 @@ export async function POST(req) {
       empAutoId,
       firstName,
       lastName,
+      titleTh,
+      firstNameTh,
+      lastNameTh,
       nickName,
       departmentId: new Types.ObjectId(departmentId),
       department,

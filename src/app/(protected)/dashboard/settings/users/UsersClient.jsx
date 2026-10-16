@@ -74,7 +74,10 @@ export default function UsersClient({ initial, actor }) {
       if (linkFilter === "unlinked" && u.employee) return false;
       if (roleFilter !== "all" && u.role !== roleFilter) return false;
       if (!needle) return true;
-      return [u.name, u.email, u.employee?.name].some((v) => (v || "").toLowerCase().includes(needle));
+      // employee.nameSearch: Thai + English + nickname (lib/employeeName.js)
+      return [u.name, u.email, u.employee?.name, u.employee?.nameSearch].some((v) =>
+        (v || "").toLowerCase().includes(needle)
+      );
     });
   }, [data.users, q, statusFilter, roleFilter, linkFilter]);
 

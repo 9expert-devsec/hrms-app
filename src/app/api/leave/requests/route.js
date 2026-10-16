@@ -6,6 +6,7 @@ import { requirePageApi } from "@/lib/rbac/guard";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import Department from "@/models/Department";
 import LeaveRequest from "@/models/LeaveRequest";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 /* ---------------- helpers ---------------- */
 // The linked employee only (lib/accountLinks.js).
@@ -138,7 +139,7 @@ export async function POST(req) {
       signatures: [
         {
           who: "employee",
-          name: [emp.firstName, emp.lastName].filter(Boolean).join(" ") || undefined,
+          name: employeeDisplayName(emp) || undefined,
           title: emp.position || undefined,
           at: new Date(),
           dataUrl: signatureDataUrl || undefined,

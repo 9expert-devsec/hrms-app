@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
 
 function cls(...xs) { return xs.filter(Boolean).join(" "); }
 const fmtDR = (s,e) => {
@@ -26,7 +27,7 @@ export default function ApprovalClient() {
     const rows = (list || []).filter((r) => {
       if (!kw) return true;
       const emp = r.employee || {};
-      const name = [emp.firstName, emp.lastName].filter(Boolean).join(" ").toLowerCase();
+      const name = employeeNameSearchText(emp);
       return (
         name.includes(kw) ||
         (r.typeCode || "").toLowerCase().includes(kw) ||
@@ -151,7 +152,7 @@ export default function ApprovalClient() {
 
             {pageRows.map((req) => {
               const emp = req.employee || {};
-              const full = [emp.firstName, emp.lastName].filter(Boolean).join(" ");
+              const full = employeeDisplayName(emp);
               return (
                 <tr key={req._id} className="border-t border-white/10">
                   <td className="px-3 py-2">

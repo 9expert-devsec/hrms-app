@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { canAccess } from "@/lib/rbac/access";
 import { accountActionBlock, linkActionBlock } from "@/lib/rbac/accountRules";
 import EmployeeAccountLink from "./EmployeeAccountLink";
+import { TITLES_TH, thaiNameError, employeeDisplayName } from "@/lib/employeeName";
 import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 
 const BANKS = [
@@ -48,6 +49,10 @@ export default function EmployeeEditForm({
 
   const [firstName, setFirstName] = useState(employee.firstName || "");
   const [lastName, setLastName] = useState(employee.lastName || "");
+  // Thai name: optional for existing staff, but a stored value can't be cleared.
+  const [titleTh, setTitleTh] = useState(employee.titleTh || "");
+  const [firstNameTh, setFirstNameTh] = useState(employee.firstNameTh || "");
+  const [lastNameTh, setLastNameTh] = useState(employee.lastNameTh || "");
   const [nickName, setNickName] = useState(employee.nickName || "");
 
   const [selectedDepId, setSelectedDepId] = useState(
@@ -146,6 +151,10 @@ export default function EmployeeEditForm({
   async function saveEmployee() {
     setSavingEmp(true);
     try {
+      // Same rule as the server: a Thai name already stored may not be cleared.
+      const thaiError = thaiNameError({ titleTh, firstNameTh, lastNameTh }, { mode: "edit", current: employee });
+      if (thaiError) throw new Error(thaiError);
+
       let photoUrl = employee.photoUrl || "";
       let photoPublicId = employee.photoPublicId || "";
 
@@ -174,6 +183,9 @@ export default function EmployeeEditForm({
       }
 
       const payload = {
+        titleTh,
+        firstNameTh,
+        lastNameTh,
         firstName,
         lastName,
         nickName,
@@ -300,7 +312,7 @@ export default function EmployeeEditForm({
     if (!canAdmin) return;
     if (
       !confirm(
-        `ยืนยันลบพนักงาน: ${firstName} ${lastName}\n\nบัญชีผู้ใช้ที่ผูกอยู่จะไม่ถูกลบ (จะถูกยกเลิกการผูก) — ระงับหรือลบบัญชีได้ที่หน้าผู้ใช้`
+        `ยืนยันลบพนักงาน: ${employeeDisplayName({ firstName, lastName, firstNameTh, lastNameTh })}\n\nบัญชีผู้ใช้ที่ผูกอยู่จะไม่ถูกลบ (จะถูกยกเลิกการผูก) — ระงับหรือลบบัญชีได้ที่หน้าผู้ใช้`
       )
     )
       return;
@@ -356,9 +368,29 @@ export default function EmployeeEditForm({
         {/* Basic */}
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <h3 className="font-medium text-slate-100 mb-2">ข้อมูลพื้นฐาน</h3>
+          {/* Thai name — above the English name */}
+          <div className="grid md:grid-cols-3 gap-4">
+            <div>
+              <Label>คำนำหน้าชื่อ</Label>
+              <select
+                value={titleTh}
+                onChange={(e) => setTitleTh(e.target.value)}
+                className="mt-1 w-full rounded-xl px-4 py-2.5"
+                style={{ background: "#FFFFFF", color: "#0D1B2A", border: "1px solid #E2E8F0" }}
+              >
+                {/* An empty choice only while nothing is stored yet. */}
+                {!employee.titleTh && <option value="">-- เลือก --</option>}
+                {TITLES_TH.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <Input label="ชื่อ (ไทย)" value={firstNameTh} onChange={setFirstNameTh} />
+            <Input label="นามสกุล (ไทย)" value={lastNameTh} onChange={setLastNameTh} />
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
-            <Input label="ชื่อ" value={firstName} onChange={setFirstName} />
-            <Input label="นามสกุล" value={lastName} onChange={setLastName} />
+            <Input label="ชื่อ (อังกฤษ)" value={firstName} onChange={setFirstName} />
+            <Input label="นามสกุล (อังกฤษ)" value={lastName} onChange={setLastName} />
             <Input label="ชื่อเล่น" value={nickName} onChange={setNickName} />
 
             {/* Department */}

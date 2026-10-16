@@ -20,6 +20,7 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import * as htmlToImage from "html-to-image";
 import { Download, Search } from "lucide-react";
 import Avatar from "../../../../../components/Avatar";
+import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
 
 /* ================================================================
    Constants & Helpers
@@ -49,8 +50,8 @@ const SIZE = {
 const tagColor = (hex, fb = "#2486FF") =>
   /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex || "") ? hex : fb;
 
-const fullName = (e) =>
-  [e.firstName, e.lastName].filter(Boolean).join(" ") || e.nickName || "-";
+// Thai name when present, else English (lib/employeeName.js)
+const fullName = (e) => employeeDisplayName(e) || e.nickName || "-";
 
 const initials = (e) => {
   const f = (e.firstName || "")[0] || "";
@@ -452,6 +453,7 @@ function makeGraph({ departments, employees }) {
       type: "ceo",
       data: {
         name: fullName(ceo),
+        nameSearch: employeeNameSearchText(ceo),
         firstName: ceo.firstName,
         lastName: ceo.lastName,
         position: ceo.position,
@@ -470,6 +472,7 @@ function makeGraph({ departments, employees }) {
       type: "coo",
       data: {
         name: fullName(coo),
+        nameSearch: employeeNameSearchText(coo),
         firstName: coo.firstName,
         lastName: coo.lastName,
         position: coo.position,
@@ -532,6 +535,7 @@ function makeGraph({ departments, employees }) {
         data: {
           parentDept: depId,
           name: fullName(g.head),
+          nameSearch: employeeNameSearchText(g.head),
           firstName: g.head.firstName,
           lastName: g.head.lastName,
           position: g.head.position,
@@ -562,6 +566,7 @@ function makeGraph({ departments, employees }) {
         data: {
           parentDept: depId,
           name: fullName(m),
+          nameSearch: employeeNameSearchText(m),
           firstName: m.firstName,
           lastName: m.lastName,
           position: m.position,
@@ -750,7 +755,9 @@ function OrgFlowInner({ departments, employees }) {
       // match by node id or by name substring
       const node =
         rf.getNode(value) ||
-        rf.getNodes().find((n) => n.data?.name?.toLowerCase().includes(value.toLowerCase()));
+        rf.getNodes().find((n) =>
+          [n.data?.name, n.data?.nameSearch].some((s) => s?.toLowerCase().includes(value.toLowerCase()))
+        );
       if (!node) return;
 
       // highlight

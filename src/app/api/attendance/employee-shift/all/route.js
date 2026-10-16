@@ -18,7 +18,7 @@ export async function GET() {
         { endDate: { $exists: false } },
       ],
     })
-      .populate("employeeId", "_id firstName lastName department")
+      .populate("employeeId", "_id firstName lastName firstNameTh lastNameTh department")
       .populate("shiftId", "_id name startTime endTime")
       .sort({ effectiveDate: -1 })
       .lean();

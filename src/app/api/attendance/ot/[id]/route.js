@@ -16,7 +16,7 @@ export async function GET(req, { params }) {
 
     const { id } = await params;
     const ot = await OTRequest.findById(id)
-      .populate("employeeId", "firstName lastName empAutoId department")
+      .populate("employeeId", "firstName lastName firstNameTh lastNameTh empAutoId department")
       .lean();
 
     if (!ot) return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
