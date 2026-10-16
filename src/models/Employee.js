@@ -25,7 +25,6 @@ const BookbankSchema = new Schema(
 
 const EmployeeSchema = new Schema(
   {
-    empAutoId: { type: String, index: true }, // เช่น IT-0001
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     nickName: { type: String },
