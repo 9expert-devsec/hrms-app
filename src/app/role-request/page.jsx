@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { ShieldCheck, Send } from "lucide-react";
 
-const ROLES = ["superadmin", "hr", "it", "payroll", "manager", "executive", "employee"];
+// The system roles ("executive" never existed). This stub only logs the
+// request, so it is not wired to /api/roles (superadmin-only).
+const ROLES = ["superadmin", "hr", "it", "payroll", "manager", "employee"];
 
 export default function RoleRequestPage() {
   const [form, setForm] = useState({

@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { UserPlus, CheckCircle2, AlertTriangle } from "lucide-react";
-
-const ROLE_OPTIONS = ["superadmin", "hr", "it", "payroll", "manager", "employee"];
+import RoleSelect from "../../../../../components/RoleSelect";
 
 export default function AdminRegisterForm() {
   const [form, setForm] = useState({
@@ -138,18 +137,13 @@ export default function AdminRegisterForm() {
 
       <div>
         <label className="block text-sm text-slate-300 mb-1">กำหนดสิทธิ์ (Role)</label>
-        <select
-          name="role"
+        {/* This page is superadmin-only, so the picker (roles from the server,
+            custom roles included) is always shown here. */}
+        <RoleSelect
           value={form.role}
-          onChange={onChange}
+          onChange={(v) => setForm({ ...form, role: v })}
           className="select-dark appearance-none pr-10 w-full"
-        >
-          {ROLE_OPTIONS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        />
         <p className="text-xs text-slate-400 mt-1">
           เลือกสิทธิ์ตามหน้าที่ของผู้ใช้ในระบบ (RBAC)
         </p>

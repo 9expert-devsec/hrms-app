@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import RoleSelect from "../../../../../../components/RoleSelect";
 import {
   DEPT_PREFIX,
   POSITIONS_BY_DEPT,
@@ -20,6 +22,8 @@ import {
 import { useRouter } from "next/navigation";
 
 export default function EmployeeCreateForm() {
+  const { data: session } = useSession();
+  const isSuperadmin = session?.user?.isSuperadmin === true;
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -603,19 +607,16 @@ export default function EmployeeCreateForm() {
                 {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            <select
-              className="select-dark appearance-none pr-10 w-full"
-              value={form.role}
-              onChange={(e) => set("role", e.target.value)}
-            >
-              <option value="employee">employee</option>
-              <option value="manager">manager</option>
-              <option value="hr">hr</option>
-              <option value="executive">executive</option>
-              <option value="it">it</option>
-              <option value="payroll">payroll</option>
-              <option value="superadmin">superadmin</option>
-            </select>
+            {/* Role changes are superadmin-only; everyone else creates "employee". */}
+            {isSuperadmin ? (
+              <RoleSelect
+                className="select-dark appearance-none pr-10 w-full"
+                value={form.role}
+                onChange={(v) => set("role", v)}
+              />
+            ) : (
+              <p className="text-xs text-slate-400 self-center">สิทธิ์เริ่มต้นคือ <b>employee</b></p>
+            )}
           </div>
         )}
       </section>

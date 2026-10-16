@@ -24,7 +24,7 @@ export async function POST(req) {
 
     // The role must be a known key (roles collection or seed) — never stored blindly.
     try {
-      await assertAssignableRole(role, gate.session.user);
+      await assertAssignableRole(role, { actor: gate.session.user });
     } catch (e) {
       if (e instanceof RoleError) return Response.json({ error: e.message }, { status: e.status });
       throw e;

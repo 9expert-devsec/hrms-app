@@ -21,23 +21,16 @@ export async function PATCH(req, { params }) {
   const body = await req.json().catch(() => ({}));
   const update = {};
 
-  // Only a superadmin may CHANGE a role (privilege escalation otherwise).
-  // The employee edit form always sends the current role along with the
-  // email, so an unchanged value is ignored rather than refused.
+  // Role changes: superadmin only, never one's own account, never demoting
+  // the last active superadmin, known keys only — all in assertAssignableRole.
+  // An unchanged value (older forms resend it) is ignored rather than refused.
   if (body.role !== undefined && body.role !== null && body.role !== "") {
-    const current = await User.findById(id).select("role").lean();
+    const current = await User.findById(id).select("_id role status").lean();
     if (!current) return new NextResponse("Not found", { status: 404 });
     const nextRole = String(body.role).trim().toLowerCase();
     if (nextRole !== current.role) {
-      if (session.user.isSuperadmin !== true) {
-        return NextResponse.json(
-          { ok: false, message: "เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่เปลี่ยนบทบาทได้" },
-          { status: 403 }
-        );
-      }
-      // Must be a known role key — an unknown key is a 400, never stored.
       try {
-        await assertAssignableRole(nextRole, session.user);
+        await assertAssignableRole(nextRole, { actor: session.user, targetUser: current });
       } catch (e) {
         if (e instanceof RoleError) return NextResponse.json({ ok: false, message: e.message }, { status: e.status });
         throw e;

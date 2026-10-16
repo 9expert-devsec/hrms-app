@@ -8,7 +8,7 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import BankSelect from "./../../../../../../components/BankSelect";
 import { Eye, EyeOff } from "lucide-react";
-import { canAccess } from "@/lib/rbac/access";
+import RoleSelect from "./../../../../../../components/RoleSelect";
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/mongoose";
 // import Employee from "@/lib/models/Employee";
@@ -179,7 +179,8 @@ export default function EmployeeCreatePage() {
   const submittedRef = useRef(false);
   const router = useRouter();
   const { data: session } = useSession();
-  const canElevate = canAccess(session?.user, "employees");
+  // Role changes are superadmin-only (the API enforces it); others create "employee".
+  const canElevate = session?.user?.isSuperadmin === true;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
@@ -861,24 +862,13 @@ export default function EmployeeCreatePage() {
                   <label className="text-sm text-slate-300">
                     สิทธิ์ (Role)
                   </label>
-                  <select
-                    className="mmt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    disabled={!canElevate}
-                  >
-                    <option value="employee">Employee</option>
-                    {canElevate && (
-                      <>
-                        <option value="manager">Manager</option>
-                        <option value="hr">HR</option>
-                        <option value="payroll">Payroll</option>
-                        <option value="it">IT</option>
-                        <option value="executive">Executive</option>
-                        <option value="superadmin">Super Admin</option>
-                      </>
-                    )}
-                  </select>
+                  {canElevate ? (
+                    <RoleSelect
+                      className="mmt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
+                      value={role}
+                      onChange={setRole}
+                    />
+                  ) : null}
                   {!canElevate && (
                     <p className="text-xs text-slate-400 mt-1">
                       สิทธิ์เริ่มต้นคือ <b>Employee</b>

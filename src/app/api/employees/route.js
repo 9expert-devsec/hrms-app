@@ -104,7 +104,8 @@ export async function POST(req) {
     const role        = (g("role") || "employee").toLowerCase();
     if (createLogin) {
       try {
-        await assertAssignableRole(role, session.user);
+        // Non-superadmins may only create "employee" accounts.
+        await assertAssignableRole(role, { actor: session.user });
       } catch (e) {
         if (e instanceof RoleError) return NextResponse.json({ ok:false, message:e.message }, { status:e.status });
         throw e;

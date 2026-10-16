@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useSession } from "next-auth/react";
 import BankSelect from "./../../../../../../components/BankSelect";
+import RoleSelect from "./../../../../../../components/RoleSelect";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
 const BANKS = [
@@ -108,6 +110,8 @@ export default function EmployeeEditForm({
   const [userSaving, setUserSaving] = useState(false);
   const [userEmail, setUserEmail] = useState(linkedUser?.email || "");
   const [userRole, setUserRole] = useState(linkedUser?.role || "employee");
+  const { data: session } = useSession();
+  const isSuperadmin = session?.user?.isSuperadmin === true;
 
   const [pwd, setPwd] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -207,7 +211,8 @@ export default function EmployeeEditForm({
       const r = await fetch(`/api/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: userEmail, role: userRole }),
+        // Only a superadmin sends a role; the API refuses role changes otherwise.
+        body: JSON.stringify(isSuperadmin ? { email: userEmail, role: userRole } : { email: userEmail }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j?.message || "Update user failed");
@@ -510,23 +515,17 @@ export default function EmployeeEditForm({
                 readOnly={!canAdmin}
               />
 
-              <div className="mt-3">
-                <Label>สิทธิ์ (Role)</Label>
-                <select
-                  className="select-dark appearance-none mt-1 w-full"
-                  value={userRole}
-                  onChange={(e) => setUserRole(e.target.value)}
-                  disabled={!canAdmin}
-                >
-                  <option value="employee">employee</option>
-                  <option value="manager">manager</option>
-                  <option value="hr">hr</option>
-                  <option value="payroll">payroll</option>
-                  <option value="it">it</option>
-                  <option value="executive">executive</option>
-                  <option value="superadmin">superadmin</option>
-                </select>
-              </div>
+              {/* Role changes are superadmin-only (the API enforces it too). */}
+              {isSuperadmin && (
+                <div className="mt-3">
+                  <Label>สิทธิ์ (Role)</Label>
+                  <RoleSelect
+                    className="select-dark appearance-none mt-1 w-full"
+                    value={userRole}
+                    onChange={setUserRole}
+                  />
+                </div>
+              )}
 
               {canAdmin && (
                 <button

@@ -9,6 +9,7 @@ import {
   validateRoleInput,
 } from "@/lib/rbac/roleRules";
 import { findRole } from "@/lib/rbac/resolveRole";
+import { newAccountRoleBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
 
 /**
  * Server side of the roles editor. Every rule lives in roleRules.js; this
@@ -129,15 +130,36 @@ export async function deleteRole(key) {
   return { key };
 }
 
+/** Active (not suspended) users holding the superadmin role. */
+export async function countActiveSuperadmins() {
+  return User.countDocuments({ role: SUPERADMIN_KEY, status: { $ne: "suspended" } });
+}
+
 /**
- * Validate a role key someone is assigning to a User. Returns the role, or
- * throws RoleError (400 unknown key; 403 superadmin role by a non-superadmin).
+ * Validate a role someone is assigning to a User — called by EVERY write of
+ * User.role. Returns the role, or throws RoleError (Thai message):
+ *   - unknown key → 400
+ *   - new account (no targetUser): non-superadmins may only create "employee"
+ *   - existing user (targetUser): superadmin only, never their own account,
+ *     never demoting the last active superadmin (accountRules.js)
  */
-export async function assertAssignableRole(key, actor) {
+export async function assertAssignableRole(key, { actor, targetUser = null } = {}) {
   const role = await findRole(key);
   if (!role) throw new RoleError(`ไม่รู้จักบทบาท "${key}"`, 400);
-  if (role.isSuperadmin && actor?.isSuperadmin !== true) {
-    throw new RoleError("เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่กำหนดบทบาทนี้ได้", 403);
+
+  if (!targetUser) {
+    const denied = newAccountRoleBlock({ actor, roleKey: role.key });
+    if (denied) throw new RoleError(denied.error, denied.status);
+    return role;
   }
+
+  const targetRole = await findRole(targetUser.role);
+  const denied = roleChangeBlock({
+    actor,
+    target: { id: targetUser._id, isSuperadmin: !!targetRole?.isSuperadmin, status: targetUser.status },
+    newRoleIsSuperadmin: role.isSuperadmin,
+    activeSuperadminCount: await countActiveSuperadmins(),
+  });
+  if (denied) throw new RoleError(denied.error, denied.status);
   return role;
 }
