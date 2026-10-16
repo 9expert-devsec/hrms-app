@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2 } from "lucide-react";
+import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2, LockOpen } from "lucide-react";
 import { accountActionBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
 import TempPasswordDialog from "../../../../../components/TempPasswordDialog";
 
@@ -29,6 +29,10 @@ function fmtDateTime(d) {
   });
 }
 
+function fmtTime(d) {
+  return new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 function Pill({ children, bg, color }) {
   return (
     <span
@@ -49,7 +53,7 @@ export default function UsersClient({ initial, actor }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
 
-  const [confirm, setConfirm] = useState(null); // { user, action: "reset" | "suspend" | "activate" }
+  const [confirm, setConfirm] = useState(null); // { user, action: "reset" | "suspend" | "activate" | "unlock" }
   const [busy, setBusy] = useState(false);
   const [tempResult, setTempResult] = useState(null); // { email, tempPassword }
   const [toast, setToast] = useState(null);
@@ -95,6 +99,12 @@ export default function UsersClient({ initial, actor }) {
         if (!res.ok || !j.ok) throw new Error(j.message || j.error || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
         setConfirm(null);
         setTempResult({ email: j.email, tempPassword: j.tempPassword });
+      } else if (action === "unlock") {
+        const res = await fetch(`/api/users/${user._id}/unlock`, { method: "POST" });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) throw new Error(j.message || j.error || "ปลดล็อกไม่สำเร็จ");
+        setConfirm(null);
+        showToast("ปลดล็อกบัญชีแล้ว");
       } else {
         const res = await fetch(`/api/users/${user._id}/status`, {
           method: "PATCH",
@@ -149,6 +159,11 @@ export default function UsersClient({ initial, actor }) {
       body: "ผู้ใช้จะกลับมาเข้าสู่ระบบได้ตามปกติ",
       cta: "เปิดใช้งาน",
     },
+    unlock: {
+      title: "ปลดล็อกบัญชี",
+      body: "บัญชีถูกล็อกชั่วคราวเพราะใส่รหัสผ่านผิดหลายครั้ง — ปลดล็อกแล้วผู้ใช้จะเข้าสู่ระบบได้ทันที",
+      cta: "ปลดล็อก",
+    },
   };
 
   return (
@@ -164,7 +179,7 @@ export default function UsersClient({ initial, actor }) {
         <div>
           <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>ผู้ใช้</h1>
           <p style={{ color: SLATE, fontSize: 13 }}>
-            บัญชีเข้าสู่ระบบทั้งหมด — รีเซ็ตรหัสผ่าน ระงับ/เปิดใช้งาน
+            บัญชีเข้าสู่ระบบทั้งหมด — รีเซ็ตรหัสผ่าน ระงับ/เปิดใช้งาน ปลดล็อก
             {actor.isSuperadmin ? " และกำหนดบทบาท" : ""}
           </p>
         </div>
@@ -220,6 +235,7 @@ export default function UsersClient({ initial, actor }) {
               const resetBlock = actionBlock(u, "reset");
               const statusAction = u.status === "suspended" ? "activate" : "suspend";
               const statusBlock = actionBlock(u, statusAction);
+              const unlockBlock = u.lockedUntil ? actionBlock(u, "unlock") : null;
               const roleBlock = actor.isSuperadmin
                 ? roleChangeBlock({
                     actor,
@@ -283,10 +299,27 @@ export default function UsersClient({ initial, actor }) {
                     ) : (
                       <Pill bg="#D1FAE5" color="#065F46">ใช้งาน</Pill>
                     )}
+                    {u.lockedUntil && (
+                      <div className="mt-1">
+                        <Pill bg="#FEF3C7" color="#92400E">ล็อกอยู่ถึง {fmtTime(u.lockedUntil)}</Pill>
+                      </div>
+                    )}
                   </td>
                   <td style={{ ...tdStyle, fontSize: 13, color: SLATE }}>{fmtDateTime(u.lastLoginAt)}</td>
                   <td style={{ ...tdStyle, textAlign: "right" }}>
                     <div className="inline-flex gap-2">
+                      {u.lockedUntil && (
+                        <span title={unlockBlock?.error}>
+                          <button
+                            onClick={() => setConfirm({ user: u, action: "unlock" })}
+                            disabled={!!unlockBlock}
+                            style={{ ...actionBtn("#92400E"), opacity: unlockBlock ? 0.45 : 1 }}
+                          >
+                            <LockOpen size={13} />
+                            ปลดล็อก
+                          </button>
+                        </span>
+                      )}
                       <span title={resetBlock?.error}>
                         <button
                           onClick={() => setConfirm({ user: u, action: "reset" })}

@@ -6,6 +6,64 @@ import User from "@/models/User";
 import Employee from "@/models/Employee";
 import { permissionsFor, needsRefresh, refreshTokenPermissions } from "@/lib/rbac/sessionPerms";
 import { RBAC_VERSION } from "@/lib/rbac/version";
+import {
+  LOGIN_MAX_FAILURES,
+  LOGIN_LOCK_MS,
+  ACCOUNT_LOCKED_ERROR,
+  isLocked,
+} from "@/lib/loginLockout";
+
+// Lockout (lib/loginLockout.js). Every write is one atomic findOneAndUpdate /
+// updateOne whose filter excludes a currently-locked account, so parallel
+// attempts can't skip the threshold and a locked account is never pushed
+// into a longer lock.
+const notLocked = (now) => ({ $or: [{ lockedUntil: null }, { lockedUntil: { $lte: now } }] });
+
+/** Count a wrong password. Returns true when the account is now locked. */
+async function recordFailedSignIn(userId) {
+  const now = new Date();
+  const updated = await User.findOneAndUpdate(
+    { _id: userId, ...notLocked(now) },
+    [
+      // A lock that has expired starts a fresh count.
+      {
+        $set: {
+          failedLoginCount: {
+            $cond: [
+              { $eq: [{ $type: "$lockedUntil" }, "date"] },
+              1,
+              { $add: [{ $ifNull: ["$failedLoginCount", 0] }, 1] },
+            ],
+          },
+        },
+      },
+      {
+        $set: {
+          lockedUntil: {
+            $cond: [
+              { $gte: ["$failedLoginCount", LOGIN_MAX_FAILURES] },
+              new Date(now.getTime() + LOGIN_LOCK_MS),
+              null,
+            ],
+          },
+        },
+      },
+    ],
+    { new: true, projection: { lockedUntil: 1 } }
+  ).lean();
+  // No match = another attempt locked it in the meantime.
+  return !updated || isLocked(updated.lockedUntil, now.getTime());
+}
+
+/** Successful sign-in: reset the counter. False if the account got locked meanwhile. */
+async function recordSuccessfulSignIn(userId) {
+  const now = new Date();
+  const r = await User.updateOne(
+    { _id: userId, ...notLocked(now) },
+    { $set: { lastLoginAt: now, failedLoginCount: 0, lockedUntil: null } }
+  );
+  return r.matchedCount > 0;
+}
 
 // Permissions are resolved at sign-in and carried on the JWT; the jwt
 // callback re-resolves them once they are older than ROLE_REFRESH_MS (5 min),
@@ -37,20 +95,20 @@ export const authOptions = {
           if (!user) return null;
           if (user.status && user.status !== "active") return null;
 
+          // Locked: refuse without comparing the password or counting the
+          // attempt. Only an existing, locked account sees this message;
+          // unknown emails and wrong passwords stay generic (return null).
+          if (isLocked(user.lockedUntil)) throw new Error(ACCOUNT_LOCKED_ERROR);
+
           const ok = await bcrypt.compare(password, user.passwordHash || "");
           if (!ok) {
-            User.updateOne(
-              { _id: user._id },
-              { $inc: { failedLoginCount: 1 } }
-            ).exec();
+            // The attempt that reaches LOGIN_MAX_FAILURES gets the lock message.
+            if (await recordFailedSignIn(user._id)) throw new Error(ACCOUNT_LOCKED_ERROR);
             return null;
           }
 
-          // Update last login / reset failed count
-          User.updateOne(
-            { _id: user._id },
-            { $set: { lastLoginAt: new Date(), failedLoginCount: 0 } }
-          ).exec();
+          // Update last login / reset failed count and lock
+          if (!(await recordSuccessfulSignIn(user._id))) throw new Error(ACCOUNT_LOCKED_ERROR);
 
           // Resolve employee record
           let emp = null;
@@ -88,6 +146,7 @@ export const authOptions = {
             mustChangePassword: user.mustChangePassword === true,
           };
         } catch (err) {
+          if (err?.message === ACCOUNT_LOCKED_ERROR) throw err;
           console.error("authorize error:", err.message);
           return null;
         }

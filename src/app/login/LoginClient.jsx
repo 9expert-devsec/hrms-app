@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { Eye, EyeOff, LogIn, Mail, Lock } from "lucide-react";
+import { ACCOUNT_LOCKED_ERROR, ACCOUNT_LOCKED_MESSAGE } from "@/lib/loginLockout";
 
 // Only same-origin paths. "//host" and "/\host" are protocol-relative in
 // browsers, so both would be open redirects.
@@ -47,6 +48,8 @@ export default function LoginClient() {
     switch (queryError) {
       case "CredentialsSignin":
         return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+      case ACCOUNT_LOCKED_ERROR:
+        return ACCOUNT_LOCKED_MESSAGE;
       default:
         return "ไม่สามารถเข้าสู่ระบบได้ กรุณาลองใหม่อีกครั้ง";
     }
@@ -74,7 +77,8 @@ export default function LoginClient() {
       return;
     }
     if (res.error) {
-      setErr(errorFromQuery || "เข้าสู่ระบบไม่สำเร็จ");
+      // Only a locked account gets its own message; everything else stays generic.
+      setErr(res.error === ACCOUNT_LOCKED_ERROR ? ACCOUNT_LOCKED_MESSAGE : errorFromQuery || "เข้าสู่ระบบไม่สำเร็จ");
       return;
     }
     router.push(callbackUrl);

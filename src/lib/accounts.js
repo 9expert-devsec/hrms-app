@@ -8,6 +8,7 @@ import { findRole } from "@/lib/rbac/resolveRole";
 import { countActiveSuperadmins, listRoles } from "@/lib/rbac/roles";
 import { accountActionBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
+import { isLocked } from "@/lib/loginLockout";
 
 /**
  * Account administration for the users page (registry key users_manage).
@@ -98,7 +99,9 @@ export async function issueTemporaryPassword(targetId, { actor }) {
         mustChangePassword: true,
         passwordResetAt: new Date(),
         passwordResetBy: actor?.id && mongoose.isValidObjectId(actor.id) ? actor.id : null,
+        // A reset also lifts a sign-in lock (lib/loginLockout.js).
         failedLoginCount: 0,
+        lockedUntil: null,
       },
     }
   );
@@ -114,7 +117,7 @@ export async function issueTemporaryPassword(targetId, { actor }) {
 export async function listUsers() {
   const [users, roles, activeSuperadminCount] = await Promise.all([
     User.find({})
-      .select("_id name email role status lastLoginAt mustChangePassword employeeId")
+      .select("_id name email role status lastLoginAt mustChangePassword lockedUntil employeeId")
       .sort({ email: 1 })
       .lean(),
     listRoles(),
@@ -147,6 +150,8 @@ export async function listUsers() {
         status: u.status || "active",
         lastLoginAt: u.lastLoginAt || null,
         mustChangePassword: u.mustChangePassword === true,
+        // Only a lock still in force; an expired one is not shown.
+        lockedUntil: isLocked(u.lockedUntil) ? new Date(u.lockedUntil).toISOString() : null,
         employee: emp
           ? {
               _id: String(emp._id),
@@ -170,4 +175,13 @@ export async function setAccountStatus(targetId, status, { actor }) {
   await User.updateOne({ _id: target.user._id }, { $set: { status } });
   forgetCachedPermissions(target.user._id);
   return { _id: String(target.user._id), status };
+}
+
+/** Lift a sign-in lock before it expires ("ปลดล็อก"); also clears the counter. */
+export async function unlockAccount(targetId, { actor }) {
+  const target = await loadTarget(targetId);
+  await assertAllowed(actor, target, "unlock");
+
+  await User.updateOne({ _id: target.user._id }, { $set: { failedLoginCount: 0, lockedUntil: null } });
+  return { _id: String(target.user._id), lockedUntil: null };
 }

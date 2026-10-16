@@ -20,7 +20,10 @@ const UserSchema = new Schema(
     passwordResetAt: Date,
     passwordResetBy: { type: Schema.Types.ObjectId, ref: "User" },
     lastLoginAt: Date,
+    // Sign-in lockout (src/lib/loginLockout.js): consecutive wrong passwords,
+    // and the time a lock ends (null / past = not locked).
     failedLoginCount: { type: Number, default: 0 },
+    lockedUntil: { type: Date, default: null },
   },
   { timestamps: true }
 );

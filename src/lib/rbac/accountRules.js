@@ -18,10 +18,11 @@ function isActive(target) {
 }
 
 /**
- * Reset password / suspend / reactivate on the users page (users_manage):
- * never your own account (use the change-password page), a non-superadmin
- * never touches a superadmin account, and the last active superadmin is
- * never suspended. `action` = "reset" | "suspend" | "activate".
+ * Reset password / suspend / reactivate / unlock on the users page
+ * (users_manage): never your own account (use the change-password page), a
+ * non-superadmin never touches a superadmin account, and the last active
+ * superadmin is never suspended.
+ * `action` = "reset" | "suspend" | "activate" | "unlock".
  */
 export function accountActionBlock({ actor, target, action, activeSuperadminCount }) {
   if (isOwn(actor, target)) {
