@@ -77,6 +77,9 @@ export const HRMS_PAGES = [
     group: "ตั้งค่าระบบ",
     pages: [
       { key: "hod_settings", label: "กำหนดหัวหน้าแผนก", href: "/dashboard/settings/department-head", match: "prefix" },
+      // View the user list, issue temporary passwords, suspend / reactivate.
+      // Changing roles stays superadmin-only.
+      { key: "users_manage", label: "จัดการบัญชีผู้ใช้", href: "/dashboard/settings/users", match: "prefix" },
     ],
   },
 ];

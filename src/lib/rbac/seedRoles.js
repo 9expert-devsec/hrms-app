@@ -77,7 +77,7 @@ export const SEED_ROLES = [
     isSystem: true,
     isSuperadmin: false,
   },
-  { key: "it", name: "ฝ่ายไอที", color: "#0891b2", pages: [...SELF], isSystem: true, isSuperadmin: false },
+  { key: "it", name: "ฝ่ายไอที", color: "#0891b2", pages: [...SELF, "users_manage"], isSystem: true, isSuperadmin: false },
   { key: "payroll", name: "ฝ่ายเงินเดือน", color: "#d97706", pages: [...SELF], isSystem: true, isSuperadmin: false },
   { key: "employee", name: "พนักงาน", color: "#6b7280", pages: [...SELF], isSystem: true, isSuperadmin: false },
 ];

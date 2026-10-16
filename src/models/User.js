@@ -13,6 +13,12 @@ const UserSchema = new Schema(
     // stripped because the schema lacked it.
     employeeId: { type: Schema.Types.ObjectId, ref: "Employee" },
     status: { type: String, enum: ["active","suspended"], default: "active" },
+    // Temporary-password flow (src/lib/accounts.js): the user must set a new
+    // password at next sign-in while mustChangePassword is true.
+    mustChangePassword: { type: Boolean, default: false },
+    passwordChangedAt: Date,
+    passwordResetAt: Date,
+    passwordResetBy: { type: Schema.Types.ObjectId, ref: "User" },
     lastLoginAt: Date,
     failedLoginCount: { type: Number, default: 0 },
   },

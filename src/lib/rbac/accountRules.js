@@ -17,6 +17,25 @@ function isActive(target) {
   return (target?.status ?? "active") !== "suspended";
 }
 
+/**
+ * Reset password / suspend / reactivate on the users page (users_manage):
+ * never your own account (use the change-password page), a non-superadmin
+ * never touches a superadmin account, and the last active superadmin is
+ * never suspended. `action` = "reset" | "suspend" | "activate".
+ */
+export function accountActionBlock({ actor, target, action, activeSuperadminCount }) {
+  if (isOwn(actor, target)) {
+    return block(403, "ดำเนินการกับบัญชีของตัวเองไม่ได้ — ใช้หน้าเปลี่ยนรหัสผ่านแทน");
+  }
+  if (target?.isSuperadmin && actor?.isSuperadmin !== true) {
+    return block(403, "จัดการบัญชี superadmin ได้เฉพาะ superadmin เท่านั้น");
+  }
+  if (action === "suspend" && target?.isSuperadmin && isActive(target) && activeSuperadminCount <= 1) {
+    return block(403, "ระงับ superadmin คนสุดท้ายที่ใช้งานอยู่ไม่ได้");
+  }
+  return null;
+}
+
 /** The role for a NEW account: non-superadmins may only create "employee". */
 export function newAccountRoleBlock({ actor, roleKey }) {
   if (actor?.isSuperadmin !== true && roleKey !== "employee") {
