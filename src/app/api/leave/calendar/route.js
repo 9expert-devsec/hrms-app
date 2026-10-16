@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requirePageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
+import { employeeDisplayName } from "@/lib/employeeName";
 
 export async function GET(req) {
   try {
