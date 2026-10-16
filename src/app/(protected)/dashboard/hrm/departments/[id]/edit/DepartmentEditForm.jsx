@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
+import NoAccountBadge from "../../../../../../../components/NoAccountBadge";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -44,6 +45,8 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
   const [headId, setHeadId] = useState(
     initial?.headOfDepartment?._id || initial?.headOfDepartment || ""
   );
+  // Same warning as Settings › กำหนด HOD when the head has no login account.
+  const selectedHead = eligibleHeads.find((u) => String(u._id) === String(headId)) || null;
 
   // --- ui states ---
   const [saving, setSaving] = useState(false);
@@ -140,6 +143,7 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
                 </option>
               ))}
             </select>
+            {selectedHead && !selectedHead.userId && <NoAccountBadge className="mt-2" />}
           </div>
 
           <div>

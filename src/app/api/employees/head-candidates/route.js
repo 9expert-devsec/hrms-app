@@ -14,9 +14,9 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();
-    const levels = [5, 6];
-
-    const match = { level: { $in: levels } };
+    // Any employee may head a department (any level, any department, with or
+    // without a login account — the page flags those without one).
+    const match = {};
 
     if (q) {
       const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -31,7 +31,7 @@ export async function GET(req) {
     }
 
     const items = await Employee.find(match)
-      .select("_id firstName lastName nickName position level department userId photoUrl")
+      .select("_id firstName lastName nickName empAutoId position level department userId photoUrl")
       .sort({ level: -1, firstName: 1 })
       .lean();
 

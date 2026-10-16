@@ -28,6 +28,7 @@ function toItem(dept) {
     _id: String(dept._id),
     code: dept.code,
     name: dept.name,
+    color: dept.color ?? null,
     head: head
       ? {
           _id: String(head._id),
@@ -64,7 +65,7 @@ export async function setDepartmentHead(departmentId, employeeId) {
     { $set: { headOfDepartment: headId } },
     { new: true }
   )
-    .select("_id code name headOfDepartment")
+    .select("_id code name color headOfDepartment")
     .populate("headOfDepartment", HEAD_FIELDS)
     .lean();
   return toItem(updated);
@@ -73,7 +74,7 @@ export async function setDepartmentHead(departmentId, employeeId) {
 /** Every department with its head: [{ _id, code, name, head, headHasAccount }]. */
 export async function listDepartmentHeads() {
   const depts = await Department.find({})
-    .select("_id code name headOfDepartment")
+    .select("_id code name color headOfDepartment")
     .populate("headOfDepartment", HEAD_FIELDS)
     .sort({ code: 1 })
     .lean();

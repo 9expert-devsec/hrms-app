@@ -17,8 +17,13 @@ export default async function DepartmentEditPage({ params }) {
 
   if (!dept) return <div className="p-6" style={{ color: "#5E6A7E" }}>Department not found</div>;
 
-  const eligible = await Employee.find({ level: { $in: [5, 6] } })
-    .select("_id firstName lastName nickName position level")
+  // L5–L6 as before, plus the current head whatever their level (Settings ›
+  // กำหนด HOD can pick anyone), so the select always shows who it is.
+  const currentHeadId = dept.headOfDepartment?._id;
+  const eligible = await Employee.find(
+    currentHeadId ? { $or: [{ level: { $in: [5, 6] } }, { _id: currentHeadId }] } : { level: { $in: [5, 6] } }
+  )
+    .select("_id firstName lastName nickName position level userId")
     .lean();
 
   return (

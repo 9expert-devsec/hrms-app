@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
+import NoAccountBadge from "../../../../../components/NoAccountBadge";
 import {
   ShieldCheck,
   Users,
@@ -14,8 +15,6 @@ import {
   X,
   Check,
   User,
-  Building2,
-  RefreshCw,
 } from "lucide-react";
 
 /* ── design tokens ─────────────────────────────────── */
@@ -30,23 +29,30 @@ const CARD = {
   boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
 };
 
-export default function DepartmentHeadPage() {
+const fullName = (e) => [e?.firstName, e?.lastName].filter(Boolean).join(" ").trim() || "-";
+
+/**
+ * Settings › กำหนด HOD. Heads live in Department.headOfDepartment (an
+ * Employee); this page and the department edit form both write it through
+ * lib/hod.js. Any employee may be picked; one without a login account gets
+ * a warning badge because they cannot approve in the system.
+ */
+export default function HodSettingsPage() {
   const router = useRouter();
   const { data: session, status: authStatus } = useSession();
 
+  // [{ _id, code, name, color, head, headHasAccount }] from /api/department-head
   const [departments, setDepartments] = useState([]);
-  const [hodMap, setHodMap] = useState({}); // departmentCode → hodRecord
   const [loading, setLoading] = useState(true);
 
   /* ── modal state ───────────────────────── */
-  const [modal, setModal] = useState(null); // { deptCode, deptName }
+  const [modal, setModal] = useState(null); // { departmentId, deptCode, deptName, hasHead }
   const [candidates, setCandidates] = useState([]);
   const [searchQ, setSearchQ] = useState("");
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   /* ── toast ─────────────────────────────── */
   const [toast, setToast] = useState(null);
@@ -59,6 +65,8 @@ export default function DepartmentHeadPage() {
   /* ── role gate ─────────────────────────── */
   // Registry check (src/lib/rbac); the middleware already enforces it.
   const allowed = canAccess(session?.user, "hod_settings");
+  // Clearing a head stays superadmin-only (the API enforces it too).
+  const canClear = session?.user?.isSuperadmin === true;
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -72,23 +80,11 @@ export default function DepartmentHeadPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [deptRes, hodRes] = await Promise.all([
-        fetch("/api/departments"),
-        fetch("/api/department-head"),
-      ]);
-      const deptJ = await deptRes.json();
-      const hodJ = await hodRes.json();
-
-      setDepartments(deptJ.ok ? deptJ.items : []);
-
-      const map = {};
-      if (hodJ.ok) {
-        hodJ.items.forEach((h) => { map[h.departmentCode] = h; });
-      }
-      setHodMap(map);
+      const res = await fetch("/api/department-head", { cache: "no-store" });
+      const j = await res.json();
+      setDepartments(j.ok ? j.items : []);
     } catch {
       setDepartments([]);
-      setHodMap({});
     } finally {
       setLoading(false);
     }
@@ -100,7 +96,7 @@ export default function DepartmentHeadPage() {
     }
   }, [session, authStatus]); // eslint-disable-line
 
-  /* ── fetch candidates ──────────────────── */
+  /* ── fetch candidates (all employees) ──── */
   async function loadCandidates(query) {
     setLoadingCandidates(true);
     try {
@@ -116,15 +112,14 @@ export default function DepartmentHeadPage() {
     }
   }
 
-  /* Show all level 5-6 candidates from any department */
-  const filteredCandidates = useMemo(() => {
-    if (!modal) return [];
-    return candidates;
-  }, [candidates, modal]);
-
   /* ── open modal ────────────────────────── */
-  function openModal(deptCode, deptName) {
-    setModal({ deptCode, deptName });
+  function openModal(dept) {
+    setModal({
+      departmentId: dept._id,
+      deptCode: dept.code,
+      deptName: dept.name,
+      hasHead: !!dept.head,
+    });
     setSelectedEmp(null);
     setSearchQ("");
     loadCandidates("");
@@ -134,19 +129,14 @@ export default function DepartmentHeadPage() {
   async function handleSave() {
     if (!selectedEmp || !modal) return;
 
-    if (!selectedEmp.userId) {
-      showToast("พนักงานนี้ยังไม่มีบัญชีผู้ใช้ ไม่สามารถกำหนดเป็น HOD ได้", "error");
-      return;
-    }
-
     setSaving(true);
     try {
       const res = await fetch("/api/department-head", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          departmentCode: modal.deptCode,
-          userId: selectedEmp.userId,
+          departmentId: modal.departmentId,
+          employeeId: selectedEmp._id,
         }),
       });
       const j = await res.json();
@@ -161,41 +151,25 @@ export default function DepartmentHeadPage() {
     }
   }
 
-  /* ── delete HOD ────────────────────────── */
-  async function handleDelete() {
+  /* ── clear HOD (superadmin) ────────────── */
+  async function handleClear() {
     if (!modal) return;
-    if (!confirm(`ต้องการลบ HOD ของแผนก ${modal.deptCode} หรือไม่?`)) return;
+    if (!confirm(`ต้องการล้าง HOD ของแผนก ${modal.deptCode} หรือไม่?`)) return;
 
-    setDeleting(true);
+    setClearing(true);
     try {
-      const res = await fetch(`/api/department-head/${modal.deptCode}`, {
+      const res = await fetch(`/api/department-head/${modal.departmentId}`, {
         method: "DELETE",
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.message || "Error");
       setModal(null);
-      showToast("ลบสำเร็จ");
+      showToast("ล้างหัวหน้าแผนกแล้ว");
       await loadData();
     } catch (err) {
       showToast(err.message, "error");
     } finally {
-      setDeleting(false);
-    }
-  }
-
-  /* ── sync from Department.headOfDepartment ── */
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      const res = await fetch("/api/department-head/sync", { method: "POST" });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.message || "Sync failed");
-      showToast(`Sync แล้ว ${j.synced ?? 0} แผนก`);
-      await loadData();
-    } catch (err) {
-      showToast(err.message, "error");
-    } finally {
-      setSyncing(false);
+      setClearing(false);
     }
   }
 
@@ -210,28 +184,17 @@ export default function DepartmentHeadPage() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }} className="space-y-6">
       {/* ── Header ───────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
-          >
-            <ShieldCheck size={22} strokeWidth={1.8} />
-          </div>
-          <div>
-            <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>กำหนด Head of Department</h1>
-          <p style={{ color: SLATE, fontSize: 13 }}>ระบุผู้รับผิดชอบอนุมัติการลาของแต่ละแผนก</p>
-          </div>
-        </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50"
-          style={{ background: ICE, color: NAVY, border: "1px solid rgba(0,92,255,0.12)", cursor: "pointer" }}
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-xl"
+          style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
         >
-          {syncing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-          Sync จากระบบเดิม
-        </button>
+          <ShieldCheck size={22} strokeWidth={1.8} />
+        </div>
+        <div>
+          <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>กำหนด Head of Department</h1>
+          <p style={{ color: SLATE, fontSize: 13 }}>ระบุผู้รับผิดชอบอนุมัติการลาของแต่ละแผนก</p>
+        </div>
       </div>
 
       {/* ── Table ─────────────────────────────── */}
@@ -250,89 +213,71 @@ export default function DepartmentHeadPage() {
               </tr>
             </thead>
             <tbody>
-              {departments.map((dept) => {
-                const hod = hodMap[dept.code];
-                const hodUser = hod?.userId;
-
-                return (
-                  <tr
-                    key={dept.code}
-                    style={{ borderBottom: "1px solid rgba(0,92,255,0.08)" }}
-                  >
-                    <td style={tdStyle}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="flex h-8 w-8 items-center justify-center rounded-lg"
-                          style={{
-                            background: dept.color ? `${dept.color}18` : "rgba(0,92,255,0.08)",
-                            color: dept.color || BLUE,
-                            fontSize: 11,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {dept.code}
-                        </div>
-                        <span style={{ color: NAVY, fontSize: 14, fontWeight: 600 }}>
-                          {dept.name}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td style={tdStyle}>
-                      {hodUser ? (
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="flex h-7 w-7 items-center justify-center rounded-full"
-                            style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
-                          >
-                            <User size={13} />
-                          </div>
-                          <div>
-                            <span style={{ color: NAVY, fontSize: 13, fontWeight: 500 }}>
-                              {hodUser.email || "-"}
-                            </span>
-                            {hodUser.role && (
-                              <span style={{ color: SLATE, fontSize: 11, marginLeft: 8 }}>
-                                ({hodUser.role})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <span
-                          className="inline-flex rounded-full px-2.5 py-0.5"
-                          style={{
-                            background: "#FEF3C7",
-                            color: "#92400E",
-                            fontSize: 11,
-                            fontWeight: 600,
-                          }}
-                        >
-                          ยังไม่ได้กำหนด
-                        </span>
-                      )}
-                    </td>
-
-                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                      <button
-                        onClick={() => openModal(dept.code, dept.name)}
-                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5"
+              {departments.map((dept) => (
+                <tr key={dept._id} style={{ borderBottom: "1px solid rgba(0,92,255,0.08)" }}>
+                  <td style={tdStyle}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="flex h-8 w-8 items-center justify-center rounded-lg"
                         style={{
-                          border: `1px solid ${BLUE}20`,
-                          color: BLUE,
-                          fontSize: 12,
-                          fontWeight: 500,
-                          background: `${BLUE}08`,
-                          cursor: "pointer",
+                          background: dept.color ? `${dept.color}18` : "rgba(0,92,255,0.08)",
+                          color: dept.color || BLUE,
+                          fontSize: 11,
+                          fontWeight: 700,
                         }}
                       >
-                        <Pencil size={13} />
-                        แก้ไข
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                        {dept.code}
+                      </div>
+                      <span style={{ color: NAVY, fontSize: 14, fontWeight: 600 }}>{dept.name}</span>
+                    </div>
+                  </td>
+
+                  <td style={tdStyle}>
+                    {dept.head ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div
+                          className="flex h-7 w-7 items-center justify-center rounded-full"
+                          style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
+                        >
+                          <User size={13} />
+                        </div>
+                        <span style={{ color: NAVY, fontSize: 13, fontWeight: 500 }}>
+                          {fullName(dept.head)}
+                        </span>
+                        {dept.head.empAutoId != null && (
+                          <span style={{ color: SLATE, fontSize: 11 }}>#{dept.head.empAutoId}</span>
+                        )}
+                        {!dept.headHasAccount && <NoAccountBadge />}
+                      </div>
+                    ) : (
+                      <span
+                        className="inline-flex rounded-full px-2.5 py-0.5"
+                        style={{ background: "#FEF3C7", color: "#92400E", fontSize: 11, fontWeight: 600 }}
+                      >
+                        ยังไม่ได้กำหนด
+                      </span>
+                    )}
+                  </td>
+
+                  <td style={{ ...tdStyle, textAlign: "center" }}>
+                    <button
+                      onClick={() => openModal(dept)}
+                      className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5"
+                      style={{
+                        border: `1px solid ${BLUE}20`,
+                        color: BLUE,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        background: `${BLUE}08`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Pencil size={13} />
+                      แก้ไข
+                    </button>
+                  </td>
+                </tr>
+              ))}
 
               {departments.length === 0 && (
                 <tr>
@@ -382,13 +327,7 @@ export default function DepartmentHeadPage() {
             <div className="relative mb-3">
               <Search
                 size={16}
-                style={{
-                  position: "absolute",
-                  left: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: SLATE,
-                }}
+                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: SLATE }}
               />
               <input
                 type="text"
@@ -412,7 +351,7 @@ export default function DepartmentHeadPage() {
             </div>
 
             <p style={{ color: SLATE, fontSize: 12, marginBottom: 8 }}>
-              แสดงพนักงาน Level 5 ขึ้นไปทุกแผนก
+              แสดงพนักงานทุกคน — หัวหน้าไม่จำเป็นต้องอยู่ในแผนกนี้
             </p>
 
             {/* Candidates list */}
@@ -430,15 +369,15 @@ export default function DepartmentHeadPage() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 size={20} className="animate-spin" style={{ color: BLUE }} />
                 </div>
-              ) : filteredCandidates.length === 0 ? (
+              ) : candidates.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8" style={{ color: SLATE, fontSize: 13 }}>
                   <Users size={24} style={{ opacity: 0.4, marginBottom: 8 }} />
                   ไม่พบพนักงานที่ตรงเงื่อนไข
                 </div>
               ) : (
-                filteredCandidates.map((emp) => {
+                candidates.map((emp) => {
                   const isSelected = selectedEmp?._id === emp._id;
-                  const empName = `${emp.firstName} ${emp.lastName}`;
+                  const empName = fullName(emp);
                   return (
                     <div
                       key={emp._id}
@@ -454,11 +393,7 @@ export default function DepartmentHeadPage() {
                       }}
                     >
                       {emp.photoUrl ? (
-                        <img
-                          src={emp.photoUrl}
-                          alt={empName}
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
+                        <img src={emp.photoUrl} alt={empName} className="h-8 w-8 rounded-full object-cover" />
                       ) : (
                         <div
                           className="flex h-8 w-8 items-center justify-center rounded-full"
@@ -472,18 +407,9 @@ export default function DepartmentHeadPage() {
                         <div style={{ color: SLATE, fontSize: 12 }}>
                           {emp.department} • {emp.position} • Level {emp.level}
                         </div>
+                        {!emp.userId && <NoAccountBadge className="mt-1" />}
                       </div>
-                      {isSelected && (
-                        <Check size={18} style={{ color: BLUE, flexShrink: 0 }} />
-                      )}
-                      {!emp.userId && (
-                        <span
-                          className="rounded-full px-2 py-0.5"
-                          style={{ fontSize: 10, background: "#FEE2E2", color: "#991B1B", flexShrink: 0 }}
-                        >
-                          ไม่มีบัญชี
-                        </span>
-                      )}
+                      {isSelected && <Check size={18} style={{ color: BLUE, flexShrink: 0 }} />}
                     </div>
                   );
                 })
@@ -493,10 +419,10 @@ export default function DepartmentHeadPage() {
             {/* Actions */}
             <div className="flex gap-3 justify-between">
               <div>
-                {hodMap[modal.deptCode] && (
+                {canClear && modal.hasHead && (
                   <button
-                    onClick={handleDelete}
-                    disabled={deleting}
+                    onClick={handleClear}
+                    disabled={clearing}
                     className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 disabled:opacity-50"
                     style={{
                       background: "#FEE2E2",
@@ -507,8 +433,8 @@ export default function DepartmentHeadPage() {
                       cursor: "pointer",
                     }}
                   >
-                    {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                    ลบ
+                    {clearing ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                    ล้างหัวหน้า
                   </button>
                 )}
               </div>
