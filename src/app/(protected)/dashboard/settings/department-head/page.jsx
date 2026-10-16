@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
 import NoAccountBadge from "../../../../../components/NoAccountBadge";
+import Avatar from "../../../../../components/Avatar";
 import {
   ShieldCheck,
   Users,
@@ -393,7 +394,7 @@ export default function HodSettingsPage() {
                       }}
                     >
                       {emp.photoUrl ? (
-                        <img src={emp.photoUrl} alt={empName} className="h-8 w-8 rounded-full object-cover" />
+                        <Avatar src={emp.photoUrl} alt={empName} size={32} />
                       ) : (
                         <div
                           className="flex h-8 w-8 items-center justify-center rounded-full"

@@ -308,7 +308,7 @@ export default function EmployeeEditForm({
                 alt="avatar"
                 fill
                 sizes="80px"
-                className="object-cover"
+                className="object-cover object-top"
               />
             </div>
             <label className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/10 hover:bg-white/15 cursor-pointer">

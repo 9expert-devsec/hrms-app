@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
+import Avatar from "../../../../../components/Avatar";
 import {
   CheckSquare,
   Loader2,
@@ -268,12 +269,7 @@ export default function OTApprovePage() {
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3">
                     {emp.photo ? (
-                      <img
-                        src={emp.photo}
-                        alt=""
-                        className="h-10 w-10 rounded-full object-cover"
-                        style={{ border: "2px solid rgba(0,92,255,0.10)" }}
-                      />
+                      <Avatar src={emp.photo} size={40} style={{ border: "2px solid rgba(0,92,255,0.10)" }} />
                     ) : (
                       <div
                         className="h-10 w-10 rounded-full grid place-items-center"
@@ -434,7 +430,7 @@ export default function OTApprovePage() {
                     return (
                       <>
                         {emp.photo ? (
-                          <img src={emp.photo} alt="" className="h-9 w-9 rounded-full object-cover" />
+                          <Avatar src={emp.photo} size={36} />
                         ) : (
                           <div
                             className="h-9 w-9 rounded-full grid place-items-center"

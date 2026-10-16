@@ -163,7 +163,8 @@ export default async function EmployeeProfilePage({ searchParams }) {
               }}
             >
               <div className="relative h-full w-full overflow-hidden rounded-[13px]">
-                <Image src={avatar} alt={e.firstName} fill sizes="112px" className="object-cover" />
+                {/* Full photo, top-anchored (no face crop on the profile page). */}
+                <Image src={avatar} alt={e.firstName} fill sizes="112px" className="object-cover object-top" />
               </div>
             </div>
             {/* Online dot */}

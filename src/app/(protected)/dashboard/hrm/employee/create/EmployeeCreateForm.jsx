@@ -240,7 +240,7 @@ export default function EmployeeCreateForm() {
               <img
                 src={preview || form.photoUrl}
                 alt="preview"
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover object-top"
               />
             ) : (
               <span className="text-xs text-slate-400">No photo</span>

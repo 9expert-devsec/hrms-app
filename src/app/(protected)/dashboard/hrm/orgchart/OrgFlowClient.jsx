@@ -19,6 +19,7 @@ import "reactflow/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import * as htmlToImage from "html-to-image";
 import { Download, Search } from "lucide-react";
+import Avatar from "../../../../../components/Avatar";
 
 /* ================================================================
    Constants & Helpers
@@ -90,19 +91,16 @@ function AvatarCircle({ photoUrl, emp, size, ringColor, bgColor, textColor, font
         justifyContent: "center",
       }}
     >
-      {src ? (
-        <img
-          src={src}
-          alt=""
-          width={size}
-          height={size}
-          style={{ objectFit: "cover", width: size, height: size }}
-        />
-      ) : (
-        <span style={{ color: textColor, fontWeight: 700, fontSize: fontSize || 14 }}>
-          {emp ? initials(emp) : "?"}
-        </span>
-      )}
+      <Avatar
+        src={src}
+        size={size}
+        radius={0}
+        fallback={
+          <span style={{ color: textColor, fontWeight: 700, fontSize: fontSize || 14 }}>
+            {emp ? initials(emp) : "?"}
+          </span>
+        }
+      />
     </div>
   );
 }

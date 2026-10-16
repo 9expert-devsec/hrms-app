@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import Avatar from "./Avatar";
 import { X, LogOut, LogIn, User } from "lucide-react";
 import { useSession, signOut, signIn } from "next-auth/react";
 import { menuConfig, filterMenu } from "@/app/config/menuConfig";
@@ -68,19 +68,17 @@ export default function MobileSidebar({ open, onClose }) {
           {status === "authenticated" ? (
             <div className="flex items-center gap-3">
               {/* Avatar */}
-              {user?.image ? (
-                <Image
-                  src={user.image}
-                  alt={user.name || "User avatar"}
-                  width={40}
-                  height={40}
-                  className="rounded-lg object-cover"
-                />
-              ) : (
-                <div className="h-10 w-10 rounded-lg bg-white/5 grid place-items-center">
-                  <User size={18} className="text-slate-300" />
-                </div>
-              )}
+              <Avatar
+                src={user?.image}
+                alt={user?.name || "User avatar"}
+                size={40}
+                radius={8}
+                fallback={
+                  <div className="h-10 w-10 rounded-lg bg-white/5 grid place-items-center">
+                    <User size={18} className="text-slate-300" />
+                  </div>
+                }
+              />
 
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-100 truncate">

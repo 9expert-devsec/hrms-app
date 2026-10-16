@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { Crown, Users } from "lucide-react";
+import Avatar from "../../../../../components/Avatar";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -48,13 +49,7 @@ function PersonCard({ p, badge, highlight = false }) {
           className="relative w-10 h-10 rounded-full overflow-hidden shrink-0"
           style={{ border: "2px solid rgba(0,92,255,0.10)", background: ICE }}
         >
-          <img
-            src={avatar(p.photoUrl)}
-            alt={p.name}
-            width={40}
-            height={40}
-            style={{ objectFit: "cover", width: 40, height: 40 }}
-          />
+          <Avatar src={avatar(p.photoUrl)} alt={p.name} size={40} radius={0} />
         </div>
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate" style={{ color: NAVY }}>
@@ -99,13 +94,7 @@ export default function MyTeamClient({ data }) {
               className="relative w-12 h-12 rounded-full overflow-hidden shrink-0"
               style={{ border: "2px solid rgba(0,92,255,0.12)", background: ICE }}
             >
-              <img
-                src={avatar(viewer.photoUrl)}
-                alt={viewer.name}
-                width={48}
-                height={48}
-                style={{ objectFit: "cover", width: 48, height: 48 }}
-              />
+              <Avatar src={avatar(viewer.photoUrl)} alt={viewer.name} size={48} radius={0} />
             </div>
             <div className="min-w-0">
               <div className="font-semibold" style={{ color: NAVY }}>{viewer.name}</div>

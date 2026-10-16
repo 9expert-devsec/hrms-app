@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import SignaturePad from "../../../../../components/SignaturePad";
+import Avatar from "../../../../../components/Avatar";
 import SignatureDisplay from "../../../../../components/SignatureDisplay";
 import AttachmentViewer, { hasAttachments } from "../../../../../components/AttachmentViewer";
 
@@ -258,11 +259,7 @@ export default function LeaveApprovePage() {
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-2">
                         {emp.photoUrl ? (
-                          <img
-                            src={emp.photoUrl}
-                            alt={empName}
-                            className="h-8 w-8 rounded-full object-cover"
-                          />
+                          <Avatar src={emp.photoUrl} alt={empName} size={32} />
                         ) : (
                           <div
                             className="flex h-8 w-8 items-center justify-center rounded-full"

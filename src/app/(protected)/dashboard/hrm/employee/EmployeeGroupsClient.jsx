@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
+import Avatar from "../../../../../components/Avatar";
 import Link from "next/link";
 import { ChevronDown, Mail, Phone } from "lucide-react";
 
@@ -94,7 +94,7 @@ export default function EmployeeGroupsClient({ groups, order, labels, deptColors
                     <li key={e.id} className="px-4 py-3 hover:bg-white/5/50">
                       <div className="flex items-center gap-3">
                         <div className="relative h-10 w-10 rounded-full overflow-hidden ring-1 ring-white/10">
-                          <Image src={e.photoUrl} alt={e.name} fill sizes="40px" className="object-cover" />
+                          <Avatar src={e.photoUrl} alt={e.name} size={40} radius={0} />
                         </div>
 
                         <div className="min-w-0 flex-1">

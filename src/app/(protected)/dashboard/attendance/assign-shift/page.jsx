@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
+import Avatar from "../../../../../components/Avatar";
 import {
   Users,
   Search,
@@ -348,12 +349,7 @@ export default function AssignShiftPage() {
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           {emp.photoUrl ? (
-                            <img
-                              src={emp.photoUrl}
-                              alt=""
-                              className="h-8 w-8 rounded-full object-cover"
-                              style={{ border: "2px solid rgba(0,92,255,0.10)" }}
-                            />
+                            <Avatar src={emp.photoUrl} size={32} style={{ border: "2px solid rgba(0,92,255,0.10)" }} />
                           ) : (
                             <div
                               className="h-8 w-8 rounded-full grid place-items-center"
@@ -504,12 +500,7 @@ export default function AssignShiftPage() {
                 style={{ background: ICE }}
               >
                 {modal.employee.photoUrl ? (
-                  <img
-                    src={modal.employee.photoUrl}
-                    alt=""
-                    className="h-10 w-10 rounded-full object-cover"
-                    style={{ border: "2px solid rgba(0,92,255,0.10)" }}
-                  />
+                  <Avatar src={modal.employee.photoUrl} size={40} style={{ border: "2px solid rgba(0,92,255,0.10)" }} />
                 ) : (
                   <div
                     className="h-10 w-10 rounded-full grid place-items-center"
