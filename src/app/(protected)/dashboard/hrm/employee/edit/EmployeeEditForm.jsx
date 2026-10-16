@@ -8,7 +8,8 @@ import RoleSelect from "./../../../../../../components/RoleSelect";
 import TempPasswordDialog from "./../../../../../../components/TempPasswordDialog";
 import { Loader2 } from "lucide-react";
 import { canAccess } from "@/lib/rbac/access";
-import { accountActionBlock } from "@/lib/rbac/accountRules";
+import { accountActionBlock, linkActionBlock } from "@/lib/rbac/accountRules";
+import EmployeeAccountLink from "./EmployeeAccountLink";
 import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 
 const BANKS = [
@@ -266,12 +267,40 @@ export default function EmployeeEditForm({
     }
   }
 
-  /* -------------------- Delete employee (with linked user) -------------------- */
+  /* -------------------- Unlink the account (it stays, with its role) -------------------- */
+  const emailMismatch =
+    !!userId && (linkedUser?.email || "").toLowerCase() !== (employee.email || "").toLowerCase();
+  const unlinkBlock = userId
+    ? linkActionBlock({
+        actor: session?.user,
+        target: { id: userId, isSuperadmin: linkedUser?.role === "superadmin" },
+        action: "unlink",
+      })
+    : null;
+  const [unlinking, setUnlinking] = useState(false);
+
+  async function onUnlink() {
+    if (!userId || unlinkBlock) return;
+    if (!confirm(`ยกเลิกการผูกบัญชี ${linkedUser?.email} กับพนักงานคนนี้?\n\nบัญชียังอยู่และคงสิทธิ์เดิม`)) return;
+    setUnlinking(true);
+    try {
+      const r = await fetch(`/api/employees/${employee._id}/account`, { method: "DELETE" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.message || j.error || "ยกเลิกการผูกไม่สำเร็จ");
+      location.reload();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setUnlinking(false);
+    }
+  }
+
+  /* -------------------- Delete employee (the linked account is kept) -------------------- */
   async function deleteEmployee() {
     if (!canAdmin) return;
     if (
       !confirm(
-        `ยืนยันลบพนักงาน: ${firstName} ${lastName}\n\nระบบจะลบบัญชีผู้ใช้ที่เชื่อมอยู่ทั้งหมดด้วย`
+        `ยืนยันลบพนักงาน: ${firstName} ${lastName}\n\nบัญชีผู้ใช้ที่ผูกอยู่จะไม่ถูกลบ (จะถูกยกเลิกการผูก) — ระงับหรือลบบัญชีได้ที่หน้าผู้ใช้`
       )
     )
       return;
@@ -503,7 +532,7 @@ export default function EmployeeEditForm({
               onClick={deleteEmployee}
               disabled={deletingEmp}
               className="inline-flex items-center gap-2 rounded-xl bg-red-600/80 hover:bg-red-600 px-4 py-2.5 text-white ring-1 ring-red-400/40 disabled:opacity-60"
-              title="ลบพนักงานและบัญชีผู้ใช้ที่เชื่อมอยู่"
+              title="ลบพนักงาน (บัญชีผู้ใช้ที่ผูกอยู่จะถูกยกเลิกการผูก ไม่ถูกลบ)"
             >
               {deletingEmp && <Loader2 className="size-4 animate-spin" />}
               Delete Employee
@@ -518,9 +547,17 @@ export default function EmployeeEditForm({
           <h3 className="font-medium text-slate-100 mb-2">บัญชีผู้ใช้</h3>
 
           {!user ? (
-            <p className="text-sm text-slate-400">
-              ยังไม่ผูกบัญชีกับพนักงานคนนี้
-            </p>
+            canAdmin ? (
+              <EmployeeAccountLink
+                employeeId={String(employee._id)}
+                employeeEmail={employee.email || ""}
+                isSuperadmin={isSuperadmin}
+              />
+            ) : (
+              <p className="text-sm text-slate-400">
+                ยังไม่ผูกบัญชีกับพนักงานคนนี้
+              </p>
+            )
           ) : (
             <>
               <Input
@@ -529,6 +566,11 @@ export default function EmployeeEditForm({
                 onChange={setUserEmail}
                 readOnly={!canAdmin}
               />
+              {emailMismatch && (
+                <p className="mt-2 text-xs rounded-lg px-3 py-2" style={{ background: "#FEF3C7", color: "#92400E" }}>
+                  อีเมลของบัญชีไม่ตรงกับอีเมลพนักงาน ({employee.email || "—"})
+                </p>
+              )}
 
               {/* Role changes are superadmin-only (the API enforces it too). */}
               {isSuperadmin && (
@@ -569,6 +611,26 @@ export default function EmployeeEditForm({
                     >
                       {pwdSaving && <Loader2 className="size-4 animate-spin" />}
                       รีเซ็ตรหัสผ่าน
+                    </button>
+                  </span>
+                </>
+              )}
+
+              {canAdmin && (
+                <>
+                  <hr className="my-5 border-white/10" />
+                  <h4 className="font-medium text-slate-100 mb-1">ยกเลิกการผูก</h4>
+                  <p className="text-xs mb-3" style={{ color: "#5E6A7E" }}>
+                    บัญชียังอยู่และคงสิทธิ์เดิม แต่จะไม่เห็นข้อมูลของพนักงานคนนี้อีก
+                  </p>
+                  <span title={unlinkBlock?.error}>
+                    <button
+                      onClick={onUnlink}
+                      disabled={unlinking || !!unlinkBlock}
+                      className="inline-flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 px-4 py-2.5 text-slate-200 ring-1 ring-white/10 disabled:opacity-60"
+                    >
+                      {unlinking && <Loader2 className="size-4 animate-spin" />}
+                      ยกเลิกการผูก
                     </button>
                   </span>
                 </>

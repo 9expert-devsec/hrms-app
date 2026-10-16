@@ -5,6 +5,7 @@ import { requireAnyPageApi } from "@/lib/rbac/guard";
 import { canSeeLeaveDocument } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
+import { deletedAccount } from "@/lib/deletedAccount";
 
 /* ---------- GET ---------- */
 export async function GET(_req, { params }) {
@@ -31,6 +32,14 @@ export async function GET(_req, { params }) {
     const visible =
       leave && (await canSeeLeaveDocument(session, { ownerUserId: leave.userId, employee: leave.employeeId }));
     if (!visible) return NextResponse.json({ ok: false, message: "ไม่พบรายการลา" }, { status: 404 });
+
+    // An approver whose account was deleted (lib/accountLinks.js) populates
+    // to null; keep the id and say so instead of dropping it. The stored
+    // record is not changed.
+    const raw = await Leave.findById(id).select("hodApproverId hrApproverId").lean();
+    for (const field of ["hodApproverId", "hrApproverId"]) {
+      if (!leave[field] && raw?.[field]) leave[field] = deletedAccount(raw[field]);
+    }
 
     return NextResponse.json({ ok: true, leave });
   } catch (err) {

@@ -17,6 +17,7 @@ import {
 import SignatureDisplay from "./../../../../../components/SignatureDisplay";
 import AttachmentViewer, { hasAttachments } from "./../../../../../components/AttachmentViewer";
 import { canAccess } from "@/lib/rbac/access";
+import { accountLabel } from "@/lib/deletedAccount";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -523,6 +524,9 @@ function DocumentDetail({ id }) {
               {leave.hodApproverNote && leave.status !== "rejected" && (
                 <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>หมายเหตุ: {leave.hodApproverNote}</p>
               )}
+              {leave.hodApproverId && (
+                <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>ผู้อนุมัติ: {accountLabel(leave.hodApproverId)}</p>
+              )}
             </div>
 
             {/* Column 3: HR */}
@@ -575,6 +579,9 @@ function DocumentDetail({ id }) {
                     <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>หมายเหตุ: {leave.hrApproverNote}</p>
                   )}
                 </div>
+              )}
+              {leave.hrApproverId && (
+                <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>ผู้อนุมัติ: {accountLabel(leave.hrApproverId)}</p>
               )}
             </div>
           </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
+import User from "@/models/User";
 import Department from "@/models/Department"; // ✅ ดึงสีจาก department
 import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
@@ -33,10 +34,17 @@ export default async function EmployeeIndexPage() {
   // ✅ ดึงรายชื่อพนักงาน (ข้อมูลเบา ๆ)
   const docs = await Employee.find(
     {},
-    "empAutoId firstName lastName nickName department position phone email photoUrl"
+    "empAutoId firstName lastName nickName department position phone email photoUrl userId"
   )
     .sort({ department: 1, lastName: 1, firstName: 1 })
     .lean();
+
+  // Has a login account = Employee.userId points at a user that still exists.
+  const liveUserIds = new Set(
+    (await User.find({ _id: { $in: docs.map((e) => e.userId).filter(Boolean) } }).select("_id").lean()).map(
+      (u) => String(u._id)
+    )
+  );
 
   // ✅ ดึงสีจาก departments: { code, color }
   const deps = await Department.find({}, "code color").lean();
@@ -59,6 +67,7 @@ export default async function EmployeeIndexPage() {
       email: e.email,
       photoUrl: e.photoUrl || "/avatar-default.png",
       department: dept,
+      hasAccount: !!e.userId && liveUserIds.has(String(e.userId)),
     });
   }
 

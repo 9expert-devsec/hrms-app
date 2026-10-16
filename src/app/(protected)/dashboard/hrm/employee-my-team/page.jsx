@@ -6,6 +6,8 @@ import { requirePage } from "@/lib/rbac/guard";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import MyTeamClient from "./MyTeamClient";
+import { employeeOfUser } from "@/lib/rbac/scopeQueries";
+import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
 
 const headFields =
   "_id firstName lastName nickName position level photoUrl";
@@ -24,19 +26,19 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
   const overrideId = sp?.id || null;
 
   // ---- หา employee ของผู้ใช้ที่ล็อกอิน ----
+  // Own team = the linked employee's (lib/accountLinks.js), never an email match.
   let viewer =
     (overrideId && (await Employee.findById(overrideId).lean())) ||
-    (session?.user?.employeeId &&
-      (await Employee.findById(session.user.employeeId).lean())) ||
-    (session?.user?.email &&
-      (await Employee.findOne({ email: session.user.email }).lean())) ||
+    (await employeeOfUser(session?.user?.id)) ||
     null;
 
   if (!viewer) {
-    return (
+    return overrideId ? (
       <div className="px-6 py-6 container mx-auto" style={{ color: "#5E6A7E" }}>
-        ไม่พบข้อมูลพนักงานของผู้ใช้ที่ล็อกอิน
+        ไม่พบข้อมูลพนักงาน
       </div>
+    ) : (
+      <UnlinkedNotice />
     );
   }
 

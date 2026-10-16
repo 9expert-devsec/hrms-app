@@ -103,6 +103,15 @@ export default function EmployeeGroupsClient({ groups, order, labels, deptColors
                             {e.nickName && <span className="text-xs text-slate-400">({e.nickName})</span>}
                             <span className="text-xs rounded-md bg-white/10 px-2 py-0.5 text-slate-300">{e.empAutoId}</span>
                             <span className="text-xs text-slate-400">{e.position}</span>
+                            {!e.hasAccount && (
+                              <span
+                                className="text-xs rounded-full px-2 py-0.5"
+                                style={{ background: "#FEF3C7", color: "#92400E", fontWeight: 600 }}
+                                title="พนักงานคนนี้ยังไม่มีบัญชีผู้ใช้ — สร้างหรือผูกได้ที่หน้าแก้ไขพนักงาน"
+                              >
+                                ไม่มีบัญชี
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-slate-300">
                             {e.phone && (

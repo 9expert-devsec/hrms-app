@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { profileAccess } from "@/lib/rbac/scopes";
-import { departmentIdOf } from "@/lib/rbac/scopeQueries";
+import { departmentIdOf, employeeOfUser } from "@/lib/rbac/scopeQueries";
+import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
 
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
@@ -32,7 +33,6 @@ const fmtDate = (d) =>
       })
     : "-";
 
-const escapeReg = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export default async function EmployeeProfilePage({ searchParams }) {
   const session = await requirePage("self_profile");
@@ -46,26 +46,15 @@ export default async function EmployeeProfilePage({ searchParams }) {
   if (targetId) {
     e = await Employee.findById(targetId).lean();
   } else {
-    if (session.user.employeeId) {
-      e = await Employee.findById(session.user.employeeId).lean();
-    }
-    if (!e && session.user.id) {
-      e = await Employee.findOne({ userId: session.user.id }).lean();
-    }
-    if (!e && session.user.email) {
-      e = await Employee.findOne({
-        email: {
-          $regex: new RegExp(`^${escapeReg(session.user.email)}$`, "i"),
-        },
-      }).lean();
-    }
+    // Own profile = the linked employee only (lib/accountLinks.js).
+    e = await employeeOfUser(session.user.id);
+    if (!e) return <UnlinkedNotice />;
   }
 
   if (!e) notFound();
 
-  const isSelf =
-    String(session.user.employeeId || "") === String(e._id) ||
-    session.user.email?.toLowerCase() === e.email?.toLowerCase();
+  // Self = linked to this account, never an email match.
+  const isSelf = !!e.userId && String(e.userId) === String(session.user.id || "");
 
   // Someone else's profile: employees holders, superadmin, a head of their
   // department, or a colleague in the same department (ทีมของฉัน links).

@@ -1,8 +1,23 @@
 // src/app/(protected)/layout.jsx
+import { Suspense } from "react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import dbConnect from "@/lib/mongoose";
+import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import Sidebar from "./../../components/Sidebar";
 import Topbar from "./../../components/Topbar";
+import SelfServiceGate from "./../../components/SelfServiceGate";
 
-export default function ProtectedLayout({ children }) {
+export default async function ProtectedLayout({ children }) {
+  // Is this account linked to an employee? (Employee.userId — read from the
+  // DB, not the token, so a link or unlink shows on the next page load.)
+  const session = await getServerSession(authOptions);
+  let linked = true;
+  if (session?.user?.id) {
+    await dbConnect();
+    linked = !!(await employeeOfUser(session.user.id, "_id"));
+  }
+
   return (
     <div
       style={{
@@ -26,7 +41,9 @@ export default function ProtectedLayout({ children }) {
       >
         <Topbar />
         <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "24px" }}>
-          {children}
+          <Suspense fallback={null}>
+            <SelfServiceGate linked={linked}>{children}</SelfServiceGate>
+          </Suspense>
         </main>
       </div>
     </div>

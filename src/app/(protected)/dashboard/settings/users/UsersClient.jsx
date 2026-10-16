@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2, LockOpen } from "lucide-react";
-import { accountActionBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
+import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2, LockOpen, Trash2 } from "lucide-react";
+import { accountActionBlock, accountDeleteBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
 import TempPasswordDialog from "../../../../../components/TempPasswordDialog";
 
 /* ── design tokens (same as the other settings pages) ───────── */
@@ -51,6 +51,8 @@ export default function UsersClient({ initial, actor }) {
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [linkFilter, setLinkFilter] = useState("all"); // "all" | "unlinked"
+  const [deleting, setDeleting] = useState(null); // { user, typed } — superadmin delete dialog
   const [roleFilter, setRoleFilter] = useState("all");
 
   const [confirm, setConfirm] = useState(null); // { user, action: "reset" | "suspend" | "activate" | "unlock" }
@@ -69,11 +71,12 @@ export default function UsersClient({ initial, actor }) {
     const needle = q.trim().toLowerCase();
     return data.users.filter((u) => {
       if (statusFilter !== "all" && u.status !== statusFilter) return false;
+      if (linkFilter === "unlinked" && u.employee) return false;
       if (roleFilter !== "all" && u.role !== roleFilter) return false;
       if (!needle) return true;
       return [u.name, u.email, u.employee?.name].some((v) => (v || "").toLowerCase().includes(needle));
     });
-  }, [data.users, q, statusFilter, roleFilter]);
+  }, [data.users, q, statusFilter, roleFilter, linkFilter]);
 
   function targetOf(u) {
     return { id: u._id, isSuperadmin: u.isSuperadmin, status: u.status };
@@ -119,6 +122,27 @@ export default function UsersClient({ initial, actor }) {
       router.refresh();
     } catch (err) {
       setConfirm(null);
+      showToast(err.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runDelete() {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/users/${deleting.user._id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmEmail: deleting.typed }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) throw new Error(j.message || j.error || "ลบบัญชีไม่สำเร็จ");
+      setDeleting(null);
+      showToast("ลบบัญชีแล้ว — ข้อมูลพนักงานและประวัติยังอยู่ครบ");
+      router.refresh();
+    } catch (err) {
       showToast(err.message, "error");
     } finally {
       setBusy(false);
@@ -205,6 +229,10 @@ export default function UsersClient({ initial, actor }) {
           <option value="active">ใช้งาน</option>
           <option value="suspended">ระงับ</option>
         </select>
+        <select value={linkFilter} onChange={(e) => setLinkFilter(e.target.value)} style={selectStyle} aria-label="การผูกพนักงาน">
+          <option value="all">ทุกบัญชี</option>
+          <option value="unlinked">ไม่ได้ผูกพนักงาน</option>
+        </select>
         <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={selectStyle} aria-label="บทบาท">
           <option value="all">ทุกบทบาท</option>
           {data.roles.map((r) => (
@@ -236,6 +264,9 @@ export default function UsersClient({ initial, actor }) {
               const statusAction = u.status === "suspended" ? "activate" : "suspend";
               const statusBlock = actionBlock(u, statusAction);
               const unlockBlock = u.lockedUntil ? actionBlock(u, "unlock") : null;
+              const deleteBlock = actor.isSuperadmin
+                ? accountDeleteBlock({ actor, target: targetOf(u), activeSuperadminCount: data.activeSuperadminCount })
+                : null;
               const roleBlock = actor.isSuperadmin
                 ? roleChangeBlock({
                     actor,
@@ -288,9 +319,14 @@ export default function UsersClient({ initial, actor }) {
                       <>
                         <span style={{ color: SLATE }}>#{u.employee.empAutoId ?? "-"}</span>{" "}
                         <span style={{ color: NAVY }}>{u.employee.name || "-"}</span>
+                        {u.employee.emailMismatch && (
+                          <div className="mt-1" title="อีเมลของบัญชีไม่ตรงกับอีเมลพนักงาน">
+                            <Pill bg="#FEF3C7" color="#92400E">อีเมลไม่ตรงกับพนักงาน</Pill>
+                          </div>
+                        )}
                       </>
                     ) : (
-                      <span style={{ color: SLATE }}>ไม่มี</span>
+                      <span style={{ color: SLATE }}>ไม่ได้ผูกพนักงาน</span>
                     )}
                   </td>
                   <td style={tdStyle}>
@@ -343,6 +379,18 @@ export default function UsersClient({ initial, actor }) {
                           {statusAction === "suspend" ? "ระงับบัญชี" : "เปิดใช้งาน"}
                         </button>
                       </span>
+                      {actor.isSuperadmin && (
+                        <span title={deleteBlock?.error}>
+                          <button
+                            onClick={() => setDeleting({ user: u, typed: "" })}
+                            disabled={!!deleteBlock}
+                            style={{ ...actionBtn("#991B1B"), opacity: deleteBlock ? 0.45 : 1 }}
+                          >
+                            <Trash2 size={13} />
+                            ลบบัญชี
+                          </button>
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -385,6 +433,53 @@ export default function UsersClient({ initial, actor }) {
             >
               {busy && <Loader2 size={15} className="animate-spin" />}
               {confirmCopy[confirm.action].cta}
+            </button>
+          </div>
+        </Dialog>
+      )}
+
+      {/* ── Delete account (superadmin; type the email to confirm) ── */}
+      {deleting && (
+        <Dialog onClose={() => !busy && setDeleting(null)} labelledBy="delete-title">
+          <h3 id="delete-title" style={{ color: "#991B1B", fontSize: 18, fontWeight: 700 }}>
+            ลบบัญชีผู้ใช้
+          </h3>
+          <p style={{ color: NAVY, fontSize: 14, marginTop: 8 }}>{deleting.user.email}</p>
+          <p style={{ color: SLATE, fontSize: 13, marginTop: 8 }}>
+            ข้อมูลพนักงานและประวัติทั้งหมด (การลา OT การอนุมัติ เวลาทำงาน) จะยังอยู่ครบ — บัญชีจะถูกยกเลิกการผูกแล้วลบ
+            และจุดที่เคยอ้างถึงบัญชีนี้จะแสดงว่า “บัญชีถูกลบ”
+          </p>
+          <p
+            className="rounded-lg px-3 py-2"
+            style={{ background: "#FEF3C7", color: "#92400E", fontSize: 13, marginTop: 10 }}
+          >
+            พนักงานที่ลาออกแล้ว แนะนำให้ใช้ “ระงับบัญชี” แทน — การลบใช้สำหรับบัญชีที่สร้างผิดหรือซ้ำเท่านั้น และย้อนกลับไม่ได้
+          </p>
+          <label style={{ display: "block", color: NAVY, fontSize: 13, marginTop: 14 }}>
+            พิมพ์อีเมลของบัญชีเพื่อยืนยัน
+          </label>
+          <input
+            value={deleting.typed}
+            onChange={(e) => setDeleting((d) => ({ ...d, typed: e.target.value }))}
+            placeholder={deleting.user.email}
+            aria-label="พิมพ์อีเมลของบัญชีเพื่อยืนยัน"
+            style={{ ...inputStyle, marginTop: 6 }}
+            autoComplete="off"
+          />
+          <div className="flex justify-end gap-3 mt-6">
+            <button onClick={() => setDeleting(null)} disabled={busy} style={secondaryBtn}>
+              ยกเลิก
+            </button>
+            <button
+              onClick={runDelete}
+              disabled={
+                busy || deleting.typed.trim().toLowerCase() !== deleting.user.email.trim().toLowerCase()
+              }
+              className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 disabled:opacity-50"
+              style={{ background: "#991B1B", color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
+            >
+              {busy && <Loader2 size={15} className="animate-spin" />}
+              ลบบัญชีถาวร
             </button>
           </div>
         </Dialog>

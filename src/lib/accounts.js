@@ -111,36 +111,31 @@ export async function issueTemporaryPassword(targetId, { actor }) {
 
 /**
  * Everything the users page shows: users with their linked employee
- * (User.employeeId, else Employee.userId), the role list (names/colours) and
- * the number of active superadmins (for the last-superadmin rule).
+ * (Employee.userId — lib/accountLinks.js; null = not linked), the role list
+ * (names/colours) and the number of active superadmins (for the
+ * last-superadmin rule).
  */
 export async function listUsers() {
   const [users, roles, activeSuperadminCount] = await Promise.all([
     User.find({})
-      .select("_id name email role status lastLoginAt mustChangePassword lockedUntil employeeId")
+      .select("_id name email role status lastLoginAt mustChangePassword lockedUntil")
       .sort({ email: 1 })
       .lean(),
     listRoles(),
     countActiveSuperadmins(),
   ]);
 
-  const emps = await Employee.find({
-    $or: [
-      { _id: { $in: users.map((u) => u.employeeId).filter(Boolean) } },
-      { userId: { $in: users.map((u) => u._id) } },
-    ],
-  })
-    .select("_id firstName lastName empAutoId userId")
+  const emps = await Employee.find({ userId: { $in: users.map((u) => u._id) } })
+    .select("_id firstName lastName empAutoId userId email")
     .lean();
-  const empById = new Map(emps.map((e) => [String(e._id), e]));
-  const empByUser = new Map(emps.filter((e) => e.userId).map((e) => [String(e.userId), e]));
+  const empByUser = new Map(emps.map((e) => [String(e.userId), e]));
   const roleByKey = new Map(roles.map((r) => [r.key, r]));
 
   return {
     activeSuperadminCount,
     roles: roles.map(({ key, name, color, isSuperadmin }) => ({ key, name, color, isSuperadmin })),
     users: users.map((u) => {
-      const emp = (u.employeeId && empById.get(String(u.employeeId))) || empByUser.get(String(u._id)) || null;
+      const emp = empByUser.get(String(u._id)) || null;
       return {
         _id: String(u._id),
         name: u.name || "",
@@ -157,6 +152,8 @@ export async function listUsers() {
               _id: String(emp._id),
               empAutoId: emp.empAutoId ?? null,
               name: [emp.firstName, emp.lastName].filter(Boolean).join(" ").trim(),
+              emailMismatch:
+                String(emp.email || "").trim().toLowerCase() !== String(u.email || "").trim().toLowerCase(),
             }
           : null,
       };

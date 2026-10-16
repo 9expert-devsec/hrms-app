@@ -5,17 +5,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UserMenu from "./UserMenu";
 import dbConnect from "@/lib/mongoose";
-import Employee from "@/models/Employee";
+import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 
 export default async function Topbar() {
   const session = await getServerSession(authOptions);
 
+  // The linked employee's photo (Employee.userId), never an email match.
   let livePhoto = null;
-  if (session?.user?.email) {
+  if (session?.user?.id) {
     await dbConnect();
-    const emp = await Employee.findOne({ email: session.user.email })
-      .select("photoUrl")
-      .lean();
+    const emp = await employeeOfUser(session.user.id, "photoUrl");
     livePhoto = emp?.photoUrl || null;
   }
 
@@ -63,7 +62,7 @@ export default async function Topbar() {
           <UserMenu
             user={{
               ...session.user,
-              photoUrl: livePhoto || session.user.photoUrl,
+              photoUrl: session.user.id ? livePhoto : session.user.photoUrl,
             }}
           />
         </div>

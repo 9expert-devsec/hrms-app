@@ -38,15 +38,11 @@ export default async function EditEmployeePage({ searchParams }) {
     .select("_id code name empIdPrefix positions")
     .lean();
 
-  // หา user ที่ผูกกับ employee คนนี้
-  let user = await User.findOne({ employeeId: emp._id })
-    .select("_id email role status")
-    .lean();
-
-  // fallback (กรณีเก่าที่ยังไม่ผูก employeeId)
-  if (!user && emp.email) {
-    user = await User.findOne({ email: emp.email }).select("_id email role status").lean();
-  }
+  // หา user ที่ผูกกับ employee คนนี้ — Employee.userId only (lib/accountLinks.js);
+  // an account that merely shares the email is not this employee's.
+  const user = emp.userId
+    ? await User.findById(emp.userId).select("_id email role status").lean()
+    : null;
 
   const canAdmin = canAccess(session.user, "employees");
 
