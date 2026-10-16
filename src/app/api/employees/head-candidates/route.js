@@ -1,39 +1,19 @@
 import dbConnect from "@/lib/mongoose";
-import Employee from "@/models/Employee";
 import { NextResponse } from "next/server";
 import { requirePageApi } from "@/lib/rbac/guard";
+import { listHeadCandidates } from "@/lib/hod";
 
 export async function GET(req) {
   try {
-    // Only the HOD settings page picks heads (the department edit form
-    // loads its candidates server-side).
+    // The HOD settings page's picker. (The department edit form loads the
+    // same list server-side via listHeadCandidates.)
     const gate = await requirePageApi("hod_settings");
     if (gate.res) return gate.res;
 
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
-    const q = (searchParams.get("q") || "").trim();
-    // Any employee may head a department (any level, any department, with or
-    // without a login account — the page flags those without one).
-    const match = {};
-
-    if (q) {
-      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      Object.assign(match, {
-        $or: [
-          { firstName: regex },
-          { lastName: regex },
-          { nickName: regex },
-          { position: regex },
-        ],
-      });
-    }
-
-    const items = await Employee.find(match)
-      .select("_id firstName lastName nickName empAutoId position level department userId photoUrl")
-      .sort({ level: -1, firstName: 1 })
-      .lean();
+    const items = await listHeadCandidates(searchParams.get("q") || "");
 
     return NextResponse.json({ items });
   } catch (e) {

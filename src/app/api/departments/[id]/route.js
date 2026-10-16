@@ -24,13 +24,14 @@ export async function PUT(req, { params }) {
     };
 
     // Head of department goes through the shared helper (same validation as
-    // Settings › กำหนด HOD). Written first, so a bad head id leaves the
-    // department untouched. ว่างได้ = clear the head.
+    // Settings › กำหนด HOD). Written first, so a bad head id — or a clear by
+    // a non-superadmin (403) — leaves the department untouched. Sending the
+    // current value (incl. empty for a department with no head) is no change.
     if ("headOfDepartment" in body) {
       let headId = body.headOfDepartment ?? null;
       if (typeof headId === "string" && headId.trim() === "") headId = null;
       try {
-        await setDepartmentHead(params.id, headId);
+        await setDepartmentHead(params.id, headId, { actor: gate.session.user });
       } catch (e) {
         if (e instanceof HodError) return NextResponse.json({ message: e.message }, { status: e.status });
         throw e;

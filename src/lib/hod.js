@@ -43,14 +43,22 @@ function toItem(dept) {
 }
 
 /**
- * Set (or, with null, clear) a department's head. Validates that the
- * department exists and, when given, that the employee exists.
- * Returns { _id, code, name, head, headHasAccount }.
+ * Set (or, with null, clear) a department's head — the ONE write path for
+ * headOfDepartment (settings page, HOD endpoints, department edit form).
+ * Validates that the department exists and, when given, that the employee
+ * exists.
+ *
+ * Clearing — the department HAS a head and `employeeId` is null/empty — is
+ * superadmin-only: `actor` (session.user) must have isSuperadmin === true,
+ * otherwise 403. A request that leaves the head as it is (same employee, or
+ * null on a department with no head) is not a clear and always passes.
+ *
+ * Returns { _id, code, name, color, head, headHasAccount }.
  */
-export async function setDepartmentHead(departmentId, employeeId) {
+export async function setDepartmentHead(departmentId, employeeId, { actor } = {}) {
   if (!mongoose.isValidObjectId(departmentId)) throw new HodError("Invalid department id", 400);
-  const exists = await Department.exists({ _id: departmentId });
-  if (!exists) throw new HodError("ไม่พบแผนก", 404);
+  const current = await Department.findById(departmentId).select("headOfDepartment").lean();
+  if (!current) throw new HodError("ไม่พบแผนก", 404);
 
   let headId = null;
   if (employeeId != null && employeeId !== "") {
@@ -58,6 +66,10 @@ export async function setDepartmentHead(departmentId, employeeId) {
     const emp = await Employee.exists({ _id: employeeId });
     if (!emp) throw new HodError("ไม่พบพนักงาน", 404);
     headId = emp._id;
+  }
+
+  if (headId === null && current.headOfDepartment && actor?.isSuperadmin !== true) {
+    throw new HodError("เฉพาะ superadmin เท่านั้นที่ล้างหัวหน้าแผนกได้", 403);
   }
 
   const updated = await Department.findByIdAndUpdate(
@@ -69,6 +81,25 @@ export async function setDepartmentHead(departmentId, employeeId) {
     .populate("headOfDepartment", HEAD_FIELDS)
     .lean();
   return toItem(updated);
+}
+
+/**
+ * Employees who may be picked as a head: everyone (any level, any
+ * department, with or without a login account — callers flag those without
+ * one). Optional `q` searches name, nickname and position. Shared by
+ * /api/employees/head-candidates and the department edit page.
+ */
+export async function listHeadCandidates(q = "") {
+  const match = {};
+  const query = String(q || "").trim();
+  if (query) {
+    const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    match.$or = [{ firstName: regex }, { lastName: regex }, { nickName: regex }, { position: regex }];
+  }
+  return Employee.find(match)
+    .select("_id firstName lastName nickName empAutoId position level department userId photoUrl")
+    .sort({ level: -1, firstName: 1 })
+    .lean();
 }
 
 /** Every department with its head: [{ _id, code, name, head, headHasAccount }]. */

@@ -25,7 +25,7 @@ const SECTION = {
   boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
 };
 
-export default function DepartmentEditForm({ initial, employeeCount, eligibleHeads = [] }) {
+export default function DepartmentEditForm({ initial, employeeCount, eligibleHeads = [], canClearHead = false }) {
   const router = useRouter();
 
   // --- form states ---
@@ -47,6 +47,10 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
   );
   // Same warning as Settings › กำหนด HOD when the head has no login account.
   const selectedHead = eligibleHeads.find((u) => String(u._id) === String(headId)) || null;
+  // Clearing a head is superadmin-only (the API enforces it). The empty
+  // option stays for a department that has no head yet, so it still renders.
+  const hadHead = !!(initial?.headOfDepartment?._id || initial?.headOfDepartment);
+  const showNoHeadOption = canClearHead || !hadHead;
 
   // --- ui states ---
   const [saving, setSaving] = useState(false);
@@ -128,14 +132,14 @@ export default function DepartmentEditForm({ initial, employeeCount, eligibleHea
 
           {/* Head of Department */}
           <div className="md:col-span-2">
-            <Label>เลือกหัวหน้าแผนก (เฉพาะ L5–L6)</Label>
+            <Label>เลือกหัวหน้าแผนก</Label>
             <select
               value={headId}
               onChange={(e) => setHeadId(e.target.value)}
               className={INPUT_CLS}
               style={INPUT_STYLE}
             >
-              <option value="">— ไม่กำหนด —</option>
+              {showNoHeadOption && <option value="">— ไม่กำหนด —</option>}
               {eligibleHeads.map((u) => (
                 <option key={u._id} value={u._id}>
                   {[u.firstName, u.lastName].filter(Boolean).join(" ") || u.nickName || "-"}

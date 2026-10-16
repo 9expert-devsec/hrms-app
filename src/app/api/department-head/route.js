@@ -22,7 +22,7 @@ export async function GET() {
 /**
  * Assign a head: { departmentId, employeeId }. Any employee may be picked
  * (no login account needed). Clearing (employeeId null/empty) is
- * superadmin-only, like DELETE /api/department-head/[departmentId].
+ * superadmin-only — enforced inside setDepartmentHead for every path.
  */
 export async function POST(req) {
   try {
@@ -34,13 +34,9 @@ export async function POST(req) {
     if (!departmentId) {
       return NextResponse.json({ ok: false, message: "ต้องระบุ departmentId" }, { status: 400 });
     }
-    const clearing = employeeId == null || employeeId === "";
-    if (clearing && session.user.isSuperadmin !== true) {
-      return NextResponse.json({ ok: false, message: "เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่ล้างหัวหน้าแผนกได้" }, { status: 403 });
-    }
 
     await dbConnect();
-    const item = await setDepartmentHead(departmentId, clearing ? null : employeeId);
+    const item = await setDepartmentHead(departmentId, employeeId ?? null, { actor: session.user });
     return NextResponse.json({ ok: true, item });
   } catch (err) {
     if (err instanceof HodError) {

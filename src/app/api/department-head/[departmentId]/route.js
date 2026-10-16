@@ -12,7 +12,7 @@ export async function DELETE(_req, { params }) {
 
     const { departmentId } = await params;
     await dbConnect();
-    const item = await setDepartmentHead(departmentId, null);
+    const item = await setDepartmentHead(departmentId, null, { actor: gate.session.user });
     return NextResponse.json({ ok: true, item });
   } catch (err) {
     if (err instanceof HodError) {
