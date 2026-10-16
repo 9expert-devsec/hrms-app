@@ -4,13 +4,15 @@ import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import Employee from "@/models/Employee";
-import { getRoleByKey, getHeadOfDepartmentIds } from "@/lib/rbac/resolveRole";
+import { permissionsFor, needsRefresh, refreshTokenPermissions } from "@/lib/rbac/sessionPerms";
 import { RBAC_VERSION } from "@/lib/rbac/version";
 
-// Permissions are resolved ONCE, at sign-in, and carried on the JWT (as in
-// genesis-lab). A role change, or becoming a department head, applies at the
-// user's next sign-in. The middleware reads these fields straight off the
-// token, so jwt() must copy every one of them.
+// Permissions are resolved at sign-in and carried on the JWT; the jwt
+// callback re-resolves them once they are older than ROLE_REFRESH_MS (5 min),
+// so role edits, revocations, suspensions and new department heads reach
+// signed-in users without a new sign-in (see lib/rbac/sessionPerms.js). The
+// middleware reads these fields straight off the token, so jwt() must copy
+// every one of them.
 
 export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -63,8 +65,7 @@ export const authOptions = {
               .lean();
           }
 
-          const role = await getRoleByKey(user.role);
-          const headOfDepartmentIds = await getHeadOfDepartmentIds(emp?._id);
+          const perms = await permissionsFor({ roleKey: user.role, employeeId: emp?._id });
 
           const displayName =
             emp?.firstName || emp?.lastName
@@ -76,13 +77,7 @@ export const authOptions = {
             name: displayName,
             email: user.email,
             role: user.role,
-            roleKey: user.role,
-            roleName: role.name,
-            roleColor: role.color,
-            isSuperadmin: role.isSuperadmin,
-            // null = superadmin (allow all); never ship the full key list.
-            pages: role.isSuperadmin ? null : role.pages,
-            headOfDepartmentIds,
+            ...perms,
             employeeId: emp?._id ? String(emp._id) : null,
             empAutoId: emp?.empAutoId || null,
             department: emp?.department || null,
@@ -114,6 +109,14 @@ export const authOptions = {
         token.name = user.name || token.name;
         token.picture = user.image ?? null;
         token.photoUrl = user.photoUrl ?? user.image ?? null;
+        token.permsCheckedAt = Date.now();
+        return token;
+      }
+      // Live refresh: a current-version token whose permissions are older
+      // than ROLE_REFRESH_MS is re-resolved from the DB (cached per process).
+      // A suspended or deleted user comes back as a revoked token.
+      if (token?.uid && token.rbac === RBAC_VERSION && needsRefresh(token)) {
+        return refreshTokenPermissions(token);
       }
       return token;
     },
