@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import dbConnect from "@/lib/mongoose";
 import { requirePageApi } from "@/lib/rbac/guard";
+import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 import AttendanceRecord from "@/lib/models/AttendanceRecord";
 import EmployeeShift from "@/lib/models/EmployeeShift";
 import WorkShift from "@/lib/models/WorkShift";
-import Employee from "@/models/Employee";
 
 export async function POST(req) {
   try {
@@ -22,23 +21,12 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, message: "action ต้องเป็น 'in' หรือ 'out'" }, { status: 400 });
     }
 
-    // Find employee by email or userId
-    const email = session.user.email;
-    const userId = session.user.id;
-    const orQuery = [];
-    if (email) orQuery.push({ email: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } });
-    if (userId) {
-      orQuery.push({ userId });
-      if (mongoose.isValidObjectId(userId)) orQuery.push({ userId: new mongoose.Types.ObjectId(userId) });
-    }
-
-    if (!orQuery.length) {
-      return NextResponse.json({ ok: false, message: "ไม่สามารถระบุตัวตนพนักงานได้" }, { status: 400 });
-    }
-
-    const employee = await Employee.findOne({ $or: orQuery }).lean();
+    // The linked employee only (Employee.userId — lib/accountLinks.js). This
+    // used to also match the session email, so an unlinked account, or one
+    // whose email had changed, could clock in as whoever shared that email.
+    const employee = await getOwnEmployee(session, null);
     if (!employee) {
-      return NextResponse.json({ ok: false, message: "ไม่พบข้อมูลพนักงาน กรุณาติดต่อ HR" }, { status: 404 });
+      return NextResponse.json({ ok: false, message: "บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน กรุณาติดต่อ HR" }, { status: 404 });
     }
 
     // Normalize today to midnight (Bangkok UTC+7)

@@ -87,7 +87,7 @@ export async function refreshTokenPermissions(token, { force = false } = {}) {
     try {
       await dbConnect();
       const user = mongoose.isValidObjectId(uid)
-        ? await User.findById(uid).select("role status mustChangePassword").lean()
+        ? await User.findById(uid).select("role status mustChangePassword email").lean()
         : null;
       if (!user || (user.status && user.status !== "active")) {
         entry = remember(uid, { revoked: true });
@@ -102,6 +102,9 @@ export async function refreshTokenPermissions(token, { force = false } = {}) {
           perms: {
             ...perms,
             mustChangePassword: user.mustChangePassword === true,
+            // An email change (lib/accounts.js changeAccountEmail) reaches the
+            // open session here; sign-in already uses the new one.
+            email: user.email,
             employeeId: emp?._id ? String(emp._id) : null,
             empAutoId: emp?.empAutoId || null,
             department: emp?.department || null,

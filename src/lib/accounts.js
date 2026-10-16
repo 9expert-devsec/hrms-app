@@ -10,17 +10,18 @@ import { accountActionBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
 import { isLocked } from "@/lib/loginLockout";
 import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
+import { validateNewPassword } from "@/lib/passwordRules";
 
 /**
  * Account administration for the users page (registry key users_manage).
  * Guard rails live in lib/rbac/accountRules.js (accountActionBlock).
  * Callers must have called dbConnect() first.
  *
- * A new account (newAccountPassword) and a reset work the same way.
- * A reset never reveals or sets the user's real password: the server makes
- * a random temporary one, returns it to the caller ONCE (never logged, only
- * its hash is stored) and sets mustChangePassword so the user must choose a
- * new password at next sign-in. A suspended user's open sessions end at the
+ * A reset (resetPassword) sets a password the admin typed, or a random
+ * temporary one returned to the caller ONCE — either way only its hash is
+ * stored, nothing is logged, and mustChangePassword makes the user choose a
+ * new password at next sign-in. New accounts always get the random kind
+ * (newAccountPassword). A suspended user's open sessions end at the
  * next permission refresh (lib/rbac/sessionPerms.js, ≤ ROLE_REFRESH_MS) and
  * authorize() refuses them at sign-in.
  */
@@ -83,15 +84,25 @@ export async function newAccountPassword() {
 }
 
 /**
- * Issue a temporary password. Returns { tempPassword, email } — the ONLY
- * place the plain password exists; callers must not log or store it.
+ * Reset another person's password (users page / employee edit form), in one
+ * of two modes — both force a change at the user's next sign-in:
+ *   - `password` given: the admin typed it (PASSWORD_MIN_LENGTH). Returns
+ *     { email } only — the typed password is never echoed back.
+ *   - no `password`: a random temporary one. Returns { tempPassword, email };
+ *     the ONLY place it exists — callers must not log or store it.
+ * Only the hash is stored. A reset also lifts a sign-in lock.
  */
-export async function issueTemporaryPassword(targetId, { actor }) {
+export async function resetPassword(targetId, { actor, password } = {}) {
+  const typed = password !== undefined && password !== null;
+  if (typed) {
+    const invalid = validateNewPassword({ newPassword: password });
+    if (invalid) throw new AccountError(invalid, 400);
+  }
   const target = await loadTarget(targetId);
   await assertAllowed(actor, target, "reset");
 
-  const tempPassword = generateTemporaryPassword();
-  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_COST);
+  const tempPassword = typed ? null : generateTemporaryPassword();
+  const passwordHash = await bcrypt.hash(typed ? password : tempPassword, BCRYPT_COST);
   await User.updateOne(
     { _id: target.user._id },
     {
@@ -107,7 +118,47 @@ export async function issueTemporaryPassword(targetId, { actor }) {
     }
   );
   forgetCachedPermissions(target.user._id);
-  return { tempPassword, email: target.user.email };
+  return typed ? { email: target.user.email } : { tempPassword, email: target.user.email };
+}
+
+/** The random-password reset (kept for callers that only need that mode). */
+export function issueTemporaryPassword(targetId, { actor }) {
+  return resetPassword(targetId, { actor });
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Trimmed, lower-cased email — how every account email is stored and compared. */
+export const normalizeEmail = (v) => String(v ?? "").trim().toLowerCase();
+
+/**
+ * Change an account's sign-in email (users page and the employee edit form —
+ * both go through here, so validation is identical). Only User.email changes;
+ * the linked Employee's email is not touched. Same guard rails as a reset.
+ * The user signs in with the new email from now on; their open session keeps
+ * working and picks the new email up at the next permission refresh.
+ */
+export async function changeAccountEmail(targetId, rawEmail, { actor }) {
+  const email = normalizeEmail(rawEmail);
+  if (!EMAIL_RE.test(email)) throw new AccountError("อีเมลไม่ถูกต้อง", 400);
+  const target = await loadTarget(targetId);
+  await assertAllowed(actor, target, "email");
+
+  if (email === normalizeEmail(target.user.email)) {
+    if (email !== target.user.email) await User.updateOne({ _id: target.user._id }, { $set: { email } });
+    return { _id: String(target.user._id), email };
+  }
+  if (await User.exists({ email, _id: { $ne: target.user._id } })) {
+    throw new AccountError("อีเมลนี้ถูกใช้กับบัญชีอื่นแล้ว", 409);
+  }
+  try {
+    await User.updateOne({ _id: target.user._id }, { $set: { email } });
+  } catch (e) {
+    if (e?.code === 11000) throw new AccountError("อีเมลนี้ถูกใช้กับบัญชีอื่นแล้ว", 409);
+    throw e;
+  }
+  forgetCachedPermissions(target.user._id);
+  return { _id: String(target.user._id), email };
 }
 
 /**
@@ -154,8 +205,9 @@ export async function listUsers() {
               empAutoId: emp.empAutoId ?? null,
               name: employeeDisplayName(emp),
               nameSearch: employeeNameSearchText(emp),
-              emailMismatch:
-                String(emp.email || "").trim().toLowerCase() !== String(u.email || "").trim().toLowerCase(),
+              // For "ใช้อีเมลเดียวกับพนักงาน"; the badge compares trimmed, case-insensitive.
+              email: emp.email || "",
+              emailMismatch: normalizeEmail(emp.email) !== normalizeEmail(u.email),
             }
           : null,
       };
