@@ -267,6 +267,14 @@ export const menuConfig = [
             pageKey: "hod_settings",
           },
           {
+            key: "settings.users",
+            type: "link",
+            icon: Users,
+            label: "ผู้ใช้",
+            href: "/dashboard/settings/users",
+            pageKey: "users_manage",
+          },
+          {
             // No registry key on purpose: pageKey null → canOpenPage allows
             // only the superadmin (same rule the middleware applies).
             key: "settings.roles",

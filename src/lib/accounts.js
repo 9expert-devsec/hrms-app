@@ -3,8 +3,9 @@ import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import User from "@/models/User";
+import Employee from "@/models/Employee";
 import { findRole } from "@/lib/rbac/resolveRole";
-import { countActiveSuperadmins } from "@/lib/rbac/roles";
+import { countActiveSuperadmins, listRoles } from "@/lib/rbac/roles";
 import { accountActionBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
 
@@ -87,6 +88,59 @@ export async function issueTemporaryPassword(targetId, { actor }) {
   );
   forgetCachedPermissions(target.user._id);
   return { tempPassword, email: target.user.email };
+}
+
+/**
+ * Everything the users page shows: users with their linked employee
+ * (User.employeeId, else Employee.userId), the role list (names/colours) and
+ * the number of active superadmins (for the last-superadmin rule).
+ */
+export async function listUsers() {
+  const [users, roles, activeSuperadminCount] = await Promise.all([
+    User.find({})
+      .select("_id name email role status lastLoginAt mustChangePassword employeeId")
+      .sort({ email: 1 })
+      .lean(),
+    listRoles(),
+    countActiveSuperadmins(),
+  ]);
+
+  const emps = await Employee.find({
+    $or: [
+      { _id: { $in: users.map((u) => u.employeeId).filter(Boolean) } },
+      { userId: { $in: users.map((u) => u._id) } },
+    ],
+  })
+    .select("_id firstName lastName empAutoId userId")
+    .lean();
+  const empById = new Map(emps.map((e) => [String(e._id), e]));
+  const empByUser = new Map(emps.filter((e) => e.userId).map((e) => [String(e.userId), e]));
+  const roleByKey = new Map(roles.map((r) => [r.key, r]));
+
+  return {
+    activeSuperadminCount,
+    roles: roles.map(({ key, name, color, isSuperadmin }) => ({ key, name, color, isSuperadmin })),
+    users: users.map((u) => {
+      const emp = (u.employeeId && empById.get(String(u.employeeId))) || empByUser.get(String(u._id)) || null;
+      return {
+        _id: String(u._id),
+        name: u.name || "",
+        email: u.email,
+        role: u.role,
+        isSuperadmin: !!roleByKey.get(u.role)?.isSuperadmin,
+        status: u.status || "active",
+        lastLoginAt: u.lastLoginAt || null,
+        mustChangePassword: u.mustChangePassword === true,
+        employee: emp
+          ? {
+              _id: String(emp._id),
+              empAutoId: emp.empAutoId ?? null,
+              name: [emp.firstName, emp.lastName].filter(Boolean).join(" ").trim(),
+            }
+          : null,
+      };
+    }),
+  };
 }
 
 /** Suspend or reactivate an account ("suspended" | "active"). */
