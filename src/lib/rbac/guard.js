@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/authOptions";
 import { getPage } from "@/lib/rbac/pages";
 import { canOpenPage, RBAC_VERSION } from "@/lib/rbac/access";
+import { CHANGE_PASSWORD_PATH } from "@/lib/passwordRules";
 
 /**
  * Server-side guards. Pure predicates live in access.js.
@@ -15,9 +16,23 @@ function isCurrent(session) {
   return !!session?.user && session.user.rbac === RBAC_VERSION;
 }
 
+/** After a temporary-password reset, nothing works until the user changes it. */
+export function mustChangePassword(session) {
+  return session?.user?.mustChangePassword === true;
+}
+
+/** The 403 every guarded API returns while a password change is pending. */
+export function passwordChangeRequiredResponse() {
+  return NextResponse.json(
+    { error: "ต้องเปลี่ยนรหัสผ่านก่อนใช้งาน", mustChangePassword: true },
+    { status: 403 }
+  );
+}
+
 /**
  * Server Component guard. Signed out → /login (back to this page after);
- * forbidden → /403. Returns the session. `pageKey` null = superadmin only.
+ * password change pending → the change-password page; forbidden → /403.
+ * Returns the session. `pageKey` null = superadmin only.
  */
 export async function requirePage(pageKey) {
   const session = await getServerSession(authOptions);
@@ -25,6 +40,7 @@ export async function requirePage(pageKey) {
     const href = pageKey ? getPage(pageKey)?.href : null;
     redirect(href ? `/login?callbackUrl=${encodeURIComponent(href)}` : "/login");
   }
+  if (mustChangePassword(session)) redirect(CHANGE_PASSWORD_PATH);
   if (!canOpenPage(session.user, pageKey)) redirect("/403");
   return session;
 }
@@ -43,6 +59,7 @@ export async function requireAnyPageApi(pageKeys = []) {
   if (!isCurrent(session)) {
     return { res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
+  if (mustChangePassword(session)) return { res: passwordChangeRequiredResponse() };
   if (!pageKeys.some((key) => canOpenPage(session.user, key))) {
     return { res: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
@@ -56,4 +73,16 @@ export function requirePageApi(pageKey) {
 /** Route-handler guard for superadmin-only endpoints (no registry key). */
 export function requireSuperadminApi() {
   return requireAnyPageApi([null]);
+}
+
+/**
+ * The ONE guard that lets a pending password change through: any signed-in
+ * user with a current session (POST /api/account/password only).
+ */
+export async function requirePasswordChangeApi() {
+  const session = await getServerSession(authOptions);
+  if (!isCurrent(session)) {
+    return { res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  return { session };
 }

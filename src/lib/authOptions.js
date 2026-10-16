@@ -83,6 +83,9 @@ export const authOptions = {
             department: emp?.department || null,
             image: emp?.photoUrl ?? null,
             photoUrl: emp?.photoUrl ?? null,
+            // Set after a temporary-password reset: everything but the
+            // change-password page is blocked until it is cleared.
+            mustChangePassword: user.mustChangePassword === true,
           };
         } catch (err) {
           console.error("authorize error:", err.message);
@@ -92,8 +95,9 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
+        token.mustChangePassword = user.mustChangePassword === true;
         token.uid = user.id;
         token.role = user.role;
         token.rbac = RBAC_VERSION;
@@ -115,6 +119,12 @@ export const authOptions = {
       // Live refresh: a current-version token whose permissions are older
       // than ROLE_REFRESH_MS is re-resolved from the DB (cached per process).
       // A suspended or deleted user comes back as a revoked token.
+      // useSession().update() (after a password change): re-read the user
+      // from the DB now, ignoring the cache. The client's payload is never
+      // trusted — only the DB decides mustChangePassword and the rest.
+      if (trigger === "update" && token?.uid && token.rbac === RBAC_VERSION) {
+        return refreshTokenPermissions(token, { force: true });
+      }
       if (token?.uid && token.rbac === RBAC_VERSION && needsRefresh(token)) {
         return refreshTokenPermissions(token);
       }
@@ -137,6 +147,7 @@ export const authOptions = {
       session.user.name = token.name || session.user.name;
       session.user.image = token.picture ?? null;
       session.user.photoUrl = token.photoUrl ?? null;
+      session.user.mustChangePassword = token.mustChangePassword === true;
       return session;
     },
   },

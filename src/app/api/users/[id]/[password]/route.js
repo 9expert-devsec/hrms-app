@@ -5,6 +5,7 @@ import User from "@/models/User";
 import { hash } from "bcryptjs";
 import mongoose from "mongoose";
 import { requireSessionAPI } from "@/lib/authz";
+import { PASSWORD_MIN_LENGTH } from "@/lib/passwordRules";
 import { canAccess } from "@/lib/rbac/access";
 import { getRoleByKey } from "@/lib/rbac/resolveRole";
 
@@ -28,7 +29,7 @@ export async function PUT(req, { params }) {
 
   await dbConnect();
   const { password } = await req.json().catch(() => ({}));
-  if (!password || String(password).length < 6) {
+  if (!password || String(password).length < PASSWORD_MIN_LENGTH) {
     return NextResponse.json({ ok: false, message: "password too short" }, { status: 400 });
   }
 

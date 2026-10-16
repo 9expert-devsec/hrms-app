@@ -6,7 +6,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { canAccessPath } from "@/lib/rbac/access";
 import {
-  ChevronDown, User as UserIcon,
+  ChevronDown, User as UserIcon, KeyRound,
   UserPlus, LogOut
 } from "lucide-react";
 
@@ -54,6 +54,7 @@ export default function UserMenu({ user }) {
           className="absolute right-0 mt-2 w-60 rounded-xl p-1 z-50"
         >
           <MenuItem href="/dashboard/hrm/employee-profile" icon={<UserIcon size={16} />} label="Profile" onClick={() => setOpen(false)} />
+          <MenuItem href="/account/password" icon={<KeyRound size={16} />} label="เปลี่ยนรหัสผ่าน" onClick={() => setOpen(false)} />
           {canAccessPath(user, "/dashboard/admin/register") && (
             <MenuItem href="/dashboard/admin/register" icon={<UserPlus size={16} />} label="Add Account" onClick={() => setOpen(false)} />
           )}

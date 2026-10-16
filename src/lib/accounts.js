@@ -6,6 +6,7 @@ import User from "@/models/User";
 import { findRole } from "@/lib/rbac/resolveRole";
 import { countActiveSuperadmins } from "@/lib/rbac/roles";
 import { accountActionBlock } from "@/lib/rbac/accountRules";
+import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
 
 /**
  * Account administration for the users page (registry key users_manage).
@@ -84,6 +85,7 @@ export async function issueTemporaryPassword(targetId, { actor }) {
       },
     }
   );
+  forgetCachedPermissions(target.user._id);
   return { tempPassword, email: target.user.email };
 }
 
@@ -96,5 +98,6 @@ export async function setAccountStatus(targetId, status, { actor }) {
   await assertAllowed(actor, target, status === "suspended" ? "suspend" : "activate");
 
   await User.updateOne({ _id: target.user._id }, { $set: { status } });
+  forgetCachedPermissions(target.user._id);
   return { _id: String(target.user._id), status };
 }

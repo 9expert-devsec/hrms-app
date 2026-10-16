@@ -57,6 +57,7 @@ function revokedToken(token) {
     isSuperadmin: false,
     pages: [],
     headOfDepartmentIds: [],
+    mustChangePassword: false,
     permsCheckedAt: Date.now(),
   };
 }
@@ -66,25 +67,36 @@ export function needsRefresh(token) {
   return Date.now() - (Number(token?.permsCheckedAt) || 0) >= ROLE_REFRESH_MS;
 }
 
+/** Drop a user's cached permissions (after their password or status changes). */
+export function forgetCachedPermissions(uid) {
+  cache.delete(String(uid || ""));
+}
+
 /**
- * Re-read the user (role + status) and re-resolve pages, isSuperadmin and
- * headOfDepartmentIds. A suspended or deleted user gets a revoked token.
+ * Re-read the user (role, status, mustChangePassword) and re-resolve pages,
+ * isSuperadmin and headOfDepartmentIds. A suspended or deleted user gets a
+ * revoked token. `force` skips the cache — used by the session update()
+ * trigger right after a password change.
  */
-export async function refreshTokenPermissions(token) {
+export async function refreshTokenPermissions(token, { force = false } = {}) {
   const uid = String(token?.uid || "");
-  let entry = fromCache(uid);
+  let entry = force ? null : fromCache(uid);
 
   if (!entry) {
     try {
       await dbConnect();
       const user = mongoose.isValidObjectId(uid)
-        ? await User.findById(uid).select("role status").lean()
+        ? await User.findById(uid).select("role status mustChangePassword").lean()
         : null;
       if (!user || (user.status && user.status !== "active")) {
         entry = remember(uid, { revoked: true });
       } else {
         const perms = await permissionsFor({ roleKey: user.role, employeeId: token.employeeId });
-        entry = remember(uid, { revoked: false, role: user.role, perms });
+        entry = remember(uid, {
+          revoked: false,
+          role: user.role,
+          perms: { ...perms, mustChangePassword: user.mustChangePassword === true },
+        });
       }
     } catch (err) {
       // DB unreachable: keep the current permissions, retry in ~30 s rather
