@@ -9,6 +9,7 @@ import TempPasswordDialog from "./../../../../../../components/TempPasswordDialo
 import { Loader2 } from "lucide-react";
 import { canAccess } from "@/lib/rbac/access";
 import { accountActionBlock } from "@/lib/rbac/accountRules";
+import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 
 const BANKS = [
   { code: "KTB", name: "KTB (กรุงไทย)", logo: "/banks/ktb.webp" },
@@ -40,6 +41,7 @@ export default function EmployeeEditForm({
   /* -------------------- Employee state -------------------- */
   const [preview, setPreview] = useState(employee.photoUrl || "");
   const [photoFile, setPhotoFile] = useState(null);
+  const [resizing, setResizing] = useState(false);
   const [savingEmp, setSavingEmp] = useState(false);
   const [deletingEmp, setDeletingEmp] = useState(false);
 
@@ -122,11 +124,21 @@ export default function EmployeeEditForm({
   const userId = user?._id ? String(user._id) : null;
 
   /* -------------------- Upload image -------------------- */
+  // Resized in the browser before upload (lib/client/resizeImage.js).
   async function onPickFile(e) {
     const f = e.target.files?.[0];
+    e.target.value = "";
     if (!f) return;
-    setPhotoFile(f);
-    setPreview(URL.createObjectURL(f));
+    setResizing(true);
+    try {
+      const ready = await prepareUpload(f);
+      setPhotoFile(ready);
+      setPreview(URL.createObjectURL(ready));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setResizing(false);
+    }
   }
 
   /* -------------------- Save employee -------------------- */
@@ -141,13 +153,11 @@ export default function EmployeeEditForm({
         fd.append("file", photoFile);
         const up = await fetch("/api/upload", { method: "POST", body: fd });
 
-        const uj = await up.json().catch(async () => {
-          const txt = await up.text().catch(() => "");
-          return { error: txt || "Upload failed" };
-        });
+        // A platform 413 has no JSON body; uploadErrorMessage maps it to Thai.
+        const uj = await up.json().catch(() => ({}));
 
         if (!up.ok || !uj?.url) {
-          throw new Error(uj?.error || "Upload failed");
+          throw new Error(uploadErrorMessage(up, uj));
         }
         photoUrl = uj.url;
         photoPublicId = uj.public_id || "";
@@ -302,11 +312,12 @@ export default function EmployeeEditForm({
               />
             </div>
             <label className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/10 hover:bg-white/15 cursor-pointer">
-              <span>เลือกไฟล์…</span>
+              <span>{resizing ? "กำลังปรับขนาดรูป…" : "เลือกไฟล์…"}</span>
               <input
                 type="file"
                 accept="image/*"
                 className="hidden"
+                disabled={resizing}
                 onChange={onPickFile}
               />
             </label>
@@ -480,7 +491,7 @@ export default function EmployeeEditForm({
         <div className="flex items-center gap-3">
           <button
             onClick={saveEmployee}
-            disabled={savingEmp}
+            disabled={savingEmp || resizing}
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 px-4 py-2.5 text-white ring-1 ring-white/10 disabled:opacity-60"
           >
             {savingEmp && <Loader2 className="size-4 animate-spin" />}

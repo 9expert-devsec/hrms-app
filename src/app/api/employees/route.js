@@ -11,6 +11,8 @@ import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
 import { newAccountPassword } from "@/lib/accounts";
+import { tooLargeRequest } from "@/lib/server/uploadRules";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/uploadLimits";
 
 // POST may carry a one-time temporary password.
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
@@ -48,6 +50,10 @@ export async function POST(req) {
     const { session } = gate;
 
     await dbConnect();
+
+    // The optional photo shares the upload limit (lib/uploadLimits.js).
+    const tooLarge = tooLargeRequest(req);
+    if (tooLarge) return NextResponse.json({ ok:false, ...tooLarge }, { status:413, headers:NO_STORE });
 
     const form = await req.formData();
     const g = (k, d = "") => form.get(k)?.toString()?.trim?.() ?? d;
@@ -126,6 +132,9 @@ export async function POST(req) {
     let photoUrl = "";
     let photoPublicId = "";
     if (photoFile && typeof photoFile === "object") {
+      if (photoFile.size > MAX_UPLOAD_BYTES) {
+        return NextResponse.json({ ok:false, message:UPLOAD_TOO_LARGE_MESSAGE }, { status:413, headers:NO_STORE });
+      }
       const buffer = Buffer.from(await photoFile.arrayBuffer());
       const uploaded = await uploadFromBuffer(buffer, {
         folder: "employees",

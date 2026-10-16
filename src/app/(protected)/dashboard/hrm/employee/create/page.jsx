@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import BankSelect from "./../../../../../../components/BankSelect";
 import RoleSelect from "./../../../../../../components/RoleSelect";
 import TempPasswordDialog from "./../../../../../../components/TempPasswordDialog";
+import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/mongoose";
 // import Employee from "@/lib/models/Employee";
@@ -224,6 +225,22 @@ export default function EmployeeCreatePage() {
 
   // Upload
   const [photoFile, setPhotoFile] = useState(null);
+  const [resizing, setResizing] = useState(false);
+
+  // Resized in the browser before upload (lib/client/resizeImage.js).
+  async function onPickPhoto(e) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setResizing(true);
+    try {
+      setPhotoFile(await prepareUpload(f));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setResizing(false);
+    }
+  }
 
   // สร้างบัญชีสำหรับล็อกอิน — the password is never typed here: the server
   // issues a temporary one, shown once, changed at first sign-in.
@@ -395,7 +412,8 @@ export default function EmployeeCreatePage() {
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data?.message || "Create failed");
+          // A platform 413 (photo too big) has no JSON body.
+          throw new Error(res.status === 413 ? uploadErrorMessage(res, data) : data?.message || "Create failed");
         }
 
         setConfirmOpen(false);
@@ -468,12 +486,13 @@ export default function EmployeeCreatePage() {
                 />
               </div>
               <label className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/10 hover:bg-white/15 cursor-pointer">
-                <span>เลือกไฟล์…</span>
+                <span>{resizing ? "กำลังปรับขนาดรูป…" : "เลือกไฟล์…"}</span>
                 <input
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+                  disabled={resizing}
+                  onChange={onPickPhoto}
                 />
               </label>
             </div>
@@ -825,7 +844,7 @@ export default function EmployeeCreatePage() {
             </button>
             <button
               type="submit"
-              disabled={!isFirstStepValid || submitting}
+              disabled={!isFirstStepValid || submitting || resizing}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 disabled:opacity-50 px-4 py-2.5 text-white ring-1 ring-white/10"
             >
               {submitting && <Loader2 className="size-4 animate-spin" />}

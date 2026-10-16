@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { requireSessionAPI } from "@/lib/authz";
-import { checkUpload } from "@/lib/server/uploadRules";
+import { checkUpload, tooLargeRequest, uploadErrorText } from "@/lib/server/uploadRules";
 
 export const runtime = "nodejs"; // ต้องใช้ Node runtime เพราะใช้ cloudinary sdk
 
@@ -30,14 +30,19 @@ export async function POST(req) {
       );
     }
 
+    // Over the limit by Content-Length: refuse before reading the body.
+    const tooLarge = tooLargeRequest(req);
+    if (tooLarge) return NextResponse.json(tooLarge, { status: 413 });
+
     const form = await req.formData();
     const file = form.get("file"); // ← ต้องชื่อ 'file' ให้ตรงกับฝั่ง client
 
-    // Image or PDF, at most 10 MB (MIME type and extension must agree).
+    // Image or PDF, at most 4 MB (MIME type and extension must agree).
+    // The browser resizes images first (lib/client/resizeImage.js).
     const check = checkUpload(file);
     if (!check.ok) {
       return NextResponse.json(
-        { error: check.error, allowed: "JPG, PNG, GIF, WEBP, PDF", maxSize: "10MB" },
+        { error: check.error, message: uploadErrorText(check.error), allowed: "JPG, PNG, GIF, WEBP, PDF", maxSize: "4MB" },
         { status: check.status }
       );
     }

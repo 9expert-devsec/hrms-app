@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { useRouter } from "next/navigation";
+import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 
 export default function EmployeeCreateForm() {
   const { data: session } = useSession();
@@ -78,18 +79,18 @@ export default function EmployeeCreateForm() {
     const localUrl = URL.createObjectURL(file);
     setPreview(localUrl);
 
-    // อัปโหลดไป API
-    const fd = new FormData();
-    fd.append("file", file);
+    // อัปโหลดไป API — resized in the browser first (lib/client/resizeImage.js)
     setUploading(true);
     try {
+      const fd = new FormData();
+      fd.append("file", await prepareUpload(file));
       const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.url)
-        throw new Error(data?.error || "upload failed");
+        throw new Error(uploadErrorMessage(res, data));
       setForm((f) => ({ ...f, photoUrl: data.url, photoPublicId: data.public_id || "" }));
     } catch (err) {
-      setUploadErr("อัปโหลดไม่สำเร็จ");
+      setUploadErr(err.message || "อัปโหลดไม่สำเร็จ");
       setPreview("");
     } finally {
       setUploading(false);

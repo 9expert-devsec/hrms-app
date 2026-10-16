@@ -18,6 +18,7 @@ import {
   X as XIcon,
 } from "lucide-react";
 import SignaturePad from "./../../../../../components/SignaturePad";
+import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -296,7 +297,7 @@ export default function LeaveRequestPage() {
             <UploadCloud size={24} style={{ color: BLUE }} />
             <span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>คลิกหรือลากไฟล์มาวางที่นี่</span>
             <span style={{ fontSize: 11, color: SLATE }}>
-              รองรับ: รูปภาพ (JPG, PNG, GIF, WEBP) และ PDF ขนาดไม่เกิน 10MB ต่อไฟล์
+              รองรับ: รูปภาพ (JPG, PNG, GIF, WEBP) และ PDF ขนาดไม่เกิน 4MB ต่อไฟล์
             </span>
             <input
               type="file"
@@ -314,7 +315,7 @@ export default function LeaveRequestPage() {
                     name: f.name,
                     size: f.size,
                     type: isImg ? "image" : "document",
-                    status: "uploading",
+                    status: isImg ? "resizing" : "uploading",
                     url: "",
                     publicId: "",
                     preview: isImg ? URL.createObjectURL(f) : null,
@@ -322,12 +323,18 @@ export default function LeaveRequestPage() {
                   setAttachments((prev) => [...prev, entry]);
 
                   try {
+                    // Images are resized first; anything still over 4 MB is
+                    // refused here (lib/client/resizeImage.js).
+                    const ready = await prepareUpload(f);
+                    setAttachments((prev) =>
+                      prev.map((a) => (a.id === id ? { ...a, status: "uploading", name: ready.name, size: ready.size } : a))
+                    );
                     const fd = new FormData();
-                    fd.append("file", f);
+                    fd.append("file", ready);
                     const res = await fetch("/api/upload/cloudinary", { method: "POST", body: fd });
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({}));
-                      throw new Error(err.error || "Upload failed");
+                      throw new Error(uploadErrorMessage(res, err));
                     }
                     const data = await res.json();
                     setAttachments((prev) =>
@@ -379,11 +386,12 @@ export default function LeaveRequestPage() {
                       {att.name}
                     </div>
                     <div style={{ fontSize: 11, color: att.status === "error" ? "#DC2626" : SLATE }}>
+                      {att.status === "resizing" && "กำลังปรับขนาดรูป…"}
                       {att.status === "uploading" && "กำลังอัพโหลด..."}
                       {att.status === "done" && `${(att.size / 1024).toFixed(0)} KB`}
                       {att.status === "error" && (att.error || "อัพโหลดล้มเหลว")}
                     </div>
-                    {att.status === "uploading" && (
+                    {(att.status === "uploading" || att.status === "resizing") && (
                       <div style={{ height: 3, background: "#E2E8F0", borderRadius: 99, marginTop: 4 }}>
                         <div style={{ height: 3, background: BLUE, borderRadius: 99, width: "60%", animation: "pulse 1s infinite" }} />
                       </div>

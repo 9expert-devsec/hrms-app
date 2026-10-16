@@ -1,6 +1,6 @@
 import cloudinary from "@/lib/cloudinary";
 import { requireSessionAPI } from "@/lib/authz";
-import { checkUpload } from "@/lib/server/uploadRules";
+import { checkUpload, tooLargeRequest, uploadErrorText } from "@/lib/server/uploadRules";
 
 export const runtime = "nodejs";
 
@@ -10,14 +10,18 @@ export async function POST(req) {
     const gate = await requireSessionAPI();
     if (gate.res) return gate.res;
 
+    // Over the limit by Content-Length: refuse before reading the body.
+    const tooLarge = tooLargeRequest(req);
+    if (tooLarge) return Response.json(tooLarge, { status: 413 });
+
     const form = await req.formData();
     const file = form.get("file");
 
-    // Image or PDF, at most 10 MB (MIME type and extension must agree).
+    // Image or PDF, at most 4 MB (MIME type and extension must agree).
     const check = checkUpload(file);
     if (!check.ok) {
       return Response.json(
-        { error: check.error, allowed: "JPG, PNG, GIF, WEBP, PDF", maxSize: "10MB" },
+        { error: check.error, message: uploadErrorText(check.error), allowed: "JPG, PNG, GIF, WEBP, PDF", maxSize: "4MB" },
         { status: check.status }
       );
     }

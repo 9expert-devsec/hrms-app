@@ -1,8 +1,33 @@
 // src/lib/server/uploadRules.js
 // Server-side file rule for every upload route: an image or a PDF, at most
-// 10 MB. The client `accept` lists only filter the picker; this is the check.
+// 4 MB (lib/uploadLimits.js — the platform rejects bigger bodies anyway).
+// The client `accept` lists only filter the picker; this is the check.
+import {
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_REQUEST_BYTES,
+  UPLOAD_TOO_LARGE_MESSAGE,
+} from "@/lib/uploadLimits";
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+export { MAX_UPLOAD_BYTES };
+
+/**
+ * A 413 body for a request whose Content-Length is already over the limit —
+ * checked before the body is read. Returns null when it may be read.
+ */
+export function tooLargeRequest(req) {
+  const len = Number(req.headers.get("content-length") || 0);
+  if (len > MAX_UPLOAD_REQUEST_BYTES) {
+    return { error: "TOO_LARGE", message: UPLOAD_TOO_LARGE_MESSAGE, maxSize: "4MB" };
+  }
+  return null;
+}
+
+/** Thai text for a checkUpload() error code. */
+export function uploadErrorText(code) {
+  if (code === "TOO_LARGE") return UPLOAD_TOO_LARGE_MESSAGE;
+  if (code === "INVALID_TYPE") return "รองรับเฉพาะรูปภาพ (JPG, PNG, GIF, WEBP) และ PDF";
+  return "ไม่พบไฟล์";
+}
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp)$/i;
