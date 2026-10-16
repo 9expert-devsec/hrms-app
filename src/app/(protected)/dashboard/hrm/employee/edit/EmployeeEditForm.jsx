@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useSession } from "next-auth/react";
 import BankSelect from "./../../../../../../components/BankSelect";
 import RoleSelect from "./../../../../../../components/RoleSelect";
-import TempPasswordDialog from "./../../../../../../components/TempPasswordDialog";
+import ResetPasswordDialog from "./../../../../../../components/ResetPasswordDialog";
 import { Loader2 } from "lucide-react";
 import { canAccess } from "@/lib/rbac/access";
 import { accountActionBlock, linkActionBlock } from "@/lib/rbac/accountRules";
@@ -124,8 +124,6 @@ export default function EmployeeEditForm({
   const { data: session } = useSession();
   const isSuperadmin = session?.user?.isSuperadmin === true;
 
-  const [pwdSaving, setPwdSaving] = useState(false);
-  const [tempResult, setTempResult] = useState(null); // { email, tempPassword }, shown once
 
   const userId = user?._id ? String(user._id) : null;
 
@@ -228,20 +226,40 @@ export default function EmployeeEditForm({
     }
   }
 
+  /* -------------------- Account actions: users_manage holders (and superadmin) -------------------- */
+  // Reset and sign-in email changes follow the users page's guard rails
+  // (accountActionBlock): never your own account, never a superadmin account
+  // for a non-superadmin.
+  const canManageAccount = !!userId && canAccess(session?.user, "users_manage");
+  const accountTarget = { id: userId, isSuperadmin: linkedUser?.role === "superadmin", status: linkedUser?.status };
+  const blockFor = (action) =>
+    canManageAccount
+      ? accountActionBlock({ actor: session?.user, target: accountTarget, action, activeSuperadminCount: Infinity })
+      : null;
+  const resetBlock = blockFor("reset");
+  const emailBlock = blockFor("email");
+  const canEditEmail = canManageAccount && !emailBlock;
+  const [resetOpen, setResetOpen] = useState(false);
+
   /* -------------------- Update user email/role -------------------- */
   async function saveUser() {
     if (!userId) return;
+    // Same path and validation as the users page (PATCH /api/users/[id] → changeAccountEmail).
+    const body = {};
+    if (canEditEmail && userEmail.trim().toLowerCase() !== (linkedUser?.email || "").toLowerCase()) body.email = userEmail;
+    if (isSuperadmin) body.role = userRole; // the API refuses role changes otherwise
+    if (!Object.keys(body).length) return alert("ไม่มีการเปลี่ยนแปลง");
     setUserSaving(true);
     try {
       const r = await fetch(`/api/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        // Only a superadmin sends a role; the API refuses role changes otherwise.
-        body: JSON.stringify(isSuperadmin ? { email: userEmail, role: userRole } : { email: userEmail }),
+        body: JSON.stringify(body),
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j?.message || "Update user failed");
-      alert("บันทึกบัญชีผู้ใช้เรียบร้อย");
+      if (!r.ok || j.ok === false) throw new Error(j?.message || "Update user failed");
+      alert(body.email ? "บันทึกแล้ว — ผู้ใช้ต้องเข้าสู่ระบบด้วยอีเมลใหม่" : "บันทึกบัญชีผู้ใช้เรียบร้อย");
+      location.reload();
     } catch (e) {
       alert(e.message || "Save user failed");
     } finally {
@@ -249,39 +267,10 @@ export default function EmployeeEditForm({
     }
   }
 
-  /* -------------------- Reset password (temporary password) -------------------- */
-  // Nobody sets a chosen password for someone else: users_manage holders (and
-  // the superadmin) issue a temporary password, shown once, and the user must
-  // set a new one at next sign-in. Same guard rails as the users page.
-  const canResetPassword = !!userId && canAccess(session?.user, "users_manage");
-  const resetBlock = canResetPassword
-    ? accountActionBlock({
-        actor: session?.user,
-        target: { id: userId, isSuperadmin: linkedUser?.role === "superadmin", status: linkedUser?.status },
-        action: "reset",
-        activeSuperadminCount: Infinity,
-      })
-    : null;
-
-  async function onResetPassword() {
-    if (!userId || resetBlock) return;
-    if (!confirm("ระบบจะสร้างรหัสผ่านชั่วคราวให้ และผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบครั้งถัดไป ดำเนินการต่อหรือไม่?")) return;
-    setPwdSaving(true);
-    try {
-      const res = await fetch(`/api/users/${userId}/reset-password`, { method: "POST", cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data?.message || data?.error || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
-      setTempResult({ email: data.email, tempPassword: data.tempPassword });
-    } catch (e) {
-      alert(e.message || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
-    } finally {
-      setPwdSaving(false);
-    }
-  }
-
   /* -------------------- Unlink the account (it stays, with its role) -------------------- */
   const emailMismatch =
-    !!userId && (linkedUser?.email || "").toLowerCase() !== (employee.email || "").toLowerCase();
+    !!userId &&
+    (linkedUser?.email || "").trim().toLowerCase() !== (employee.email || "").trim().toLowerCase();
   const unlinkBlock = userId
     ? linkActionBlock({
         actor: session?.user,
@@ -592,16 +581,31 @@ export default function EmployeeEditForm({
             )
           ) : (
             <>
+              {/* Sign-in email: users_manage holders and superadmin only (guard rails). */}
               <Input
                 label="อีเมล (ล็อกอิน)"
                 value={userEmail}
                 onChange={setUserEmail}
-                readOnly={!canAdmin}
+                readOnly={!canEditEmail}
               />
-              {emailMismatch && (
-                <p className="mt-2 text-xs rounded-lg px-3 py-2" style={{ background: "#FEF3C7", color: "#92400E" }}>
-                  อีเมลของบัญชีไม่ตรงกับอีเมลพนักงาน ({employee.email || "—"})
+              {!canEditEmail && (
+                <p className="mt-1 text-xs" style={{ color: "#5E6A7E" }} title={emailBlock?.error}>
+                  {emailBlock?.error || "เปลี่ยนอีเมลเข้าสู่ระบบได้เฉพาะผู้ดูแลบัญชีผู้ใช้"}
                 </p>
+              )}
+              {emailMismatch && (
+                <div className="mt-2 text-xs rounded-lg px-3 py-2" style={{ background: "#FEF3C7", color: "#92400E" }}>
+                  อีเมลของบัญชีไม่ตรงกับอีเมลพนักงาน ({employee.email || "—"})
+                  {canEditEmail && employee.email && (
+                    <button
+                      type="button"
+                      onClick={() => setUserEmail(employee.email)}
+                      className="block mt-1 underline font-semibold"
+                    >
+                      ใช้อีเมลเดียวกับพนักงาน
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Role changes are superadmin-only (the API enforces it too). */}
@@ -616,7 +620,7 @@ export default function EmployeeEditForm({
                 </div>
               )}
 
-              {canAdmin && (
+              {(canEditEmail || isSuperadmin) && (
                 <button
                   onClick={saveUser}
                   disabled={userSaving}
@@ -627,21 +631,20 @@ export default function EmployeeEditForm({
                 </button>
               )}
 
-              {canResetPassword && (
+              {canManageAccount && (
                 <>
                   <hr className="my-5 border-white/10" />
 
                   <h4 className="font-medium text-slate-100 mb-1">รีเซ็ตรหัสผ่าน</h4>
                   <p className="text-xs mb-3" style={{ color: "#5E6A7E" }}>
-                    สร้างรหัสผ่านชั่วคราว (แสดงครั้งเดียว) — ผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบ
+                    กำหนดรหัสผ่านเอง หรือให้ระบบสุ่ม — ผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบครั้งถัดไป
                   </p>
                   <span title={resetBlock?.error}>
                     <button
-                      onClick={onResetPassword}
-                      disabled={pwdSaving || !!resetBlock}
+                      onClick={() => setResetOpen(true)}
+                      disabled={!!resetBlock}
                       className="inline-flex items-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 px-4 py-2.5 text-white ring-1 ring-white/10 disabled:opacity-60"
                     >
-                      {pwdSaving && <Loader2 className="size-4 animate-spin" />}
                       รีเซ็ตรหัสผ่าน
                     </button>
                   </span>
@@ -672,11 +675,13 @@ export default function EmployeeEditForm({
         </section>
       </div>
 
-      {tempResult && (
-        <TempPasswordDialog
-          email={tempResult.email}
-          tempPassword={tempResult.tempPassword}
-          onClose={() => setTempResult(null)}
+      {resetOpen && userId && (
+        <ResetPasswordDialog
+          user={{ _id: userId, email: linkedUser?.email || "" }}
+          onClose={() => setResetOpen(false)}
+          onDone={(mode) => {
+            if (mode === "typed") alert("ตั้งรหัสผ่านแล้ว — ผู้ใช้ต้องเปลี่ยนรหัสเมื่อเข้าสู่ระบบครั้งถัดไป");
+          }}
         />
       )}
     </div>

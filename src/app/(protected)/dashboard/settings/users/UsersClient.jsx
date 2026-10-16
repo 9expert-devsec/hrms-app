@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2, LockOpen, Trash2 } from "lucide-react";
+import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2, LockOpen, Trash2, Mail } from "lucide-react";
 import { accountActionBlock, accountDeleteBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
-import TempPasswordDialog from "../../../../../components/TempPasswordDialog";
+import ResetPasswordDialog from "../../../../../components/ResetPasswordDialog";
 
 /* ── design tokens (same as the other settings pages) ───────── */
 const NAVY = "#0D1B2A";
@@ -55,9 +55,10 @@ export default function UsersClient({ initial, actor }) {
   const [deleting, setDeleting] = useState(null); // { user, typed } — superadmin delete dialog
   const [roleFilter, setRoleFilter] = useState("all");
 
-  const [confirm, setConfirm] = useState(null); // { user, action: "reset" | "suspend" | "activate" | "unlock" }
+  const [confirm, setConfirm] = useState(null); // { user, action: "suspend" | "activate" | "unlock" }
   const [busy, setBusy] = useState(false);
-  const [tempResult, setTempResult] = useState(null); // { email, tempPassword }
+  const [resetFor, setResetFor] = useState(null); // user — ResetPasswordDialog
+  const [editingEmail, setEditingEmail] = useState(null); // { user, value, error }
   const [toast, setToast] = useState(null);
 
   const roleByKey = useMemo(() => new Map(data.roles.map((r) => [r.key, r])), [data.roles]);
@@ -99,13 +100,7 @@ export default function UsersClient({ initial, actor }) {
     const { user, action } = confirm;
     setBusy(true);
     try {
-      if (action === "reset") {
-        const res = await fetch(`/api/users/${user._id}/reset-password`, { method: "POST", cache: "no-store" });
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok || !j.ok) throw new Error(j.message || j.error || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
-        setConfirm(null);
-        setTempResult({ email: j.email, tempPassword: j.tempPassword });
-      } else if (action === "unlock") {
+      if (action === "unlock") {
         const res = await fetch(`/api/users/${user._id}/unlock`, { method: "POST" });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) throw new Error(j.message || j.error || "ปลดล็อกไม่สำเร็จ");
@@ -170,12 +165,28 @@ export default function UsersClient({ initial, actor }) {
     }
   }
 
+  async function saveEmail() {
+    if (!editingEmail) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/users/${editingEmail.user._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: editingEmail.value }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j.ok === false) throw new Error(j.message || j.error || "บันทึกอีเมลไม่สำเร็จ");
+      setEditingEmail(null);
+      showToast("เปลี่ยนอีเมลแล้ว — ผู้ใช้ต้องเข้าสู่ระบบด้วยอีเมลใหม่");
+      router.refresh();
+    } catch (err) {
+      setEditingEmail((d) => (d ? { ...d, error: err.message } : d));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const confirmCopy = {
-    reset: {
-      title: "รีเซ็ตรหัสผ่าน",
-      body: "ระบบจะสร้างรหัสผ่านชั่วคราวให้ และผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบครั้งถัดไป รหัสผ่านเดิมจะใช้ไม่ได้อีก",
-      cta: "สร้างรหัสผ่านชั่วคราว",
-    },
     suspend: {
       title: "ระงับบัญชี",
       body: "ผู้ใช้จะเข้าสู่ระบบไม่ได้ และการใช้งานที่เปิดอยู่จะถูกตัดภายในประมาณ 5 นาที",
@@ -206,7 +217,7 @@ export default function UsersClient({ initial, actor }) {
         <div>
           <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>ผู้ใช้</h1>
           <p style={{ color: SLATE, fontSize: 13 }}>
-            บัญชีเข้าสู่ระบบทั้งหมด — รีเซ็ตรหัสผ่าน ระงับ/เปิดใช้งาน ปลดล็อก
+            บัญชีเข้าสู่ระบบทั้งหมด — รีเซ็ตรหัสผ่าน แก้ไขอีเมล ระงับ/เปิดใช้งาน ปลดล็อก
             {actor.isSuperadmin ? " และกำหนดบทบาท" : ""}
           </p>
         </div>
@@ -264,6 +275,7 @@ export default function UsersClient({ initial, actor }) {
             {rows.map((u) => {
               const role = roleByKey.get(u.role);
               const resetBlock = actionBlock(u, "reset");
+              const emailBlock = actionBlock(u, "email");
               const statusAction = u.status === "suspended" ? "activate" : "suspend";
               const statusBlock = actionBlock(u, statusAction);
               const unlockBlock = u.lockedUntil ? actionBlock(u, "unlock") : null;
@@ -361,12 +373,22 @@ export default function UsersClient({ initial, actor }) {
                       )}
                       <span title={resetBlock?.error}>
                         <button
-                          onClick={() => setConfirm({ user: u, action: "reset" })}
+                          onClick={() => setResetFor(u)}
                           disabled={!!resetBlock}
                           style={{ ...actionBtn(BLUE), opacity: resetBlock ? 0.45 : 1 }}
                         >
                           <KeyRound size={13} />
                           รีเซ็ตรหัสผ่าน
+                        </button>
+                      </span>
+                      <span title={emailBlock?.error}>
+                        <button
+                          onClick={() => setEditingEmail({ user: u, value: u.email, error: "" })}
+                          disabled={!!emailBlock}
+                          style={{ ...actionBtn(BLUE), opacity: emailBlock ? 0.45 : 1 }}
+                        >
+                          <Mail size={13} />
+                          แก้ไขอีเมล
                         </button>
                       </span>
                       <span title={statusBlock?.error}>
@@ -488,13 +510,76 @@ export default function UsersClient({ initial, actor }) {
         </Dialog>
       )}
 
-      {/* ── Temporary password (shown once) ────── */}
-      {tempResult && (
-        <TempPasswordDialog
-          email={tempResult.email}
-          tempPassword={tempResult.tempPassword}
-          onClose={() => setTempResult(null)}
+      {/* ── Reset password (typed or random) ───── */}
+      {resetFor && (
+        <ResetPasswordDialog
+          user={resetFor}
+          onClose={() => setResetFor(null)}
+          onDone={(mode) => {
+            if (mode === "typed") showToast("ตั้งรหัสผ่านแล้ว — ผู้ใช้ต้องเปลี่ยนรหัสเมื่อเข้าสู่ระบบครั้งถัดไป");
+            router.refresh();
+          }}
         />
+      )}
+
+      {/* ── Edit sign-in email ─────────────────── */}
+      {editingEmail && (
+        <Dialog onClose={() => !busy && setEditingEmail(null)} labelledBy="email-title">
+          <h3 id="email-title" style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
+            แก้ไขอีเมลเข้าสู่ระบบ
+          </h3>
+          <p style={{ color: SLATE, fontSize: 13, marginTop: 6 }}>
+            ผู้ใช้จะต้องเข้าสู่ระบบด้วยอีเมลใหม่ — อีเมลในข้อมูลพนักงานไม่เปลี่ยนตาม
+          </p>
+          <label style={{ display: "block", color: NAVY, fontSize: 13, marginTop: 14 }}>อีเมล</label>
+          <input
+            type="email"
+            value={editingEmail.value}
+            onChange={(e) => setEditingEmail((d) => ({ ...d, value: e.target.value, error: "" }))}
+            aria-label="อีเมลเข้าสู่ระบบ"
+            autoComplete="off"
+            style={{ ...inputStyle, marginTop: 6 }}
+          />
+          {editingEmail.user.employee?.emailMismatch && (
+            <div
+              className="rounded-lg px-3 py-2 mt-3"
+              style={{ background: "#FEF3C7", color: "#92400E", fontSize: 13 }}
+            >
+              อีเมลพนักงาน: <b>{editingEmail.user.employee.email || "—"}</b>
+              {editingEmail.user.employee.email && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingEmail((d) => ({ ...d, value: d.user.employee.email, error: "" }))
+                  }
+                  className="block mt-2 rounded-lg px-3 py-1.5"
+                  style={{ border: "1px solid #92400E40", color: "#92400E", fontWeight: 600, background: "#FFFFFF" }}
+                >
+                  ใช้อีเมลเดียวกับพนักงาน
+                </button>
+              )}
+            </div>
+          )}
+          {editingEmail.error && (
+            <p role="alert" style={{ color: "#991B1B", fontSize: 13, marginTop: 10 }}>
+              {editingEmail.error}
+            </p>
+          )}
+          <div className="flex justify-end gap-3 mt-6">
+            <button onClick={() => setEditingEmail(null)} disabled={busy} style={secondaryBtn}>
+              ยกเลิก
+            </button>
+            <button
+              onClick={saveEmail}
+              disabled={busy || !editingEmail.value.trim()}
+              className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 disabled:opacity-50"
+              style={{ background: BLUE, color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
+            >
+              {busy && <Loader2 size={15} className="animate-spin" />}
+              บันทึกอีเมล
+            </button>
+          </div>
+        </Dialog>
       )}
 
       {/* ── Toast ─────────────────────────────── */}
