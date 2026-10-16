@@ -14,6 +14,7 @@ import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
  * Guard rails live in lib/rbac/accountRules.js (accountActionBlock).
  * Callers must have called dbConnect() first.
  *
+ * A new account (newAccountPassword) and a reset work the same way.
  * A reset never reveals or sets the user's real password: the server makes
  * a random temporary one, returns it to the caller ONCE (never logged, only
  * its hash is stored) and sets mustChangePassword so the user must choose a
@@ -62,6 +63,21 @@ async function assertAllowed(actor, { user, isSuperadmin }, action) {
     activeSuperadminCount: isSuperadmin ? await countActiveSuperadmins() : Infinity,
   });
   if (denied) throw new AccountError(denied.error, denied.status);
+}
+
+/**
+ * Password fields for a NEW account (POST /api/auth/register, POST
+ * /api/employees): nobody chooses another person's password, so every new
+ * account starts with a temporary one and must change it at first sign-in.
+ * Spread `fields` into User.create; `tempPassword` goes back to the creator
+ * ONCE (Cache-Control: no-store) and must never be logged or stored.
+ */
+export async function newAccountPassword() {
+  const tempPassword = generateTemporaryPassword();
+  return {
+    tempPassword,
+    fields: { passwordHash: await bcrypt.hash(tempPassword, BCRYPT_COST), mustChangePassword: true },
+  };
 }
 
 /**

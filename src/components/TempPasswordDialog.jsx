@@ -4,9 +4,10 @@ import { useState } from "react";
 import { AlertTriangle, Check, Copy } from "lucide-react";
 
 /**
- * One-time display of a temporary password (POST /api/users/[id]/reset-password).
- * Used by the users page and the employee edit form. The password exists only
- * in this dialog's props; closing it discards it.
+ * One-time display of a temporary password: a reset (POST
+ * /api/users/[id]/reset-password — users page, employee edit form) or a new
+ * account (POST /api/auth/register, POST /api/employees). The password exists
+ * only in this dialog's props; closing it discards it.
  */
 export default function TempPasswordDialog({ email, tempPassword, onClose }) {
   const [copied, setCopied] = useState(false);

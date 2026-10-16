@@ -6,12 +6,14 @@ import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import User from "@/models/User";
 import Counter from "@/models/Counter";
-import { hash } from "bcryptjs";
 import { uploadFromBuffer } from "@/lib/cloudinary";
 import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
-import { PASSWORD_MIN_LENGTH } from "@/lib/passwordRules";
+import { newAccountPassword } from "@/lib/accounts";
+
+// POST may carry a one-time temporary password.
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 // Without `employees`, callers (the shift-assign picker) get no contact data.
 const FULL_FIELDS =
@@ -101,19 +103,21 @@ export async function POST(req) {
 
     // --- login role: validated before any write (counter, upload, user) ---
     // Must be a known key; only a superadmin may grant a superadmin role.
-    const createLogin = g("createLogin").toLowerCase() === "true";
-    const role        = (g("role") || "employee").toLowerCase();
+    // The password is never chosen here: a new account gets a temporary one
+    // (returned once below) and must change it at first sign-in.
+    const createLogin  = g("createLogin").toLowerCase() === "true";
+    const role         = (g("role") || "employee").toLowerCase();
+    const accountEmail = g("accountEmail");
     if (createLogin) {
       try {
         // Non-superadmins may only create "employee" accounts.
         await assertAssignableRole(role, { actor: session.user });
       } catch (e) {
-        if (e instanceof RoleError) return NextResponse.json({ ok:false, message:e.message }, { status:e.status });
+        if (e instanceof RoleError) return NextResponse.json({ ok:false, message:e.message }, { status:e.status, headers:NO_STORE });
         throw e;
       }
-      // Same minimum length as every other password that gets set.
-      if (g("password").length < PASSWORD_MIN_LENGTH) {
-        return NextResponse.json({ ok:false, message:`รหัสผ่านต้องมีอย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร` }, { status:400 });
+      if (!accountEmail) {
+        return NextResponse.json({ ok:false, message:"ข้อมูลล็อกอินไม่ถูกต้อง" }, { status:400, headers:NO_STORE });
       }
     }
 
@@ -145,18 +149,14 @@ export async function POST(req) {
     const empId = `${empIdPrefix}-${String(lastRun + 1).padStart(4, "0")}`;
 
     // --- create user? ---
-    const accountEmail    = g("accountEmail");
-    const password        = g("password");
-    const passwordConfirm = g("passwordConfirm");
-
     let createdUser = null;
+    let tempPassword = null;
     if (createLogin) {
-      if (!accountEmail || !password || password !== passwordConfirm) {
-        return NextResponse.json({ ok:false, message:"ข้อมูลล็อกอินไม่ถูกต้อง" }, { status:400 });
-      }
+      const pw = await newAccountPassword();
+      tempPassword = pw.tempPassword;
       createdUser = await User.create({
         email: accountEmail,
-        passwordHash: await hash(password, 10),
+        ...pw.fields,
         role,
         status: "active",
       });
@@ -190,9 +190,17 @@ export async function POST(req) {
       await User.findByIdAndUpdate(createdUser._id, { employeeId: employee._id });
     }
 
-    return NextResponse.json({ ok: true, employee }, { status: 201 });
+    return NextResponse.json(
+      {
+        ok: true,
+        employee,
+        // Shown ONCE to the creator (TempPasswordDialog); never logged.
+        account: createdUser ? { email: createdUser.email, tempPassword } : null,
+      },
+      { status: 201, headers: NO_STORE }
+    );
   } catch (err) {
     console.error("POST /api/employees error:", err);
-    return NextResponse.json({ ok: false, message: err?.message || "Server error" }, { status: 500 });
+    return NextResponse.json({ ok: false, message: err?.message || "Server error" }, { status: 500, headers: NO_STORE });
   }
 }

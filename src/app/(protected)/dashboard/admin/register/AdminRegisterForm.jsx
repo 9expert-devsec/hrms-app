@@ -3,18 +3,19 @@
 import { useState } from "react";
 import { UserPlus, CheckCircle2, AlertTriangle } from "lucide-react";
 import RoleSelect from "../../../../../components/RoleSelect";
-import { PASSWORD_MIN_LENGTH } from "@/lib/passwordRules";
+import TempPasswordDialog from "../../../../../components/TempPasswordDialog";
 
+// The new user's password is never typed here: the server issues a temporary
+// one, shown once, and the user must change it at first sign-in.
 export default function AdminRegisterForm() {
   const [form, setForm] = useState({
     name: "",
     email: "",
-    password: "",
-    confirm: "",
     role: "employee",
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // {ok:boolean, message:string, created?:any}
+  const [tempResult, setTempResult] = useState(null); // { email, tempPassword }, shown once
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -27,24 +28,16 @@ export default function AdminRegisterForm() {
       setResult({ ok: false, message: "อีเมลไม่ถูกต้อง" });
       return;
     }
-    if (form.password.length < PASSWORD_MIN_LENGTH) {
-      setResult({ ok: false, message: `รหัสผ่านอย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร` });
-      return;
-    }
-    if (form.password !== form.confirm) {
-      setResult({ ok: false, message: "รหัสผ่านไม่ตรงกัน" });
-      return;
-    }
 
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name || form.email.split("@")[0],
           email: form.email,
-          password: form.password,
           role: form.role,
         }),
       });
@@ -52,8 +45,10 @@ export default function AdminRegisterForm() {
       if (!res.ok) {
         setResult({ ok: false, message: data?.error || "สร้างผู้ใช้ไม่สำเร็จ" });
       } else {
-        setResult({ ok: true, message: "สร้างผู้ใช้สำเร็จ", created: data });
-        setForm({ name: "", email: "", password: "", confirm: "", role: "employee" });
+        const { tempPassword, ...created } = data;
+        setResult({ ok: true, message: "สร้างผู้ใช้สำเร็จ", created });
+        setTempResult({ email: data.email, tempPassword });
+        setForm({ name: "", email: "", role: "employee" });
       }
     } catch (err) {
       setResult({ ok: false, message: "เกิดข้อผิดพลาดจากเครือข่าย" });
@@ -109,32 +104,9 @@ export default function AdminRegisterForm() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm text-slate-300 mb-1">รหัสผ่าน</label>
-          <input
-            required
-            type="password"
-            name="password"
-            value={form.password}
-            onChange={onChange}
-            className="w-full rounded-xl bg-white/5 px-4 py-2.5 text-slate-100 placeholder:text-slate-400 outline-none ring-1 ring-inset ring-white/10 focus:ring-indigo-400/40"
-            placeholder={`อย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร`}
-          />
-        </div>
-        <div>
-          <label className="block text-sm text-slate-300 mb-1">ยืนยันรหัสผ่าน</label>
-          <input
-            required
-            type="password"
-            name="confirm"
-            value={form.confirm}
-            onChange={onChange}
-            className="w-full rounded-xl bg-white/5 px-4 py-2.5 text-slate-100 placeholder:text-slate-400 outline-none ring-1 ring-inset ring-white/10 focus:ring-indigo-400/40"
-            placeholder="พิมพ์รหัสผ่านอีกครั้ง"
-          />
-        </div>
-      </div>
+      <p className="text-xs text-slate-400">
+        ระบบจะสร้างรหัสผ่านชั่วคราวให้และแสดงครั้งเดียว — ผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบครั้งแรก
+      </p>
 
       <div>
         <label className="block text-sm text-slate-300 mb-1">กำหนดสิทธิ์ (Role)</label>
@@ -162,6 +134,14 @@ export default function AdminRegisterForm() {
           {loading ? "Creating..." : "Create user"}
         </button>
       </div>
+
+      {tempResult && (
+        <TempPasswordDialog
+          email={tempResult.email}
+          tempPassword={tempResult.tempPassword}
+          onClose={() => setTempResult(null)}
+        />
+      )}
     </form>
   );
 }

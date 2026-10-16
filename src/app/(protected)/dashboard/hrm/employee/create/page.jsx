@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import BankSelect from "./../../../../../../components/BankSelect";
-import { Eye, EyeOff } from "lucide-react";
 import RoleSelect from "./../../../../../../components/RoleSelect";
+import TempPasswordDialog from "./../../../../../../components/TempPasswordDialog";
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/mongoose";
 // import Employee from "@/lib/models/Employee";
@@ -225,14 +225,12 @@ export default function EmployeeCreatePage() {
   // Upload
   const [photoFile, setPhotoFile] = useState(null);
 
-  // สร้างบัญชีสำหรับล็อกอิน
+  // สร้างบัญชีสำหรับล็อกอิน — the password is never typed here: the server
+  // issues a temporary one, shown once, changed at first sign-in.
   const [createLogin, setCreateLogin] = useState(true);
   const [accountEmail, setAccountEmail] = useState("");
-  const [pwd, setPwd] = useState("");
-  const [pwd2, setPwd2] = useState("");
   const [role, setRole] = useState("employee");
-  const [showPwd, setShowPwd] = useState(false);
-  const [showPwd2, setShowPwd2] = useState(false);
+  const [tempResult, setTempResult] = useState(null); // { email, tempPassword }, shown once
 
   // misc
   const [submitting, setSubmitting] = useState(false);
@@ -264,10 +262,6 @@ export default function EmployeeCreatePage() {
     if (createLogin) {
       if (!emailRx.test(accountEmail)) {
         alert("กรุณากรอกอีเมลล็อกอินให้ถูกต้อง");
-        return;
-      }
-      if (!pwd || !pwd2 || pwd !== pwd2) {
-        alert("รหัสผ่านไม่ตรงกัน");
         return;
       }
     }
@@ -318,22 +312,6 @@ export default function EmployeeCreatePage() {
     birthday &&
     address.trim();
 
-  function genPassword() {
-    try {
-      const arr = new Uint32Array(2);
-      window.crypto.getRandomValues(arr);
-      const pass = btoa(String(arr[0]) + String(arr[1]))
-        .replace(/[^A-Za-z0-9]/g, "")
-        .slice(0, 12);
-      setPwd(pass);
-      setPwd2(pass);
-    } catch {
-      const pass = Math.random().toString(36).slice(-12);
-      setPwd(pass);
-      setPwd2(pass);
-    }
-  }
-
   async function doSubmit() {
     if (submittedRef.current) return; // <— กันยิงซ้ำ
     submittedRef.current = true;
@@ -354,10 +332,6 @@ export default function EmployeeCreatePage() {
       if (createLogin) {
         if (!emailRx.test(accountEmail)) {
           alert("กรุณากรอกอีเมลสำหรับล็อกอินให้ถูกต้อง");
-          return;
-        }
-        if (!pwd || !pwd2 || pwd !== pwd2) {
-          alert("รหัสผ่านไม่ตรงกัน");
           return;
         }
       }
@@ -410,23 +384,27 @@ export default function EmployeeCreatePage() {
         fd.append("createLogin", String(createLogin));
         if (createLogin) {
           fd.append("accountEmail", accountEmail);
-          fd.append("password", pwd);
-          fd.append("passwordConfirm", pwd2);
           fd.append("role", canElevate ? role : "employee");
         }
 
         const res = await fetch("/api/employees", {
           method: "POST",
           body: fd,
+          cache: "no-store",
         });
 
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
           throw new Error(data?.message || "Create failed");
         }
 
-        alert("สร้างพนักงานสำเร็จ");
         setConfirmOpen(false);
+        if (data?.account?.tempPassword) {
+          // Reload only after the creator has seen the one-time password.
+          setTempResult({ email: data.account.email, tempPassword: data.account.tempPassword });
+          return;
+        }
+        alert("สร้างพนักงานสำเร็จ");
         window.location.reload();
         return;
       } catch (err) {
@@ -807,55 +785,12 @@ export default function EmployeeCreatePage() {
                   />
                 </div>
 
-                <div>
-                  <label className="text-sm text-slate-300">
-                    รหัสผ่านเริ่มต้น
-                  </label>
-                  <div className="mt-1 relative">
-                    <input
-                      type={showPwd ? "text" : "password"}
-                      className="w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 pr-12 text-slate-100"
-                      value={pwd}
-                      onChange={(e) => setPwd(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
-                      title="แสดง/ซ่อนรหัสผ่าน"
-                    >
-                      {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={genPassword}
-                    className="text-xs mt-1 text-indigo-300 hover:text-indigo-200"
-                  >
-                    สุ่มรหัสผ่าน
-                  </button>
-                </div>
-
-                <div>
-                  <label className="text-sm text-slate-300">
-                    ยืนยันรหัสผ่าน
-                  </label>
-                  <div className="mt-1 relative">
-                    <input
-                      type={showPwd2 ? "text" : "password"}
-                      className="w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 pr-12 text-slate-100"
-                      value={pwd2}
-                      onChange={(e) => setPwd2(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd2((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
-                      title="แสดง/ซ่อนรหัสผ่าน"
-                    >
-                      {showPwd2 ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
+                <div className="md:col-span-1">
+                  <label className="text-sm text-slate-300">รหัสผ่าน</label>
+                  <p className="text-xs text-slate-400 mt-2">
+                    ระบบจะสร้างรหัสผ่านชั่วคราวและแสดงครั้งเดียวหลังบันทึก —
+                    พนักงานต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบครั้งแรก
+                  </p>
                 </div>
 
                 <div className="md:col-span-1">
@@ -965,6 +900,17 @@ export default function EmployeeCreatePage() {
           </div>
         </div>
       </form>
+
+      {tempResult && (
+        <TempPasswordDialog
+          email={tempResult.email}
+          tempPassword={tempResult.tempPassword}
+          onClose={() => {
+            setTempResult(null);
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

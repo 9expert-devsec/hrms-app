@@ -14,8 +14,6 @@ import {
   UserPlus,
   Upload,
   X,
-  Eye,
-  EyeOff,
   Loader2,
 } from "lucide-react";
 
@@ -55,7 +53,6 @@ export default function EmployeeCreateForm() {
       },
     },
     createAccount: true,
-    accountPassword: "",
     role: "employee",
   });
 
@@ -68,7 +65,6 @@ export default function EmployeeCreateForm() {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false); // เปิด/ปิดกล่องยืนยัน
   const [saving, setSaving] = useState(false); // แสดงโหลดตอนบันทึก
-  const [showPwd, setShowPwd] = useState(false);
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
   const phoneRe = /^(\d{10}|\d{3}-\d{3}-\d{4})$/;
@@ -590,23 +586,10 @@ export default function EmployeeCreateForm() {
 
         {form.createAccount && (
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="relative">
-              <input
-                type={showPwd ? "text" : "password"}
-                placeholder="Initial password"
-                className="w-full rounded-xl bg-white/5 px-4 py-2.5 pr-10 ring-1 ring-white/10 text-slate-100"
-                value={form.accountPassword}
-                onChange={(e) => set("accountPassword", e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPwd((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                aria-label={showPwd ? "Hide password" : "Show password"}
-              >
-                {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+            {/* No password field: the server issues a temporary one. */}
+            <p className="text-xs text-slate-400 self-center">
+              ระบบจะสร้างรหัสผ่านชั่วคราวให้ และพนักงานต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบครั้งแรก
+            </p>
             {/* Role changes are superadmin-only; everyone else creates "employee". */}
             {isSuperadmin ? (
               <RoleSelect
