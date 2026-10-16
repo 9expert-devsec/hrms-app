@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import { getRoleByKey, getHeadOfDepartmentIds } from "@/lib/rbac/resolveRole";
+import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import { ROLE_REFRESH_MS } from "@/lib/rbac/version";
 
 /**
@@ -91,11 +92,20 @@ export async function refreshTokenPermissions(token, { force = false } = {}) {
       if (!user || (user.status && user.status !== "active")) {
         entry = remember(uid, { revoked: true });
       } else {
-        const perms = await permissionsFor({ roleKey: user.role, employeeId: token.employeeId });
+        // Re-resolve the linked employee too: a link or unlink (lib/accountLinks.js)
+        // reaches the token here, like a role change.
+        const emp = await employeeOfUser(uid, "_id empAutoId department");
+        const perms = await permissionsFor({ roleKey: user.role, employeeId: emp?._id });
         entry = remember(uid, {
           revoked: false,
           role: user.role,
-          perms: { ...perms, mustChangePassword: user.mustChangePassword === true },
+          perms: {
+            ...perms,
+            mustChangePassword: user.mustChangePassword === true,
+            employeeId: emp?._id ? String(emp._id) : null,
+            empAutoId: emp?.empAutoId || null,
+            department: emp?.department || null,
+          },
         });
       }
     } catch (err) {

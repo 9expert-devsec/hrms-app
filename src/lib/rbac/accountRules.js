@@ -37,6 +37,36 @@ export function accountActionBlock({ actor, target, action, activeSuperadminCoun
   return null;
 }
 
+/**
+ * Linking an account to an employee, or unlinking it (employees holders and
+ * the superadmin): a non-superadmin never touches a superadmin account, and
+ * nobody links or unlinks their own account (linking yourself to an employee
+ * would hand you that person's self-service data and head-of-department
+ * rights). `action` = "link" | "unlink".
+ */
+export function linkActionBlock({ actor, target, action }) {
+  if (isOwn(actor, target)) {
+    return block(403, action === "unlink" ? "ยกเลิกการผูกบัญชีของตัวเองไม่ได้" : "ผูกบัญชีของตัวเองไม่ได้");
+  }
+  if (target?.isSuperadmin && actor?.isSuperadmin !== true) {
+    return block(403, "จัดการบัญชี superadmin ได้เฉพาะ superadmin เท่านั้น");
+  }
+  return null;
+}
+
+/**
+ * Deleting an account: superadmin only, never your own account, never the
+ * last active superadmin. (Suspending is preferred for people who left.)
+ */
+export function accountDeleteBlock({ actor, target, activeSuperadminCount }) {
+  if (actor?.isSuperadmin !== true) return block(403, "ลบบัญชีได้เฉพาะ superadmin เท่านั้น");
+  if (isOwn(actor, target)) return block(403, "ลบบัญชีของตัวเองไม่ได้");
+  if (target?.isSuperadmin && isActive(target) && activeSuperadminCount <= 1) {
+    return block(403, "ลบ superadmin คนสุดท้ายที่ใช้งานอยู่ไม่ได้");
+  }
+  return null;
+}
+
 /** The role for a NEW account: non-superadmins may only create "employee". */
 export function newAccountRoleBlock({ actor, roleKey }) {
   if (actor?.isSuperadmin !== true && roleKey !== "employee") {

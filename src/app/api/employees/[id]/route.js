@@ -5,10 +5,6 @@ import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import cloudinary from "@/lib/cloudinary";
 
-function escapeReg(s = "") {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 export async function PUT(req, { params }) {
   // Own profile (self_profile, self fields) or any employee (employees).
   const gate = await requireAnyPageApi(["self_profile", "employees"]);
@@ -22,9 +18,9 @@ export async function PUT(req, { params }) {
   if (!emp) return new Response("Not found", { status: 404 });
 
   const canManage = canAccess(session.user, "employees");
-  const isSelf =
-    String(emp._id) === String(session.user.employeeId || "") ||
-    emp.email?.toLowerCase() === session.user.email?.toLowerCase();
+  // Self = the employee linked to this account (Employee.userId), never an
+  // email match — an unlinked account must not edit whoever shares its email.
+  const isSelf = !!emp.userId && String(emp.userId) === String(session.user.id || "");
 
   if (!(isSelf || canManage)) {
     return new Response("Forbidden", { status: 403 });
@@ -83,7 +79,10 @@ export async function PUT(req, { params }) {
 
 /**
  * DELETE /api/employees/[id]
- * ลบพนักงาน + ลบบัญชีผู้ใช้ที่เชื่อมอยู่ทั้งหมด (employeeId หรือ email ตรงกันแบบ case-insensitive)
+ * ลบพนักงาน — the linked account is NOT deleted: deleting accounts is
+ * superadmin-only (DELETE /api/users/[id]). It used to delete every user
+ * whose email matched, which could remove an unrelated (even superadmin)
+ * account. The account is left unlinked; suspend or delete it on the users page.
  * กันไม่ให้ลบตัวเอง
  */
 export async function DELETE(req, { params }) {
@@ -98,10 +97,7 @@ export async function DELETE(req, { params }) {
   if (!emp) return new Response("Not found", { status: 404 });
 
   // กันลบตัวเอง (ลดความเสี่ยงล็อกตัวเองออกจากระบบ)
-  const isSelf =
-    String(emp._id) === String(session.user.employeeId || "") ||
-    (emp.email &&
-      emp.email.toLowerCase() === (session.user.email || "").toLowerCase());
+  const isSelf = !!emp.userId && String(emp.userId) === String(session.user.id || "");
   if (isSelf) {
     return new Response(
       JSON.stringify({ ok: false, message: "You cannot delete yourself." }),
@@ -118,25 +114,16 @@ export async function DELETE(req, { params }) {
     }
   }
 
-  // หา user ที่เชื่อมกับ employee คนนี้ (ทั้งแบบ employeeId และอีเมล)
-  const userQuery = {
-    $or: [{ employeeId: emp._id }],
-  };
-  if (emp.email) {
-    userQuery.$or.push({
-      email: new RegExp(`^${escapeReg(emp.email)}$`, "i"),
-    });
-  }
-
-  const users = await User.find(userQuery).select("_id");
-  if (users.length) {
-    await User.deleteMany({ _id: { $in: users.map((u) => u._id) } });
+  // The linked account stays (unlinked) — clear its mirror of this employee.
+  const unlinkedUserId = emp.userId ? String(emp.userId) : null;
+  if (emp.userId) {
+    await User.updateOne({ _id: emp.userId, employeeId: emp._id }, { $set: { employeeId: null } });
   }
 
   await Employee.findByIdAndDelete(id);
 
   return new Response(
-    JSON.stringify({ ok: true, deletedUsers: users.length }),
+    JSON.stringify({ ok: true, deletedUsers: 0, unlinkedUserId }),
     { status: 200 }
   );
 }

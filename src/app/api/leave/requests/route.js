@@ -3,19 +3,13 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
 // ถ้าทีมคุณมี requireSessionApi แยกสำหรับ API ให้เปลี่ยนเป็น requireSessionApi ได้
 import { requirePageApi } from "@/lib/rbac/guard";
-import Employee from "@/models/Employee";
+import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import Department from "@/models/Department";
 import LeaveRequest from "@/models/LeaveRequest";
 
 /* ---------------- helpers ---------------- */
-async function resolveEmployee(me) {
-  // พยายามหาด้วยหลายคีย์ให้เจอแน่ๆ
-  return (
-    (await Employee.findOne({
-      $or: [{ _id: me?.employeeId }, { _id: me?._id }, { userId: me?._id }, { user: me?._id }],
-    }).lean()) || null
-  );
-}
+// The linked employee only (lib/accountLinks.js).
+const resolveEmployee = (session) => employeeOfUser(session?.user?.id);
 
 // set เวลาเป็น 00:00 ของวันนั้น (เพื่อเทียบซ้ำให้ชัวร์)
 function startOfDay(d) {

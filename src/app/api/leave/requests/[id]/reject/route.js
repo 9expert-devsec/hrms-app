@@ -5,33 +5,10 @@ import { NextResponse } from "next/server";
 import { requireSuperadminApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import LeaveRequest from "@/models/LeaveRequest";
-import Employee from "@/models/Employee";
+import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 
-async function resolveEmployeeFromSession(session) {
-  const me = session?.user || session || {};
-  const ids = [me.employeeId, me._id, me.id, session?.employeeId].filter(
-    Boolean
-  );
-  const links = [me.userId, me.user, session?.userId].filter(Boolean);
-  const emails = [
-    me.email,
-    session?.user?.email,
-    me.workEmail,
-    me.personalEmail,
-  ].filter(Boolean);
-  const or = [];
-  ids.forEach((v) => or.push({ _id: v }));
-  links.forEach((v) => {
-    or.push({ userId: v });
-    or.push({ user: v });
-  });
-  emails.forEach((v) => {
-    or.push({ workEmail: v });
-    or.push({ personalEmail: v });
-  });
-  if (!or.length) return null;
-  return await Employee.findOne({ $or: or }).lean();
-}
+// The linked employee only (lib/accountLinks.js).
+const resolveEmployeeFromSession = (session) => getOwnEmployee(session, null);
 
 export async function POST(req, ctx) {
   // Orphan page (/dashboard/leave/approval): superadmin only. It used to

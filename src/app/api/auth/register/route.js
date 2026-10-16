@@ -41,8 +41,14 @@ export async function POST(req) {
     const { tempPassword, fields } = await newAccountPassword();
     const user = await User.create({ name: name || email, email, role, ...fields });
 
-    // ผูก userId กลับไปที่ employee (ถ้ามีพนักงานอีเมลนี้อยู่)
-    await Employee.updateOne({ email }, { $set: { userId: user._id } }).exec();
+    // ผูก userId กลับไปที่ employee (ถ้ามีพนักงานอีเมลนี้อยู่) — only one that
+    // has no account yet: the link is one-to-one (lib/accountLinks.js).
+    const linked = await Employee.findOneAndUpdate(
+      { email, userId: null },
+      { $set: { userId: user._id } },
+      { projection: { _id: 1 } }
+    ).lean();
+    if (linked) await User.updateOne({ _id: user._id }, { $set: { employeeId: linked._id } });
 
     return Response.json(
       { ok: true, id: user._id, email: user.email, role: user.role, tempPassword },

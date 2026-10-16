@@ -6,25 +6,12 @@ import { canAccess } from "@/lib/rbac/access";
 import dbConnect from "@/lib/mongoose";
 import mongoose from "mongoose";
 import LeaveRequest from "@/models/LeaveRequest";
-import Employee from "@/models/Employee";
+import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 
 const O = (v) => (v ? new mongoose.Types.ObjectId(String(v)) : null);
 
-/* resolve employee ของผู้ล็อกอิน */
-async function resolveEmployeeFromSession(session) {
-  const me = session?.user || session || {};
-  const candidateIds = [me.employeeId, me._id, me.id, session?.employeeId].filter(Boolean);
-  const userLinkIds  = [me.userId, me.user, session?.userId].filter(Boolean);
-  const emails       = [me.email, session?.user?.email, me.workEmail, me.personalEmail].filter(Boolean);
-
-  const or = [];
-  candidateIds.forEach(v => or.push({ _id: v }));
-  userLinkIds.forEach(v => { or.push({ userId: v }); or.push({ user: v }); });
-  emails.forEach(v => { or.push({ workEmail: v }); or.push({ personalEmail: v }); });
-
-  if (!or.length) return null;
-  return await Employee.findOne({ $or: or }).lean();
-}
+/* resolve employee ของผู้ล็อกอิน — the linked employee only (lib/accountLinks.js) */
+const resolveEmployeeFromSession = (session) => getOwnEmployee(session, null);
 
 /* HR = the HR leave step in the RBAC registry. (This used to read
    session.user.roles, which is never set, and fell back to any department

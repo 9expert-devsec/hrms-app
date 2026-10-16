@@ -5,19 +5,11 @@ import mongoose from "mongoose";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 
+/** The approver's linked employee (Employee.userId — lib/accountLinks.js), or null. */
 export async function resolveActorEmployee(session) {
-  // พยายามให้ครบทุกเคส: มี employeeId ใน session / มี userId เดียว
-  const empId = session?.user?.employeeId || session?.user?.employee?._id;
-  if (empId) {
-    const e = await Employee.findById(empId);
-    if (e) return e;
-  }
-  const userId = session?.user?.id || session?.user?._id || session?.user?.userId;
-  if (userId && mongoose.isValidObjectId(userId)) {
-    const e = await Employee.findOne({ userId: new mongoose.Types.ObjectId(userId) });
-    if (e) return e;
-  }
-  return null;
+  const userId = session?.user?.id;
+  if (!userId || !mongoose.isValidObjectId(userId)) return null;
+  return Employee.findOne({ userId: new mongoose.Types.ObjectId(userId) });
 }
 
 export async function isHODForEmployee(actorEmpId, targetEmpId) {

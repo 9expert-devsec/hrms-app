@@ -8,32 +8,24 @@ import Employee from "@/models/Employee";
  * called dbConnect() first.
  */
 
-function escapeReg(s = "") {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * The employee linked to an account. Employee.userId is THE link (one-to-one,
+ * lib/accountLinks.js); there is no email or token fallback, so an unlinked
+ * account never resolves to somebody else's record. `select` null = all fields.
+ */
+export async function employeeOfUser(userId, select = null) {
+  if (!userId || !mongoose.isValidObjectId(userId)) return null;
+  const q = Employee.findOne({ userId });
+  if (select) q.select(select);
+  return q.lean();
 }
 
 /**
- * The caller's own Employee: session.user.employeeId, else Employee.userId,
- * else a case-insensitive email match. Never reads ids from the request.
+ * The caller's own Employee, or null for an account with no linked employee.
+ * Never reads ids from the request.
  */
-export async function getOwnEmployee(session, select = "_id departmentId department email") {
-  const user = session?.user;
-  if (!user) return null;
-
-  if (user.employeeId && mongoose.isValidObjectId(user.employeeId)) {
-    const byId = await Employee.findById(user.employeeId).select(select).lean();
-    if (byId) return byId;
-  }
-  if (user.id && mongoose.isValidObjectId(user.id)) {
-    const byUser = await Employee.findOne({ userId: user.id }).select(select).lean();
-    if (byUser) return byUser;
-  }
-  if (user.email) {
-    return Employee.findOne({ email: new RegExp(`^${escapeReg(user.email)}$`, "i") })
-      .select(select)
-      .lean();
-  }
-  return null;
+export function getOwnEmployee(session, select = "_id departmentId department email") {
+  return employeeOfUser(session?.user?.id, select);
 }
 
 /** Employee _ids (strings) in these departments, matched by departmentId or code. */

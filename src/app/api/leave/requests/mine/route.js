@@ -1,26 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAnyPageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
-import Employee from "@/models/Employee";
+import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 import LeaveRequest from "@/models/LeaveRequest";
 
-/** หา employee ของผู้ล็อกอิน (อิงแนวเดียวกับ page.jsx ที่คุณใช้) */
-async function resolveEmployeeFromSession(session) {
-  const me = session?.user || session || {};
-
-  const candidateIds = [me.employeeId, me._id, me.id, session?.employeeId].filter(Boolean);
-  const userLinkIds  = [me.userId, me.user, session?.userId].filter(Boolean);
-  const emails       = [me.email, session?.user?.email, me.workEmail, me.personalEmail].filter(Boolean);
-
-  const or = [];
-  for (const v of candidateIds) or.push({ _id: v });
-  for (const v of userLinkIds) { or.push({ userId: v }); or.push({ user: v }); }
-  for (const v of emails) { or.push({ workEmail: v }); or.push({ personalEmail: v }); }
-
-  if (or.length === 0) return null;
-  const emp = await Employee.findOne({ $or: or }).lean();
-  return emp || null;
-}
+/** หา employee ของผู้ล็อกอิน — the linked employee only (lib/accountLinks.js) */
+const resolveEmployeeFromSession = (session) => getOwnEmployee(session, null);
 
 export async function GET(req) {
   const gate = await requireAnyPageApi(["self_leave_request", "self_leave_history"]);

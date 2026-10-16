@@ -3,7 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
-import Employee from "@/models/Employee";
+import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import { permissionsFor, needsRefresh, refreshTokenPermissions } from "@/lib/rbac/sessionPerms";
 import { RBAC_VERSION } from "@/lib/rbac/version";
 import {
@@ -110,18 +110,10 @@ export const authOptions = {
           // Update last login / reset failed count and lock
           if (!(await recordSuccessfulSignIn(user._id))) throw new Error(ACCOUNT_LOCKED_ERROR);
 
-          // Resolve employee record
-          let emp = null;
-          if (user.employeeId) {
-            emp = await Employee.findById(user.employeeId)
-              .select("firstName lastName nickName empAutoId department photoUrl")
-              .lean();
-          }
-          if (!emp) {
-            emp = await Employee.findOne({ email })
-              .select("firstName lastName nickName empAutoId department photoUrl")
-              .lean();
-          }
+          // The linked employee (Employee.userId — lib/accountLinks.js). No
+          // email fallback: an unlinked account has no employee, rather than
+          // borrowing whoever shares its email.
+          const emp = await employeeOfUser(user._id, "firstName lastName nickName empAutoId department photoUrl");
 
           const perms = await permissionsFor({ roleKey: user.role, employeeId: emp?._id });
 

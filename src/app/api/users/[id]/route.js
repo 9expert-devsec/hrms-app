@@ -1,7 +1,9 @@
 // src/app/api/users/[id]/route.js
 import { NextResponse } from "next/server";
-import { requirePageApi } from "@/lib/rbac/guard";
+import { requirePageApi, requireSuperadminApi } from "@/lib/rbac/guard";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
+import { AccountError } from "@/lib/accounts";
+import { deleteAccount } from "@/lib/accountLinks";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import mongoose from "mongoose";
@@ -44,4 +46,29 @@ export async function PATCH(req, { params }) {
   if (!doc) return new NextResponse("Not found", { status: 404 });
 
   return NextResponse.json({ ok: true, user: { _id: String(doc._id), role: doc.role } });
+}
+
+/**
+ * Delete an account — superadmin only (lib/accountLinks.js deleteAccount):
+ * body { confirmEmail } must equal the account's email; never your own
+ * account or the last active superadmin. The linked employee is unlinked and
+ * kept, with all history.
+ */
+export async function DELETE(req, { params }) {
+  try {
+    const gate = await requireSuperadminApi();
+    if (gate.res) return gate.res;
+
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    await dbConnect();
+    const item = await deleteAccount(id, { actor: gate.session.user, confirmEmail: body?.confirmEmail });
+    return NextResponse.json({ ok: true, item });
+  } catch (err) {
+    if (err instanceof AccountError) {
+      return NextResponse.json({ ok: false, message: err.message }, { status: err.status });
+    }
+    console.error("DELETE /api/users/[id] error:", err?.message);
+    return NextResponse.json({ ok: false, message: "เกิดข้อผิดพลาด กรุณาลองใหม่" }, { status: 500 });
+  }
 }

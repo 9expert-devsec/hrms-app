@@ -6,7 +6,7 @@ import { leaveListEmployeeIds } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
 import LeaveBalance from "@/models/LeaveBalance";
-import Employee from "@/models/Employee";
+import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 
 /* ---------- helpers ---------- */
 
@@ -43,7 +43,6 @@ export async function GET(req) {
     const status = searchParams.get("status");
     const year = searchParams.get("year");
 
-    const userId = session.user.id || session.user._id || session.user.sub;
     const scope = searchParams.get("scope");
     const filter = {};
 
@@ -57,7 +56,11 @@ export async function GET(req) {
       const ids = await leaveListEmployeeIds(user); // null = everyone
       if (ids) filter.employeeId = { $in: ids };
     } else {
-      filter.userId = userId;
+      // Own leaves = the linked employee's, so history survives an account
+      // being replaced; an unlinked account has none.
+      const own = await getOwnEmployee(session, "_id");
+      if (!own) return NextResponse.json({ ok: true, items: [] });
+      filter.employeeId = own._id;
     }
 
     if (status && status !== "all") filter.status = status;
@@ -99,15 +102,12 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, message: "Session missing userId" }, { status: 401 });
     }
 
-    // find employee by email as a reliable fallback
-    let employeeId = session.user.employeeId;
-    if (!employeeId) {
-      const employee = await Employee.findOne({ email: session.user.email }).lean();
-      if (!employee) {
-        return NextResponse.json({ ok: false, message: "Employee record not found" }, { status: 400 });
-      }
-      employeeId = employee._id;
+    // The linked employee only (lib/accountLinks.js) — never an email match.
+    const employee = await getOwnEmployee(session, "_id");
+    if (!employee) {
+      return NextResponse.json({ ok: false, message: "บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน" }, { status: 400 });
     }
+    const employeeId = employee._id;
 
     const body = await req.json();
     const { leaveType, startDate, endDate, reason, attachmentUrl, attachments, employeeSignature } = body;
