@@ -41,6 +41,7 @@ import {
   AlarmClock,
   BarChart2,
   CalendarOff,
+  KeyRound,
 } from "lucide-react";
 
 export const menuConfig = [
@@ -264,6 +265,16 @@ export const menuConfig = [
             label: "กำหนด HOD",
             href: "/dashboard/settings/department-head",
             pageKey: "hod_settings",
+          },
+          {
+            // No registry key on purpose: pageKey null → canOpenPage allows
+            // only the superadmin (same rule the middleware applies).
+            key: "settings.roles",
+            type: "link",
+            icon: KeyRound,
+            label: "บทบาทและสิทธิ์",
+            href: "/dashboard/settings/roles",
+            pageKey: null,
           },
         ],
       },
