@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
 import Department from "@/models/Department";
-import mongoose from "mongoose"; // ✅ ใช้ mongoose.isValidObjectId
 import { requirePageApi } from "@/lib/rbac/guard";
+import { setDepartmentHead, HodError } from "@/lib/hod";
 
 export async function PUT(req, { params }) {
   try {
@@ -23,17 +23,23 @@ export async function PUT(req, { params }) {
       positions: Array.isArray(body.positions) ? body.positions : [],
     };
 
-    // ✅ validate headOfDepartment (ว่างได้, ผิดรูปแบบให้ 400)
-    let headId = body.headOfDepartment ?? null;
-    if (typeof headId === "string" && headId.trim() === "") headId = null;
-    if (headId && !mongoose.isValidObjectId(headId)) {
-      return NextResponse.json({ message: "Invalid headOfDepartment id" }, { status: 400 });
+    // Head of department goes through the shared helper (same validation as
+    // Settings › กำหนด HOD). Written first, so a bad head id leaves the
+    // department untouched. ว่างได้ = clear the head.
+    if ("headOfDepartment" in body) {
+      let headId = body.headOfDepartment ?? null;
+      if (typeof headId === "string" && headId.trim() === "") headId = null;
+      try {
+        await setDepartmentHead(params.id, headId);
+      } catch (e) {
+        if (e instanceof HodError) return NextResponse.json({ message: e.message }, { status: e.status });
+        throw e;
+      }
     }
-    update.headOfDepartment = headId;
 
     const doc = await Department.findByIdAndUpdate(params.id, update, {
       new: true,
-    }).populate("headOfDepartment", "_id firstName lastName position level");
+    }).populate("headOfDepartment", "_id firstName lastName position level empAutoId userId");
 
     if (!doc) return NextResponse.json({ message: "Department not found" }, { status: 404 });
     return NextResponse.json(doc);

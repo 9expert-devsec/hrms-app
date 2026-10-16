@@ -1,22 +1,17 @@
 // src/app/api/department-head/route.js
+// Heads of department live in Department.headOfDepartment (see lib/hod.js).
 import { NextResponse } from "next/server";
 import { requirePageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
-import DepartmentHead from "@/models/DepartmentHead";
+import { listDepartmentHeads, setDepartmentHead, HodError } from "@/lib/hod";
 
 export async function GET() {
   try {
-    await dbConnect();
     const gate = await requirePageApi("hod_settings");
     if (gate.res) return gate.res;
-    const { session } = gate;
 
-    const items = await DepartmentHead.find()
-      .populate("userId", "email role")
-      .populate("assignedBy", "email")
-      .sort({ departmentCode: 1 })
-      .lean();
-
+    await dbConnect();
+    const items = await listDepartmentHeads();
     return NextResponse.json({ ok: true, items });
   } catch (err) {
     console.error("GET /api/department-head error:", err);
@@ -24,29 +19,33 @@ export async function GET() {
   }
 }
 
+/**
+ * Assign a head: { departmentId, employeeId }. Any employee may be picked
+ * (no login account needed). Clearing (employeeId null/empty) is
+ * superadmin-only, like DELETE /api/department-head/[departmentId].
+ */
 export async function POST(req) {
   try {
-    await dbConnect();
     const gate = await requirePageApi("hod_settings");
     if (gate.res) return gate.res;
     const { session } = gate;
 
-
-    const { departmentCode, userId } = await req.json();
-    if (!departmentCode || !userId) {
-      return NextResponse.json({ ok: false, message: "ต้องระบุ departmentCode และ userId" }, { status: 400 });
+    const { departmentId, employeeId } = await req.json().catch(() => ({}));
+    if (!departmentId) {
+      return NextResponse.json({ ok: false, message: "ต้องระบุ departmentId" }, { status: 400 });
+    }
+    const clearing = employeeId == null || employeeId === "";
+    if (clearing && session.user.isSuperadmin !== true) {
+      return NextResponse.json({ ok: false, message: "เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่ล้างหัวหน้าแผนกได้" }, { status: 403 });
     }
 
-    const assignedBy = session.user.id || session.user._id || session.user.sub;
-
-    const item = await DepartmentHead.findOneAndUpdate(
-      { departmentCode },
-      { userId, assignedBy },
-      { upsert: true, new: true, runValidators: true }
-    );
-
+    await dbConnect();
+    const item = await setDepartmentHead(departmentId, clearing ? null : employeeId);
     return NextResponse.json({ ok: true, item });
   } catch (err) {
+    if (err instanceof HodError) {
+      return NextResponse.json({ ok: false, message: err.message }, { status: err.status });
+    }
     console.error("POST /api/department-head error:", err);
     return NextResponse.json({ ok: false, message: err.message }, { status: 500 });
   }

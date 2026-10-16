@@ -64,10 +64,7 @@ export const authOptions = {
           }
 
           const role = await getRoleByKey(user.role);
-          const headOfDepartmentIds = await getHeadOfDepartmentIds({
-            userId: user._id,
-            employeeId: emp?._id,
-          });
+          const headOfDepartmentIds = await getHeadOfDepartmentIds(emp?._id);
 
           const displayName =
             emp?.firstName || emp?.lastName

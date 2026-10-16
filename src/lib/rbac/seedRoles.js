@@ -7,7 +7,7 @@
  * Page sets reproduce the access each role had before RBAC, minus the holes:
  *   - manager has no `scope_leave_all_depts`: a manager now approves the HOD
  *     step only for departments they head (previously, a manager with no
- *     DepartmentHead record saw every department's pending leave).
+ *     department-head assignment saw every department's pending leave).
  *   - hr keeps `scope_ot_all` and the HR leave step, but not
  *     `scope_leave_all_depts` — HR acts on the HR step, not the HOD step.
  *   - `employees`, `orgchart` and `departments` are no longer reachable by URL

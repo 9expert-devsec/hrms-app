@@ -1,7 +1,6 @@
 import "server-only";
 import Role from "@/models/Role";
 import Department from "@/models/Department";
-import DepartmentHead from "@/models/DepartmentHead";
 import { SEED_ROLES, FALLBACK_ROLE_KEY } from "@/lib/rbac/seedRoles";
 
 /**
@@ -46,29 +45,11 @@ export async function getRoleByKey(key) {
 }
 
 /**
- * _ids (as strings) of the departments this person heads.
- *
- * Source of truth: Department.headOfDepartment (→ Employee).
- * TEMPORARY until round 7 consolidates HOD data: a head recorded only in the
- * old DepartmentHead collection (userId → departmentCode) is included too, by
- * looking the department up by code, so nobody loses HOD access meanwhile.
+ * _ids (as strings) of the departments this person heads. Single store:
+ * User → Employee (as resolved in authorize) → Department.headOfDepartment.
  */
-export async function getHeadOfDepartmentIds({ userId, employeeId }) {
-  const ids = new Set();
-
-  if (employeeId) {
-    const depts = await Department.find({ headOfDepartment: employeeId }).select("_id").lean();
-    depts.forEach((d) => ids.add(String(d._id)));
-  }
-
-  if (userId) {
-    const legacy = await DepartmentHead.find({ userId }).select("departmentCode").lean();
-    const codes = legacy.map((h) => h.departmentCode).filter(Boolean);
-    if (codes.length) {
-      const depts = await Department.find({ code: { $in: codes } }).select("_id").lean();
-      depts.forEach((d) => ids.add(String(d._id)));
-    }
-  }
-
-  return [...ids];
+export async function getHeadOfDepartmentIds(employeeId) {
+  if (!employeeId) return [];
+  const depts = await Department.find({ headOfDepartment: employeeId }).select("_id").lean();
+  return depts.map((d) => String(d._id));
 }
