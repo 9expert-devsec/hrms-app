@@ -18,7 +18,6 @@ import {
   Zap,
   Pencil,
   KeyRound,
-  Ban,
   ArrowLeft,
 } from "lucide-react";
 
@@ -301,17 +300,16 @@ export default async function EmployeeProfilePage({ searchParams }) {
                     label="Edit employee info"
                     ActionIcon={Pencil}
                   />
-                  <QuickActionLink
-                    href={`/dashboard/hrm/employee/reset-password?id=${e._id}`}
-                    label="Reset password"
-                    ActionIcon={KeyRound}
-                  />
-                  <QuickActionLink
-                    href={`/dashboard/hrm/employee/deactivate?id=${e._id}`}
-                    label="Deactivate account"
-                    ActionIcon={Ban}
-                    danger
-                  />
+                  {/* Own password only (requires the current one); someone
+                      else's is reset with a temporary password on the users
+                      page. Suspending is a users_manage action, not here. */}
+                  {isSelf && (
+                    <QuickActionLink
+                      href="/account/password"
+                      label="เปลี่ยนรหัสผ่าน"
+                      ActionIcon={KeyRound}
+                    />
+                  )}
                 </>
               ) : (
                 <p style={{ color: "#5E6A7E", fontSize: "14px" }}>No actions available</p>

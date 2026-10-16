@@ -5,7 +5,10 @@ import Image from "next/image";
 import { useSession } from "next-auth/react";
 import BankSelect from "./../../../../../../components/BankSelect";
 import RoleSelect from "./../../../../../../components/RoleSelect";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import TempPasswordDialog from "./../../../../../../components/TempPasswordDialog";
+import { Loader2 } from "lucide-react";
+import { canAccess } from "@/lib/rbac/access";
+import { accountActionBlock } from "@/lib/rbac/accountRules";
 
 const BANKS = [
   { code: "KTB", name: "KTB (กรุงไทย)", logo: "/banks/ktb.webp" },
@@ -113,9 +116,8 @@ export default function EmployeeEditForm({
   const { data: session } = useSession();
   const isSuperadmin = session?.user?.isSuperadmin === true;
 
-  const [pwd, setPwd] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
   const [pwdSaving, setPwdSaving] = useState(false);
+  const [tempResult, setTempResult] = useState(null); // { email, tempPassword }, shown once
 
   const userId = user?._id ? String(user._id) : null;
 
@@ -224,29 +226,31 @@ export default function EmployeeEditForm({
     }
   }
 
-  /* -------------------- Reset password -------------------- */
+  /* -------------------- Reset password (temporary password) -------------------- */
+  // Nobody sets a chosen password for someone else: users_manage holders (and
+  // the superadmin) issue a temporary password, shown once, and the user must
+  // set a new one at next sign-in. Same guard rails as the users page.
+  const canResetPassword = !!userId && canAccess(session?.user, "users_manage");
+  const resetBlock = canResetPassword
+    ? accountActionBlock({
+        actor: session?.user,
+        target: { id: userId, isSuperadmin: linkedUser?.role === "superadmin", status: linkedUser?.status },
+        action: "reset",
+        activeSuperadminCount: Infinity,
+      })
+    : null;
+
   async function onResetPassword() {
-    if (!userId) {
-      alert("ไม่พบ userId ของบัญชีนี้");
-      return;
-    }
-    if (!pwd || pwd.length < 6) {
-      alert("กรุณาใส่รหัสผ่านอย่างน้อย 6 ตัวอักษร");
-      return;
-    }
+    if (!userId || resetBlock) return;
+    if (!confirm("ระบบจะสร้างรหัสผ่านชั่วคราวให้ และผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบครั้งถัดไป ดำเนินการต่อหรือไม่?")) return;
     setPwdSaving(true);
     try {
-      const res = await fetch(`/api/users/${userId}/password`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pwd }),
-      });
+      const res = await fetch(`/api/users/${userId}/reset-password`, { method: "POST", cache: "no-store" });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Reset password failed");
-      alert("รีเซ็ตรหัสผ่านสำเร็จ");
-      setPwd("");
+      if (!res.ok || !data.ok) throw new Error(data?.message || data?.error || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
+      setTempResult({ email: data.email, tempPassword: data.tempPassword });
     } catch (e) {
-      alert(e.message || "Reset password failed");
+      alert(e.message || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
     } finally {
       setPwdSaving(false);
     }
@@ -538,40 +542,38 @@ export default function EmployeeEditForm({
                 </button>
               )}
 
-              <hr className="my-5 border-white/10" />
+              {canResetPassword && (
+                <>
+                  <hr className="my-5 border-white/10" />
 
-              <h4 className="font-medium text-slate-100 mb-2">
-                ตั้งรหัสผ่านใหม่
-              </h4>
-              <div className="relative">
-                <Input
-                  type={showPwd ? "text" : "password"}
-                  label="รหัสผ่านใหม่"
-                  value={pwd}
-                  onChange={setPwd}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd((v) => !v)}
-                  className="absolute right-3 top-[38px] text-slate-400"
-                  title={showPwd ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                >
-                  {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-
-              <button
-                onClick={onResetPassword}
-                disabled={pwdSaving || !canAdmin}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 px-4 py-2.5 text-white ring-1 ring-white/10 disabled:opacity-60"
-              >
-                {pwdSaving && <Loader2 className="size-4 animate-spin" />}
-                รีเซ็ตรหัสผ่าน
-              </button>
+                  <h4 className="font-medium text-slate-100 mb-1">รีเซ็ตรหัสผ่าน</h4>
+                  <p className="text-xs mb-3" style={{ color: "#5E6A7E" }}>
+                    สร้างรหัสผ่านชั่วคราว (แสดงครั้งเดียว) — ผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบ
+                  </p>
+                  <span title={resetBlock?.error}>
+                    <button
+                      onClick={onResetPassword}
+                      disabled={pwdSaving || !!resetBlock}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 px-4 py-2.5 text-white ring-1 ring-white/10 disabled:opacity-60"
+                    >
+                      {pwdSaving && <Loader2 className="size-4 animate-spin" />}
+                      รีเซ็ตรหัสผ่าน
+                    </button>
+                  </span>
+                </>
+              )}
             </>
           )}
         </section>
       </div>
+
+      {tempResult && (
+        <TempPasswordDialog
+          email={tempResult.email}
+          tempPassword={tempResult.tempPassword}
+          onClose={() => setTempResult(null)}
+        />
+      )}
     </div>
   );
 }

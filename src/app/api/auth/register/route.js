@@ -4,6 +4,7 @@ import Employee from "@/models/Employee";
 import bcrypt from "bcryptjs";
 import { requireSuperadminApi } from "@/lib/rbac/guard";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
+import { PASSWORD_MIN_LENGTH } from "@/lib/passwordRules";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,9 @@ export async function POST(req) {
     const { name, email, password, role: rawRole = "employee" } = await req.json();
     if (!email || !password) {
       return Response.json({ error: "email/password required" }, { status: 400 });
+    }
+    if (String(password).length < PASSWORD_MIN_LENGTH) {
+      return Response.json({ error: `รหัสผ่านต้องมีอย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร` }, { status: 400 });
     }
     const role = String(rawRole || "employee").trim().toLowerCase();
 

@@ -1,10 +1,11 @@
 /**
- * Password rules shared by the change-password form, POST /api/account/password
- * and PUT /api/users/[id]/password. Pure — safe in the browser.
+ * Password rules for every password a user SETS (the change-password form and
+ * POST /api/account/password). Pure — safe in the browser.
  *
- * The minimum length is the rule the app already enforced (6 characters).
+ * Applies only when a new password is set; existing passwords (including
+ * shorter ones set before this rule) keep working.
  */
-export const PASSWORD_MIN_LENGTH = 6;
+export const PASSWORD_MIN_LENGTH = 8;
 
 /** Where a user with mustChangePassword is sent (outside /dashboard). */
 export const CHANGE_PASSWORD_PATH = "/account/password";

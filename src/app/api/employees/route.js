@@ -11,6 +11,7 @@ import { uploadFromBuffer } from "@/lib/cloudinary";
 import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
+import { PASSWORD_MIN_LENGTH } from "@/lib/passwordRules";
 
 // Without `employees`, callers (the shift-assign picker) get no contact data.
 const FULL_FIELDS =
@@ -109,6 +110,10 @@ export async function POST(req) {
       } catch (e) {
         if (e instanceof RoleError) return NextResponse.json({ ok:false, message:e.message }, { status:e.status });
         throw e;
+      }
+      // Same minimum length as every other password that gets set.
+      if (g("password").length < PASSWORD_MIN_LENGTH) {
+        return NextResponse.json({ ok:false, message:`รหัสผ่านต้องมีอย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร` }, { status:400 });
       }
     }
 

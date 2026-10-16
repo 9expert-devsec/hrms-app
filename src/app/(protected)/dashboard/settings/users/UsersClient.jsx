@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Search, KeyRound, Ban, CheckCircle2, Copy, Check, X, Loader2, AlertTriangle } from "lucide-react";
+import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2 } from "lucide-react";
 import { accountActionBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
+import TempPasswordDialog from "../../../../../components/TempPasswordDialog";
 
 /* ── design tokens (same as the other settings pages) ───────── */
 const NAVY = "#0D1B2A";
@@ -51,7 +52,6 @@ export default function UsersClient({ initial, actor }) {
   const [confirm, setConfirm] = useState(null); // { user, action: "reset" | "suspend" | "activate" }
   const [busy, setBusy] = useState(false);
   const [tempResult, setTempResult] = useState(null); // { email, tempPassword }
-  const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState(null);
 
   const roleByKey = useMemo(() => new Map(data.roles.map((r) => [r.key, r])), [data.roles]);
@@ -94,7 +94,6 @@ export default function UsersClient({ initial, actor }) {
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) throw new Error(j.message || j.error || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
         setConfirm(null);
-        setCopied(false);
         setTempResult({ email: j.email, tempPassword: j.tempPassword });
       } else {
         const res = await fetch(`/api/users/${user._id}/status`, {
@@ -131,15 +130,6 @@ export default function UsersClient({ initial, actor }) {
       router.refresh();
     } catch (err) {
       showToast(err.message, "error");
-    }
-  }
-
-  async function copyTemp() {
-    try {
-      await navigator.clipboard.writeText(tempResult.tempPassword);
-      setCopied(true);
-    } catch {
-      setCopied(false);
     }
   }
 
@@ -369,36 +359,11 @@ export default function UsersClient({ initial, actor }) {
 
       {/* ── Temporary password (shown once) ────── */}
       {tempResult && (
-        <Dialog onClose={() => setTempResult(null)} labelledBy="temp-title">
-          <h3 id="temp-title" style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
-            รหัสผ่านชั่วคราว
-          </h3>
-          <p style={{ color: SLATE, fontSize: 13, marginTop: 4 }}>{tempResult.email}</p>
-          <div
-            className="mt-4 flex items-center justify-between gap-3 rounded-xl px-4 py-3"
-            style={{ background: ICE, border: "1px solid rgba(0,92,255,0.15)" }}
-          >
-            <code style={{ fontSize: 20, letterSpacing: "0.08em", color: NAVY, fontWeight: 700 }}>
-              {tempResult.tempPassword}
-            </code>
-            <button onClick={copyTemp} style={actionBtn(BLUE)}>
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-              {copied ? "คัดลอกแล้ว" : "คัดลอก"}
-            </button>
-          </div>
-          <div
-            className="mt-4 flex gap-2 rounded-xl px-4 py-3"
-            style={{ background: "#FEF3C7", color: "#92400E", fontSize: 13 }}
-          >
-            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-            รหัสนี้จะแสดงครั้งเดียว — แจ้งพนักงานโดยตรง และพนักงานต้องตั้งรหัสใหม่เมื่อเข้าสู่ระบบ
-          </div>
-          <div className="flex justify-end mt-6">
-            <button onClick={() => setTempResult(null)} style={secondaryBtn}>
-              ปิด
-            </button>
-          </div>
-        </Dialog>
+        <TempPasswordDialog
+          email={tempResult.email}
+          tempPassword={tempResult.tempPassword}
+          onClose={() => setTempResult(null)}
+        />
       )}
 
       {/* ── Toast ─────────────────────────────── */}

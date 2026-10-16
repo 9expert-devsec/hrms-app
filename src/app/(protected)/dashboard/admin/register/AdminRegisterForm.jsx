@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UserPlus, CheckCircle2, AlertTriangle } from "lucide-react";
 import RoleSelect from "../../../../../components/RoleSelect";
+import { PASSWORD_MIN_LENGTH } from "@/lib/passwordRules";
 
 export default function AdminRegisterForm() {
   const [form, setForm] = useState({
@@ -26,8 +27,8 @@ export default function AdminRegisterForm() {
       setResult({ ok: false, message: "อีเมลไม่ถูกต้อง" });
       return;
     }
-    if (form.password.length < 6) {
-      setResult({ ok: false, message: "รหัสผ่านอย่างน้อย 6 ตัวอักษร" });
+    if (form.password.length < PASSWORD_MIN_LENGTH) {
+      setResult({ ok: false, message: `รหัสผ่านอย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร` });
       return;
     }
     if (form.password !== form.confirm) {
@@ -118,7 +119,7 @@ export default function AdminRegisterForm() {
             value={form.password}
             onChange={onChange}
             className="w-full rounded-xl bg-white/5 px-4 py-2.5 text-slate-100 placeholder:text-slate-400 outline-none ring-1 ring-inset ring-white/10 focus:ring-indigo-400/40"
-            placeholder="อย่างน้อย 6 ตัวอักษร"
+            placeholder={`อย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร`}
           />
         </div>
         <div>

@@ -40,12 +40,12 @@ export default async function EditEmployeePage({ searchParams }) {
 
   // หา user ที่ผูกกับ employee คนนี้
   let user = await User.findOne({ employeeId: emp._id })
-    .select("_id email role")
+    .select("_id email role status")
     .lean();
 
   // fallback (กรณีเก่าที่ยังไม่ผูก employeeId)
   if (!user && emp.email) {
-    user = await User.findOne({ email: emp.email }).select("_id email role").lean();
+    user = await User.findOne({ email: emp.email }).select("_id email role status").lean();
   }
 
   const canAdmin = canAccess(session.user, "employees");
