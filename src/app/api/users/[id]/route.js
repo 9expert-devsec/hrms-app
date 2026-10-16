@@ -1,6 +1,7 @@
 // src/app/api/users/[id]/route.js
 import { NextResponse } from "next/server";
 import { requirePageApi } from "@/lib/rbac/guard";
+import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 import mongoose from "mongoose";
@@ -26,14 +27,22 @@ export async function PATCH(req, { params }) {
   if (body.role !== undefined && body.role !== null && body.role !== "") {
     const current = await User.findById(id).select("role").lean();
     if (!current) return new NextResponse("Not found", { status: 404 });
-    if (body.role !== current.role) {
+    const nextRole = String(body.role).trim().toLowerCase();
+    if (nextRole !== current.role) {
       if (session.user.isSuperadmin !== true) {
         return NextResponse.json(
           { ok: false, message: "เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่เปลี่ยนบทบาทได้" },
           { status: 403 }
         );
       }
-      update.role = body.role;
+      // Must be a known role key — an unknown key is a 400, never stored.
+      try {
+        await assertAssignableRole(nextRole, session.user);
+      } catch (e) {
+        if (e instanceof RoleError) return NextResponse.json({ ok: false, message: e.message }, { status: e.status });
+        throw e;
+      }
+      update.role = nextRole;
     }
   }
   // (ถ้าจะให้เปลี่ยนอีเมลที่นี่ด้วยก็เพิ่ม validate และ assign ได้)

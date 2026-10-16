@@ -14,7 +14,8 @@ function toRole(doc) {
     color: doc.color ?? null,
     pages: Array.isArray(doc.pages) ? doc.pages : [],
     isSystem: !!doc.isSystem,
-    isSuperadmin: !!doc.isSuperadmin,
+    // Only the superadmin key may bypass checks, whatever a document says.
+    isSuperadmin: !!doc.isSuperadmin && doc.key === "superadmin",
   };
 }
 

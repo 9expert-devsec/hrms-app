@@ -1,25 +1,22 @@
 import mongoose, { Schema, models } from "mongoose";
 import { ALL_PAGE_KEYS } from "@/lib/rbac/pages";
+import {
+  DEFAULT_ROLE_COLOR as DEFAULT_COLOR,
+  ROLE_KEY_RE,
+  SUPERADMIN_KEY,
+  normalizeHex,
+} from "@/lib/rbac/roleRules";
 
 /**
  * Role — a set of page keys from the registry (src/lib/rbac/pages.js).
  * A user either may open a page or may not. `isSuperadmin` bypasses every
- * check and is a singleton, enforced by callers via assertSingleSuperadmin
- * (not a hook, to keep the write path cheap).
+ * check and belongs to the `superadmin` key only (validated below; the
+ * roles API refuses it for any other key).
  *
- * Until the round-8 role editor writes documents, the collection may be
- * empty; resolveRole.js then falls back to SEED_ROLES.
+ * The collection may be empty, or hold only some keys: resolveRole.js falls
+ * back to SEED_ROLES. Saving a system role in the editor upserts its doc.
+ * Writes go through src/lib/rbac/roles.js, which applies roleRules.js.
  */
-const DEFAULT_COLOR = "#6b7280";
-
-/** '#abc' / '#aabbcc' (any case, with or without '#') → '#aabbcc', else null. */
-function normalizeHex(value) {
-  if (typeof value !== "string") return null;
-  let hex = value.trim().replace(/^#/, "").toLowerCase();
-  if (/^[0-9a-f]{3}$/.test(hex)) hex = hex.split("").map((c) => c + c).join("");
-  return /^[0-9a-f]{6}$/.test(hex) ? `#${hex}` : null;
-}
-
 const RoleSchema = new Schema(
   {
     // Permanent slug — what User.role and the session carry.
@@ -30,7 +27,7 @@ const RoleSchema = new Schema(
       lowercase: true,
       trim: true,
       immutable: true,
-      match: /^[a-z0-9_-]+$/,
+      match: ROLE_KEY_RE,
     },
     name: { type: String, required: true, trim: true },
     description: { type: String, default: "", trim: true },
@@ -50,6 +47,14 @@ RoleSchema.pre("validate", function normalizeColor(next) {
   next();
 });
 
+RoleSchema.pre("validate", function onlySuperadminKeyIsSuperadmin(next) {
+  if (this.isSuperadmin && this.key !== SUPERADMIN_KEY) {
+    this.invalidate("isSuperadmin", "Only the superadmin role may have isSuperadmin");
+  }
+  next();
+});
+
+// Defensive only: the roles API already rejects unknown keys with a 400.
 RoleSchema.pre("validate", function pruneUnknownPages(next) {
   if (Array.isArray(this.pages)) {
     const allowed = new Set(ALL_PAGE_KEYS);

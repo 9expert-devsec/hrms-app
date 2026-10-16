@@ -3,6 +3,7 @@ import User from "@/models/User";
 import Employee from "@/models/Employee";
 import bcrypt from "bcryptjs";
 import { requireSuperadminApi } from "@/lib/rbac/guard";
+import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
 
 export const runtime = "nodejs";
 
@@ -13,12 +14,21 @@ export async function POST(req) {
     const gate = await requireSuperadminApi();
     if (gate.res) return gate.res;
 
-    const { name, email, password, role = "employee" } = await req.json();
+    const { name, email, password, role: rawRole = "employee" } = await req.json();
     if (!email || !password) {
       return Response.json({ error: "email/password required" }, { status: 400 });
     }
+    const role = String(rawRole || "employee").trim().toLowerCase();
 
     await dbConnect();
+
+    // The role must be a known key (roles collection or seed) — never stored blindly.
+    try {
+      await assertAssignableRole(role, gate.session.user);
+    } catch (e) {
+      if (e instanceof RoleError) return Response.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
 
     const existed = await User.findOne({ email });
     if (existed) return Response.json({ error: "Email already in use" }, { status: 409 });

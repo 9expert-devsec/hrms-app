@@ -10,7 +10,7 @@ import { hash } from "bcryptjs";
 import { uploadFromBuffer } from "@/lib/cloudinary";
 import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
-import { findRole } from "@/lib/rbac/resolveRole";
+import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
 
 // Without `employees`, callers (the shift-assign picker) get no contact data.
 const FULL_FIELDS =
@@ -103,12 +103,11 @@ export async function POST(req) {
     const createLogin = g("createLogin").toLowerCase() === "true";
     const role        = (g("role") || "employee").toLowerCase();
     if (createLogin) {
-      const roleDef = await findRole(role);
-      if (!roleDef) {
-        return NextResponse.json({ ok:false, message:`ไม่รู้จักบทบาท "${role}"` }, { status:400 });
-      }
-      if (roleDef.isSuperadmin && session.user.isSuperadmin !== true) {
-        return NextResponse.json({ ok:false, message:"เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่กำหนดบทบาทนี้ได้" }, { status:403 });
+      try {
+        await assertAssignableRole(role, session.user);
+      } catch (e) {
+        if (e instanceof RoleError) return NextResponse.json({ ok:false, message:e.message }, { status:e.status });
+        throw e;
       }
     }
 
