@@ -7,6 +7,7 @@ import { X, LogOut, LogIn, User } from "lucide-react";
 import { useSession, signOut, signIn } from "next-auth/react";
 import { menuConfig, filterMenu } from "@/app/config/menuConfig";
 import { canOpenPage } from "@/lib/rbac/access";
+import useMenuBadges from "./useMenuBadges";
 
 export default function MobileSidebar({ open, onClose }) {
   const { data, status } = useSession();
@@ -16,6 +17,7 @@ export default function MobileSidebar({ open, onClose }) {
     () => filterMenu(menuConfig, user, canOpenPage).flatMap((n) => n.children ?? []),
     [user]
   );
+  const badges = useMenuBadges(user);
 
   // ล็อก scroll เมื่อเมนูเปิด
   useEffect(() => {
@@ -124,8 +126,11 @@ export default function MobileSidebar({ open, onClose }) {
                     .filter((child) => child.type === "link")
                     .map((child) => (
                       <li key={child.key}>
-                        <Link href={child.href} onClick={onClose} className="block rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300">
+                        <Link href={child.href} onClick={onClose} className="flex items-center rounded-lg px-3 py-2 hover:bg-white/5 hover:text-indigo-300">
                           {child.label}
+                          {child.badgeKey && badges[child.badgeKey] > 0 && (
+                            <span className="ml-auto rounded-full bg-red-600 px-1.5 text-xs font-bold text-white">{badges[child.badgeKey]}</span>
+                          )}
                         </Link>
                       </li>
                     ))}

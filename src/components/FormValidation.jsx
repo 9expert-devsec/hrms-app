@@ -28,8 +28,9 @@ export function FieldError({ k, errors, prefix = "emp" }) {
 /**
  * Red box above the buttons: the count and names of the fields to fix, and
  * a server error (also shown on its field when the API names one).
+ * `labels` maps field keys to names (default: the employee form's).
  */
-export function ErrorSummary({ errorKeys = [], serverError = null, serverOnField = false }) {
+export function ErrorSummary({ errorKeys = [], serverError = null, serverOnField = false, labels = FIELD_LABELS }) {
   const clientKeys = serverOnField ? errorKeys.filter((k) => k !== serverError?.field) : errorKeys;
   if (!clientKeys.length && !serverError) return null;
   return (
@@ -43,14 +44,14 @@ export function ErrorSummary({ errorKeys = [], serverError = null, serverOnField
           <div className="font-semibold">กรุณากรอกข้อมูลให้ครบ {clientKeys.length} รายการ</div>
           <ul className="mt-1 list-disc pl-5">
             {clientKeys.map((k) => (
-              <li key={k}>{FIELD_LABELS[k] || k}</li>
+              <li key={k}>{labels[k] || k}</li>
             ))}
           </ul>
         </>
       )}
       {serverError && (
         <div className={clientKeys.length ? "mt-2" : "font-semibold"}>
-          {serverError.field && FIELD_LABELS[serverError.field] ? `${FIELD_LABELS[serverError.field]}: ` : ""}
+          {serverError.field && labels[serverError.field] ? `${labels[serverError.field]}: ` : ""}
           {serverError.message}
         </div>
       )}

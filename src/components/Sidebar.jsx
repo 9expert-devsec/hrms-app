@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { menuConfig, filterMenu } from "@/app/config/menuConfig";
 import { canOpenPage } from "@/lib/rbac/access";
+import useMenuBadges from "./useMenuBadges";
 
 /* ── 9Expert Brand tokens ─────────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -33,9 +34,34 @@ function isActivePath(pathname, href) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+/* ── Badge (menuConfig badgeKey → useMenuBadges count) ─────────── */
+const BadgesContext = createContext({});
+
+function Badge({ count, dot }) {
+  if (!count) return null;
+  const common = { background: "#DC2626", color: "#FFFFFF", fontWeight: 700, borderRadius: "9999px" };
+  if (dot) {
+    return (
+      <span
+        aria-label={`${count} รายการรอ`}
+        style={{ ...common, position: "absolute", top: "2px", right: "2px", minWidth: "16px", height: "16px", fontSize: "10px", lineHeight: "16px", textAlign: "center" }}
+      >
+        {count > 9 ? "9+" : count}
+      </span>
+    );
+  }
+  return (
+    <span aria-label={`${count} รายการรอ`} style={{ ...common, marginLeft: "auto", padding: "0 6px", fontSize: "11px", lineHeight: "18px" }}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 /* ── NavLink ───────────────────────────────────────────────────── */
 function NavLink({ node, active, collapsed }) {
   const Icon = node.icon;
+  const badges = useContext(BadgesContext);
+  const count = node.badgeKey ? badges[node.badgeKey] || 0 : 0;
   /* Collapsed mode: icon-only pill */
   if (collapsed) {
     return (
@@ -53,6 +79,7 @@ function NavLink({ node, active, collapsed }) {
           color: active ? NAVY : SLATE,
           transition: "all 150ms ease",
           textDecoration: "none",
+          position: "relative",
         }}
         onMouseEnter={(e) => {
           if (!active) {
@@ -68,6 +95,7 @@ function NavLink({ node, active, collapsed }) {
         }}
       >
         {Icon && <Icon size={18} aria-hidden />}
+        <Badge count={count} dot />
       </Link>
     );
   }
@@ -131,6 +159,7 @@ function NavLink({ node, active, collapsed }) {
       >
         {node.label}
       </span>
+      <Badge count={count} />
     </Link>
   );
 }
@@ -144,6 +173,7 @@ function RecursiveNode({
   open,
   setOpen,
 }) {
+  const badges = useContext(BadgesContext);
   const paddingLeft = collapsed ? 0 : Math.min(depth * 12, 32);
 
   if (node.type === "link") {
@@ -164,6 +194,10 @@ function RecursiveNode({
     const opened = !!open[node.key];
     const toggle = () => setOpen((s) => ({ ...s, [node.key]: !opened }));
     const Icon = node.icon;
+    // A closed group still shows its links' counts.
+    const groupCount = opened
+      ? 0
+      : children.reduce((sum, c) => sum + (c.badgeKey ? badges[c.badgeKey] || 0 : 0), 0);
 
     /* Collapsed: icon-only pill for group */
     const groupBtn = collapsed ? (
@@ -182,6 +216,7 @@ function RecursiveNode({
           border: "none",
           cursor: "pointer",
           transition: "all 150ms ease",
+          position: "relative",
         }}
         onMouseEnter={(e) => {
           if (!opened) {
@@ -197,6 +232,7 @@ function RecursiveNode({
         }}
       >
         {Icon && <Icon size={18} />}
+        <Badge count={groupCount} dot />
       </button>
     ) : (
       <button
@@ -256,7 +292,8 @@ function RecursiveNode({
             {node.label}
           </span>
         </span>
-        <span style={{ marginLeft: "auto", color: SLATE }}>
+        <span style={{ marginLeft: "auto", color: SLATE, display: "flex", alignItems: "center", gap: "6px" }}>
+          <Badge count={groupCount} />
           {opened ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
       </button>
@@ -374,8 +411,10 @@ export default function Sidebar() {
   // Registry-driven: a link shows when canOpenPage(user, pageKey) is true;
   // empty groups disappear.
   const items = useMemo(() => filterMenu(menuConfig, user, canOpenPage), [user]);
+  const badges = useMenuBadges(user);
 
   return (
+    <BadgesContext.Provider value={badges}>
     <aside
       className="hidden md:block shrink-0"
       style={{
@@ -592,5 +631,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </BadgesContext.Provider>
   );
 }

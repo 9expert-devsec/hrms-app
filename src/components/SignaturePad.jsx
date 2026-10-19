@@ -10,6 +10,10 @@ export default function SignaturePad({
   onClear,
   label = "Signature",
   required = false,
+  hint = "Please sign within the box",
+  clearLabel = "Clear",
+  confirmLabel = "Confirm Signature",
+  resignLabel = "Re-sign",
 }) {
   const canvasRef = useRef(null);
   const points = useRef([]);
@@ -187,7 +191,7 @@ export default function SignaturePad({
             cursor: "pointer",
           }}
         >
-          Re-sign
+          {resignLabel}
         </button>
       </div>
     );
@@ -217,7 +221,7 @@ export default function SignaturePad({
         onPointerLeave={handlePointerLeave}
       />
       <span style={{ color: "#5E6A7E", fontSize: 12 }}>
-        Please sign within the box
+        {hint}
       </span>
       <div style={{ display: "flex", gap: 8 }}>
         <button
@@ -233,7 +237,7 @@ export default function SignaturePad({
             cursor: "pointer",
           }}
         >
-          Clear
+          {clearLabel}
         </button>
         <button
           type="button"
@@ -249,7 +253,7 @@ export default function SignaturePad({
             cursor: hasStrokes ? "pointer" : "not-allowed",
           }}
         >
-          Confirm Signature
+          {confirmLabel}
         </button>
       </div>
     </div>

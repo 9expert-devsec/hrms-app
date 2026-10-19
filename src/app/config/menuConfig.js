@@ -42,6 +42,7 @@ import {
   BarChart2,
   CalendarOff,
   KeyRound,
+  MapPin,
 } from "lucide-react";
 
 export const menuConfig = [
@@ -143,6 +144,16 @@ export const menuConfig = [
             label: "แจ้ง OT",
             href: "/dashboard/attendance/ot",
             pageKey: "self_ot",
+          },
+          {
+            key: "time.offsite",
+            type: "link",
+            icon: MapPin,
+            label: "ทำงานนอกสถานที่",
+            href: "/dashboard/offsite",
+            pageKey: "offsite_self",
+            // Count from components/useMenuBadges.js (invitations waiting for me).
+            badgeKey: "offsite_invites",
           },
           {
             key: "time.ot-approve",

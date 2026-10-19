@@ -21,6 +21,7 @@ import {
   Pencil,
   KeyRound,
   ArrowLeft,
+  PenLine,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -301,6 +302,14 @@ export default async function EmployeeProfilePage({ searchParams }) {
                       href="/account/password"
                       label="เปลี่ยนรหัสผ่าน"
                       ActionIcon={KeyRound}
+                    />
+                  )}
+                  {/* Own signature only (off-site requests are signed with it). */}
+                  {isSelf && (
+                    <QuickActionLink
+                      href="/dashboard/hrm/employee-profile/signature"
+                      label="แก้ไขลายเซ็น"
+                      ActionIcon={PenLine}
                     />
                   )}
                 </>
