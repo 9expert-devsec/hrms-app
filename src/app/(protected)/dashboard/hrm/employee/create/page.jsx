@@ -11,12 +11,17 @@ import RoleSelect from "./../../../../../../components/RoleSelect";
 import TempPasswordDialog from "./../../../../../../components/TempPasswordDialog";
 import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 import { TITLES_TH, employeeFullNameTh } from "@/lib/employeeName";
+import {
+  FIELD_LABELS,
+  requiredFields,
+  validateEmployeeForm,
+  fieldFromServerError,
+} from "@/lib/employeeFormRules";
+import { Req, FieldError, ErrorSummary } from "./../../../../../../components/FormValidation";
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/mongoose";
 // import Employee from "@/lib/models/Employee";
 
-const phone10 = /^\d{10}$/;
-const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const bankAccRx = /^\d{9,12}$/;
 
 const BANKS = [
@@ -256,6 +261,8 @@ export default function EmployeeCreatePage() {
 
   // misc
   const [submitting, setSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false); // first บันทึก clicked
+  const [serverError, setServerError] = useState(null); // { message, field, value }
 
   // เลือกแผนก/ตำแหน่ง
   const selectedDep = useMemo(
@@ -277,15 +284,16 @@ export default function EmployeeCreatePage() {
     setLevel(p?.level ?? "");
   }
 
+  // Validate on บันทึก (lib/employeeFormRules.js): the button stays enabled;
+  // problems show under each field and in the summary box above the buttons.
   function handlePreSubmit(e) {
     e.preventDefault();
-    if (!isFirstStepValid) return;
-    // เช็ก login เงื่อนไขก่อนเปิด confirm ก็ได้ (เอาแบบนิ่ม)
-    if (createLogin) {
-      if (!emailRx.test(accountEmail)) {
-        alert("กรุณากรอกอีเมลล็อกอินให้ถูกต้อง");
-        return;
-      }
+    setAttempted(true);
+    setServerError(null);
+    const keys = Object.keys(validateEmployeeForm(formValues, { mode: "create", createLogin }));
+    if (keys.length) {
+      focusField(keys[0]);
+      return;
     }
     setConfirmOpen(true);
   }
@@ -321,47 +329,40 @@ export default function EmployeeCreatePage() {
   // Emp ID Prefix preview
   const empPrefix = selectedDep?.empIdPrefix || selectedDep?.code || "";
 
-  // validate ขั้นแรก
-  const isFirstStepValid =
-    TITLES_TH.includes(titleTh) &&
-    firstNameTh.trim() &&
-    lastNameTh.trim() &&
-    firstName.trim() &&
-    lastName.trim() &&
-    selectedDepId &&
-    positionId &&
-    level !== "" &&
-    dateOfJoin &&
-    phone10.test(phone) &&
-    emailRx.test(email) &&
-    birthday &&
-    address.trim();
+  // ---- validation (lib/employeeFormRules.js) ----
+  // Nothing is red until the first บันทึก; after that each message clears as
+  // soon as its field becomes valid. A server error naming a field stays on
+  // that field until its value changes.
+  const formValues = {
+    titleTh, firstNameTh, lastNameTh, firstName, lastName,
+    departmentId: selectedDepId, positionId, dateOfJoin, phone, email, birthday, address, accountEmail,
+  };
+  const clientErrors = attempted ? validateEmployeeForm(formValues, { mode: "create", createLogin }) : {};
+  const serverOnField =
+    serverError?.field && !clientErrors[serverError.field] && formValues[serverError.field] === serverError.value;
+  const errors = serverOnField ? { ...clientErrors, [serverError.field]: serverError.message } : clientErrors;
+  const errorKeys = Object.keys(FIELD_LABELS).filter((k) => errors[k]);
+  const fieldProps = (key) => ({
+    id: `emp-${key}`,
+    "aria-required": requiredFields({ mode: "create", createLogin }).includes(key) ? "true" : undefined,
+    "aria-invalid": errors[key] ? "true" : undefined,
+    "aria-describedby": errors[key] ? `emp-${key}-error` : undefined,
+  });
+  const errRing = (key) => (errors[key] ? " !ring-2 !ring-red-500" : "");
 
   async function doSubmit() {
     if (submittedRef.current) return; // <— กันยิงซ้ำ
+    const invalid = Object.keys(validateEmployeeForm(formValues, { mode: "create", createLogin }));
+    if (invalid.length) {
+      setConfirmOpen(false);
+      setAttempted(true);
+      focusField(invalid[0]);
+      return;
+    }
     submittedRef.current = true;
     setPendingSubmit(true);
+    setServerError(null);
     try {
-      setPendingSubmit(true);
-
-      console.log("submit ids:", { selectedDepId, positionId });
-      if (!selectedDepId || !positionId) {
-        alert("กรุณาเลือกแผนกและตำแหน่ง");
-        submittedRef.current = false; // ปลดล็อกให้กดใหม่ได้
-        return;
-      }
-
-      const fd = new FormData();
-      if (!isFirstStepValid) return;
-
-      if (createLogin) {
-        if (!emailRx.test(accountEmail)) {
-          alert("กรุณากรอกอีเมลสำหรับล็อกอินให้ถูกต้อง");
-          return;
-        }
-      }
-
-      try {
         setSubmitting(true);
 
         const fd = new FormData();
@@ -403,11 +404,6 @@ export default function EmployeeCreatePage() {
 
         if (photoFile) fd.append("photo", photoFile);
 
-        if (!selectedDepId) {
-          alert("กรุณาเลือกแผนก");
-          return;
-        }
-
         // Login fields
         fd.append("createLogin", String(createLogin));
         if (createLogin) {
@@ -423,8 +419,15 @@ export default function EmployeeCreatePage() {
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          // Shown in the summary box, and on the field when the API names one.
           // A platform 413 (photo too big) has no JSON body.
-          throw new Error(res.status === 413 ? uploadErrorMessage(res, data) : data?.message || "Create failed");
+          const message = res.status === 413 ? uploadErrorMessage(res, data) : data?.message || "สร้างไม่สำเร็จ";
+          const field = res.status === 413 ? null : fieldFromServerError(data);
+          setServerError({ message, field, value: field ? formValues[field] : undefined });
+          setConfirmOpen(false);
+          if (field) focusField(field);
+          submittedRef.current = false;
+          return;
         }
 
         setConfirmOpen(false);
@@ -436,30 +439,25 @@ export default function EmployeeCreatePage() {
         alert("สร้างพนักงานสำเร็จ");
         window.location.reload();
         return;
-      } catch (err) {
-        console.error(err);
-        alert(err.message || "สร้างไม่สำเร็จ");
-        submittedRef.current = false;
-      } finally {
-        setSubmitting(false);
-      }
-      const res = await fetch("/api/employees", { method: "POST", body: fd });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || "Create failed");
-      }
-
-      alert("สร้างพนักงานสำเร็จ");
-      setConfirmOpen(false);
-      window.location.reload();
-      return;
     } catch (err) {
       console.error(err);
-      alert(err.message || "สร้างไม่สำเร็จ");
+      setServerError({ message: err.message || "สร้างไม่สำเร็จ", field: null });
+      setConfirmOpen(false);
       submittedRef.current = false;
     } finally {
+      setSubmitting(false);
       setPendingSubmit(false);
     }
+  }
+
+  // Scroll to and focus a field (by its emp-<key> id).
+  function focusField(key) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`emp-${key}`);
+      if (!el) return;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.focus({ preventScroll: true });
+    });
   }
 
   return (
@@ -519,9 +517,10 @@ export default function EmployeeCreatePage() {
             {/* Thai name (required) — above the English name */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="text-sm text-slate-300">คำนำหน้าชื่อ</label>
+                <label htmlFor="emp-titleTh" className="text-sm text-slate-300">คำนำหน้าชื่อ<Req /></label>
                 <select
-                  className="mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
+                  {...fieldProps("titleTh")}
+                  className={`mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white${errRing("titleTh")}`}
                   value={titleTh}
                   onChange={(e) => setTitleTh(e.target.value)}
                 >
@@ -530,41 +529,50 @@ export default function EmployeeCreatePage() {
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+                <FieldError k="titleTh" errors={errors} />
               </div>
               <div>
-                <label className="text-sm text-slate-300">ชื่อ (ไทย)</label>
+                <label htmlFor="emp-firstNameTh" className="text-sm text-slate-300">ชื่อ (ไทย)<Req /></label>
                 <input
-                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  {...fieldProps("firstNameTh")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("firstNameTh")}`}
                   value={firstNameTh}
                   onChange={(e) => setFirstNameTh(e.target.value)}
                 />
+                <FieldError k="firstNameTh" errors={errors} />
               </div>
               <div>
-                <label className="text-sm text-slate-300">นามสกุล (ไทย)</label>
+                <label htmlFor="emp-lastNameTh" className="text-sm text-slate-300">นามสกุล (ไทย)<Req /></label>
                 <input
-                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  {...fieldProps("lastNameTh")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("lastNameTh")}`}
                   value={lastNameTh}
                   onChange={(e) => setLastNameTh(e.target.value)}
                 />
+                <FieldError k="lastNameTh" errors={errors} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm text-slate-300">ชื่อ (อังกฤษ)</label>
+                <label htmlFor="emp-firstName" className="text-sm text-slate-300">ชื่อ (อังกฤษ)<Req /></label>
                 <input
-                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  {...fieldProps("firstName")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("firstName")}`}
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                 />
+                <FieldError k="firstName" errors={errors} />
               </div>
               <div>
-                <label className="text-sm text-slate-300">นามสกุล (อังกฤษ)</label>
+                <label htmlFor="emp-lastName" className="text-sm text-slate-300">นามสกุล (อังกฤษ)<Req /></label>
                 <input
-                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  {...fieldProps("lastName")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("lastName")}`}
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                 />
+                <FieldError k="lastName" errors={errors} />
               </div>
               <div>
                 <label className="text-sm text-slate-300">ชื่อเล่น</label>
@@ -576,9 +584,10 @@ export default function EmployeeCreatePage() {
               </div>
 
               <div>
-                <label className="text-sm text-slate-300">แผนก</label>
+                <label htmlFor="emp-departmentId" className="text-sm text-slate-300">แผนก<Req /></label>
                 <select
-                  className="mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
+                  {...fieldProps("departmentId")}
+                  className={`mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white${errRing("departmentId")}`}
                   value={selectedDepId}
                   onChange={(e) => setSelectedDepId(e.target.value)}
                 >
@@ -589,14 +598,16 @@ export default function EmployeeCreatePage() {
                     </option>
                   ))}
                 </select>
+                <FieldError k="departmentId" errors={errors} />
               </div>
 
               <div>
-                <label className="text-sm text-slate-300 mt-4 block">
-                  ตำแหน่ง
+                <label htmlFor="emp-positionId" className="text-sm text-slate-300 mt-4 block">
+                  ตำแหน่ง<Req />
                 </label>
                 <select
-                  className="mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white"
+                  {...fieldProps("positionId")}
+                  className={`mt-1 w-full rounded-xl bg-slate-800 px-4 py-2.5 ring-1 ring-slate-700 text-white${errRing("positionId")}`}
                   disabled={!selectedDepId}
                   value={positionId}
                   onChange={handlePositionChange}
@@ -608,6 +619,7 @@ export default function EmployeeCreatePage() {
                     </option>
                   ))}
                 </select>
+                <FieldError k="positionId" errors={errors} />
               </div>
 
               <div>
@@ -622,61 +634,67 @@ export default function EmployeeCreatePage() {
               </div>
 
               <div>
-                <label className="text-sm text-slate-300">วันที่เริ่มงาน</label>
+                <label htmlFor="emp-dateOfJoin" className="text-sm text-slate-300">วันที่เริ่มงาน<Req /></label>
                 <input
                   type="date"
-                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  {...fieldProps("dateOfJoin")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("dateOfJoin")}`}
                   value={dateOfJoin}
                   onChange={(e) => setDateOfJoin(e.target.value)}
                 />
+                <FieldError k="dateOfJoin" errors={errors} />
               </div>
 
               <div>
-                <label className="text-sm text-slate-300">
-                  เบอร์โทร (10 หลัก)
+                <label htmlFor="emp-phone" className="text-sm text-slate-300">
+                  เบอร์โทร (10 หลัก)<Req />
                 </label>
                 <input
                   inputMode="numeric"
                   maxLength={10} // กันกรอกด้วย
-                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100 ${
-                    phone && !phone10.test(phone) ? "ring-red-400/40" : ""
-                  }`}
+                  {...fieldProps("phone")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("phone")}`}
                   value={phone}
                   onChange={(e) => {
                     const onlyDigits = e.target.value.replace(/\D/g, "");
                     setPhone(onlyDigits.slice(0, 10)); // จำกัดแค่ 10 หลัก
                   }}
                 />
+                <FieldError k="phone" errors={errors} />
               </div>
 
               <div>
-                <label className="text-sm text-slate-300">อีเมล</label>
+                <label htmlFor="emp-email" className="text-sm text-slate-300">อีเมล<Req /></label>
                 <input
-                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100 ${
-                    email && !emailRx.test(email) ? "ring-red-400/40" : ""
-                  }`}
+                  {...fieldProps("email")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("email")}`}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
+                <FieldError k="email" errors={errors} />
               </div>
 
               <div>
-                <label className="text-sm text-slate-300">วันเกิด</label>
+                <label htmlFor="emp-birthday" className="text-sm text-slate-300">วันเกิด<Req /></label>
                 <input
                   type="date"
-                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  {...fieldProps("birthday")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("birthday")}`}
                   value={birthday}
                   onChange={(e) => setBirthday(e.target.value)}
                 />
+                <FieldError k="birthday" errors={errors} />
               </div>
 
               <div className="md:col-span-2">
-                <label className="text-sm text-slate-300">ที่อยู่</label>
+                <label htmlFor="emp-address" className="text-sm text-slate-300">ที่อยู่<Req /></label>
                 <input
-                  className="mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100"
+                  {...fieldProps("address")}
+                  className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10 text-slate-100${errRing("address")}`}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                 />
+                <FieldError k="address" errors={errors} />
               </div>
 
               <div>
@@ -835,18 +853,16 @@ export default function EmployeeCreatePage() {
             {createLogin && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                 <div className="md:col-span-1">
-                  <label className="text-sm text-slate-300">
-                    อีเมล (ใช้ล็อกอิน)
+                  <label htmlFor="emp-accountEmail" className="text-sm text-slate-300">
+                    อีเมล (ใช้ล็อกอิน)<Req />
                   </label>
                   <input
-                    className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ${
-                      accountEmail && !emailRx.test(accountEmail)
-                        ? "ring-red-400/40"
-                        : "ring-white/10"
-                    }`}
+                    {...fieldProps("accountEmail")}
+                    className={`mt-1 w-full rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10${errRing("accountEmail")}`}
                     value={accountEmail}
                     onChange={(e) => setAccountEmail(e.target.value)}
                   />
+                  <FieldError k="accountEmail" errors={errors} />
                 </div>
 
                 <div className="md:col-span-1">
@@ -878,6 +894,8 @@ export default function EmployeeCreatePage() {
             )}
           </div>
 
+          <ErrorSummary errorKeys={errorKeys} serverError={serverError} serverOnField={serverOnField} />
+
           {/* Actions */}
           <div className="flex gap-3">
             <button
@@ -887,9 +905,10 @@ export default function EmployeeCreatePage() {
             >
               ยกเลิก
             </button>
+            {/* Enabled whenever no save is in flight — problems are listed on click. */}
             <button
               type="submit"
-              disabled={!isFirstStepValid || submitting || resizing}
+              disabled={submitting || resizing}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 disabled:opacity-50 px-4 py-2.5 text-white ring-1 ring-white/10"
             >
               {submitting && <Loader2 className="size-4 animate-spin" />}

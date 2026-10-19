@@ -10,7 +10,14 @@ import { Loader2 } from "lucide-react";
 import { canAccess } from "@/lib/rbac/access";
 import { accountActionBlock, linkActionBlock } from "@/lib/rbac/accountRules";
 import EmployeeAccountLink from "./EmployeeAccountLink";
-import { TITLES_TH, thaiNameError, employeeDisplayName } from "@/lib/employeeName";
+import { TITLES_TH, employeeDisplayName } from "@/lib/employeeName";
+import {
+  FIELD_LABELS,
+  requiredFields,
+  validateEmployeeForm,
+  fieldFromServerError,
+} from "@/lib/employeeFormRules";
+import { Req, FieldError, ErrorSummary } from "./../../../../../../components/FormValidation";
 import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 
 const BANKS = [
@@ -145,14 +152,51 @@ export default function EmployeeEditForm({
     }
   }
 
+  /* -------------------- Validation (lib/employeeFormRules.js) -------------------- */
+  // Nothing is red until the first save; messages clear as fields become
+  // valid. A stored Thai name may not be cleared (same rule as the server).
+  const [attempted, setAttempted] = useState(false);
+  const [serverError, setServerError] = useState(null); // { message, field, value }
+  const formValues = {
+    titleTh, firstNameTh, lastNameTh, firstName, lastName,
+    departmentId: selectedDepId,
+    // The server keeps the stored position when none is picked.
+    positionId: positionId || employee.position || "",
+    dateOfJoin, phone, email, birthday, address,
+  };
+  const ruleOpts = { mode: "edit", stored: { ...employee, departmentId: employee.departmentId ? String(employee.departmentId) : "" } };
+  const clientErrors = attempted ? validateEmployeeForm(formValues, ruleOpts) : {};
+  const serverOnField =
+    serverError?.field && !clientErrors[serverError.field] && formValues[serverError.field] === serverError.value;
+  const errors = serverOnField ? { ...clientErrors, [serverError.field]: serverError.message } : clientErrors;
+  const errorKeys = Object.keys(FIELD_LABELS).filter((k) => errors[k]);
+  const required = requiredFields(ruleOpts);
+  const fieldProps = (key) => ({
+    id: `emp-${key}`,
+    required: required.includes(key),
+    error: errors[key],
+  });
+
+  function focusField(key) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`emp-${key}`);
+      if (!el) return;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.focus({ preventScroll: true });
+    });
+  }
+
   /* -------------------- Save employee -------------------- */
   async function saveEmployee() {
+    setAttempted(true);
+    setServerError(null);
+    const invalid = Object.keys(validateEmployeeForm(formValues, ruleOpts));
+    if (invalid.length) {
+      focusField(invalid[0]); // before any upload
+      return;
+    }
     setSavingEmp(true);
     try {
-      // Same rule as the server: a Thai name already stored may not be cleared.
-      const thaiError = thaiNameError({ titleTh, firstNameTh, lastNameTh }, { mode: "edit", current: employee });
-      if (thaiError) throw new Error(thaiError);
-
       let photoUrl = employee.photoUrl || "";
       let photoPublicId = employee.photoPublicId || "";
 
@@ -215,12 +259,18 @@ export default function EmployeeEditForm({
         body: JSON.stringify(payload),
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j?.message || "Update failed");
+      if (!res.ok) {
+        // Summary box, and the field when the API names one.
+        const field = fieldFromServerError(j);
+        setServerError({ message: j?.message || "บันทึกไม่สำเร็จ", field, value: field ? formValues[field] : undefined });
+        if (field) focusField(field);
+        return;
+      }
 
       alert("บันทึกข้อมูลพนักงานเรียบร้อย");
       location.reload();
     } catch (e) {
-      alert(e.message || "Save failed");
+      setServerError({ message: e.message || "บันทึกไม่สำเร็จ", field: null });
     } finally {
       setSavingEmp(false);
     }
@@ -360,12 +410,19 @@ export default function EmployeeEditForm({
           {/* Thai name — above the English name */}
           <div className="grid md:grid-cols-3 gap-4">
             <div>
-              <Label>คำนำหน้าชื่อ</Label>
+              <label htmlFor="emp-titleTh" className="text-sm" style={{ color: "#5E6A7E" }}>
+                คำนำหน้าชื่อ{required.includes("titleTh") && <Req />}
+              </label>
               <select
+                {...selectProps(fieldProps("titleTh"))}
                 value={titleTh}
                 onChange={(e) => setTitleTh(e.target.value)}
                 className="mt-1 w-full rounded-xl px-4 py-2.5"
-                style={{ background: "#FFFFFF", color: "#0D1B2A", border: "1px solid #E2E8F0" }}
+                style={{
+                  background: "#FFFFFF",
+                  color: "#0D1B2A",
+                  border: errors.titleTh ? "2px solid #EF4444" : "1px solid #E2E8F0",
+                }}
               >
                 {/* An empty choice only while nothing is stored yet. */}
                 {!employee.titleTh && <option value="">-- เลือก --</option>}
@@ -373,19 +430,23 @@ export default function EmployeeEditForm({
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
+              <FieldError k="titleTh" errors={errors} />
             </div>
-            <Input label="ชื่อ (ไทย)" value={firstNameTh} onChange={setFirstNameTh} />
-            <Input label="นามสกุล (ไทย)" value={lastNameTh} onChange={setLastNameTh} />
+            <Input label="ชื่อ (ไทย)" value={firstNameTh} onChange={setFirstNameTh} {...fieldProps("firstNameTh")} />
+            <Input label="นามสกุล (ไทย)" value={lastNameTh} onChange={setLastNameTh} {...fieldProps("lastNameTh")} />
           </div>
           <div className="grid md:grid-cols-2 gap-4">
-            <Input label="ชื่อ (อังกฤษ)" value={firstName} onChange={setFirstName} />
-            <Input label="นามสกุล (อังกฤษ)" value={lastName} onChange={setLastName} />
+            <Input label="ชื่อ (อังกฤษ)" value={firstName} onChange={setFirstName} {...fieldProps("firstName")} />
+            <Input label="นามสกุล (อังกฤษ)" value={lastName} onChange={setLastName} {...fieldProps("lastName")} />
             <Input label="ชื่อเล่น" value={nickName} onChange={setNickName} />
 
             {/* Department */}
             <div>
-              <Label>แผนก</Label>
+              <label htmlFor="emp-departmentId" className="text-sm" style={{ color: "#5E6A7E" }}>
+                แผนก<Req />
+              </label>
               <select
+                {...selectProps(fieldProps("departmentId"))}
                 className="select-dark appearance-none mt-1 w-full"
                 value={selectedDepId}
                 onChange={(e) => {
@@ -399,12 +460,16 @@ export default function EmployeeEditForm({
                   </option>
                 ))}
               </select>
+              <FieldError k="departmentId" errors={errors} />
             </div>
 
             {/* Position */}
             <div>
-              <Label>ตำแหน่ง</Label>
+              <label htmlFor="emp-positionId" className="text-sm" style={{ color: "#5E6A7E" }}>
+                ตำแหน่ง<Req />
+              </label>
               <select
+                {...selectProps(fieldProps("positionId"))}
                 className="select-dark appearance-none mt-1 w-full"
                 value={positionId}
                 onChange={(e) => setPositionId(e.target.value)}
@@ -416,6 +481,7 @@ export default function EmployeeEditForm({
                   </option>
                 ))}
               </select>
+              <FieldError k="positionId" errors={errors} />
             </div>
 
             <Input
@@ -430,22 +496,25 @@ export default function EmployeeEditForm({
               label="วันที่เริ่มงาน"
               value={dateOfJoin}
               onChange={setDateOfJoin}
+              {...fieldProps("dateOfJoin")}
             />
             <Input
               label="เบอร์โทร"
               value={phone}
               onChange={(v) => setPhone(v.replace(/\D/g, ""))}
+              {...fieldProps("phone")}
             />
-            <Input label="อีเมล" value={email} onChange={setEmail} />
+            <Input label="อีเมล" value={email} onChange={setEmail} {...fieldProps("email")} />
             <Input
               type="date"
               label="วันเกิด"
               value={birthday}
               onChange={setBirthday}
+              {...fieldProps("birthday")}
             />
 
             <div className="md:col-span-2">
-              <Input label="ที่อยู่" value={address} onChange={setAddress} />
+              <Input label="ที่อยู่" value={address} onChange={setAddress} {...fieldProps("address")} />
             </div>
 
             <div>
@@ -537,6 +606,8 @@ export default function EmployeeEditForm({
             </div>
           </div>
         </section>
+
+        <ErrorSummary errorKeys={errorKeys} serverError={serverError} serverOnField={serverOnField} />
 
         <div className="flex items-center gap-3">
           <button
@@ -692,23 +763,48 @@ export default function EmployeeEditForm({
 function Label({ children }) {
   return <label className="text-sm" style={{ color: "#5E6A7E" }}>{children}</label>;
 }
-function Input({ label, value, onChange, type = "text", readOnly = false }) {
+function Input({ label, value, onChange, type = "text", readOnly = false, id, required = false, error }) {
   return (
     <div>
-      {label && <Label>{label}</Label>}
+      {label && (
+        <label htmlFor={id} className="text-sm" style={{ color: "#5E6A7E" }}>
+          {label}
+          {required && <Req />}
+        </label>
+      )}
       <input
+        id={id}
         type={type}
         value={value ?? ""}
         readOnly={readOnly}
         onChange={(e) => onChange?.(e.target.value)}
+        aria-required={required ? "true" : undefined}
+        aria-invalid={error ? "true" : undefined}
+        aria-describedby={error && id ? `${id}-error` : undefined}
         className="mt-1 w-full rounded-xl px-4 py-2.5"
         style={{
           background: "#FFFFFF",
           color: "#0D1B2A",
-          border: "1px solid #E2E8F0",
+          border: error ? "2px solid #EF4444" : "1px solid #E2E8F0",
           opacity: readOnly ? 0.7 : 1,
         }}
       />
+      {error && id && (
+        <p id={`${id}-error`} className="mt-1 text-xs text-red-500">
+          {error}
+        </p>
+      )}
     </div>
   );
+}
+
+/** <select> wrapper with the same required marker / error handling as Input. */
+function selectProps({ id, required, error }) {
+  return {
+    id,
+    "aria-required": required ? "true" : undefined,
+    "aria-invalid": error ? "true" : undefined,
+    "aria-describedby": error ? `${id}-error` : undefined,
+    style: error ? { outline: "2px solid #EF4444", outlineOffset: 0 } : undefined,
+  };
 }

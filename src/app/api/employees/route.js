@@ -12,6 +12,10 @@ import { canAccess } from "@/lib/rbac/access";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
 import { newAccountPassword } from "@/lib/accounts";
 import { thaiNameError } from "@/lib/employeeName";
+import { fieldFromServerError } from "@/lib/employeeFormRules";
+
+// Which Thai-name field a thaiNameError message is about (for the form).
+const thaiErrorField = (message) => fieldFromServerError({ message });
 import { tooLargeRequest } from "@/lib/server/uploadRules";
 import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/uploadLimits";
 
@@ -63,14 +67,14 @@ export async function POST(req) {
     const departmentId = g("departmentId");
     const positionId   = g("positionId");
     if (!mongoose.isValidObjectId(departmentId))
-      return NextResponse.json({ ok:false, message:"departmentId invalid" }, { status:400 });
+      return NextResponse.json({ ok:false, message:"departmentId invalid", field:"departmentId" }, { status:400 });
     if (!mongoose.isValidObjectId(positionId))
-      return NextResponse.json({ ok:false, message:"positionId invalid" }, { status:400 });
+      return NextResponse.json({ ok:false, message:"positionId invalid", field:"positionId" }, { status:400 });
 
     const dep = await Department.findById(departmentId).lean();
-    if (!dep)  return NextResponse.json({ ok:false, message:"department not found" }, { status:404 });
+    if (!dep)  return NextResponse.json({ ok:false, message:"department not found", field:"departmentId" }, { status:404 });
     const pos = (dep.positions || []).find(p => String(p._id) === String(positionId));
-    if (!pos)  return NextResponse.json({ ok:false, message:"position invalid" }, { status:400 });
+    if (!pos)  return NextResponse.json({ ok:false, message:"position invalid", field:"positionId" }, { status:400 });
 
     const department = dep.code || dep.name || "UNKNOWN";
     const position   = pos.name;
@@ -96,7 +100,7 @@ export async function POST(req) {
     const firstNameTh = g("firstNameTh");
     const lastNameTh  = g("lastNameTh");
     const thaiError = thaiNameError({ titleTh, firstNameTh, lastNameTh }, { mode: "create" });
-    if (thaiError) return NextResponse.json({ ok:false, message:thaiError }, { status:400, headers:NO_STORE });
+    if (thaiError) return NextResponse.json({ ok:false, message:thaiError, field:thaiErrorField(thaiError) }, { status:400, headers:NO_STORE });
 
     const emergency = {
       firstName: g("emergency.firstName"),
@@ -131,7 +135,12 @@ export async function POST(req) {
         throw e;
       }
       if (!accountEmail) {
-        return NextResponse.json({ ok:false, message:"ข้อมูลล็อกอินไม่ถูกต้อง" }, { status:400, headers:NO_STORE });
+        return NextResponse.json({ ok:false, message:"ข้อมูลล็อกอินไม่ถูกต้อง", field:"accountEmail" }, { status:400, headers:NO_STORE });
+      }
+      // Before anything is written: a taken email used to fail later as a
+      // raw duplicate-key 500.
+      if (await User.exists({ email: accountEmail.toLowerCase() })) {
+        return NextResponse.json({ ok:false, message:"อีเมลนี้ถูกใช้กับบัญชีอื่นแล้ว", field:"accountEmail" }, { status:409, headers:NO_STORE });
       }
     }
 
