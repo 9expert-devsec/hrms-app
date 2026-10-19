@@ -44,6 +44,7 @@ import {
   KeyRound,
   MapPin,
   FolderOpen,
+  Mail,
 } from "lucide-react";
 
 export const menuConfig = [
@@ -162,6 +163,14 @@ export const menuConfig = [
             icon: FolderOpen,
             label: "คำขอทำงานนอกสถานที่ทั้งหมด",
             href: "/dashboard/offsite/all",
+            pageKey: "offsite_hr",
+          },
+          {
+            key: "time.email-log",
+            type: "link",
+            icon: Mail,
+            label: "บันทึกการส่งอีเมล",
+            href: "/dashboard/offsite/all/email-log",
             pageKey: "offsite_hr",
           },
           {

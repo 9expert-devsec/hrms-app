@@ -7,6 +7,7 @@ import Department from "@/models/Department";
 import Counter from "@/models/Counter";
 import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 import { canAccess } from "@/lib/rbac/access";
+import { notifyTransitions } from "@/lib/offsiteNotify";
 import { HEAD_FIELDS } from "@/lib/hod";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 import {
@@ -93,7 +94,12 @@ function addEvent(doc, session, type, detail = "") {
   doc.events.push({ at: new Date(), by, type, detail });
 }
 
-async function save(doc) {
+/**
+ * Save, then notify: the events this action appended (since loadOwn marked
+ * the count) go to lib/offsiteNotify.js — only after the write succeeded.
+ */
+async function save(doc, session) {
+  const mark = doc.$locals.eventMark ?? doc.events.length;
   try {
     await doc.save();
   } catch (e) {
@@ -102,6 +108,8 @@ async function save(doc) {
     }
     throw e;
   }
+  await notifyTransitions(doc, doc.events.slice(mark), session);
+  doc.$locals.eventMark = doc.events.length;
   return doc;
 }
 
@@ -287,6 +295,7 @@ async function loadOwn(session, id, { readOnly = false } = {}) {
   if (!emp && !(readOnly && hasHrView(session.user))) throw new OffsiteError("บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน", 403);
   if (!doc) throw new OffsiteError("ไม่พบคำขอ", 404);
   if (!canRead(doc, emp?._id, session.user)) throw new OffsiteError("ไม่มีสิทธิ์เข้าถึงคำขอนี้", 403);
+  doc.$locals.eventMark = doc.events.length; // save() notifies only what this action adds
   return { doc, emp, isCreator: !!emp && str(doc.createdBy) === str(emp._id) };
 }
 
@@ -649,7 +658,7 @@ export async function createRequest(session, input = {}) {
     revision: 0,
   });
   addEvent(doc, session, "created", fields.jobName);
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, true, session.user);
 }
 
@@ -662,7 +671,7 @@ export async function updateRequest(session, id, input = {}) {
   doc.members = await buildMembers(input.members, emp, doc.members);
   doc.leader = input.leader;
   addEvent(doc, session, "updated");
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -730,7 +739,7 @@ export async function sendInvitations(session, id, opts) {
 
   // Last, so a refused send (409 above) consumes no number.
   if (!doc.docNo) doc.docNo = await nextDocNo();
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -760,7 +769,7 @@ export async function respondToInvitation(session, id, { action, reason } = {}, 
   } else {
     throw new OffsiteError("action ต้องเป็น accept หรือ decline", 400);
   }
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -778,7 +787,7 @@ export async function submitStep1(session, id, opts) {
   doc.set(await creatorSnapshot(emp));
   addEvent(doc, session, "step1_signed", nameOf(emp));
   await activateNext(doc, session, deps);
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -789,7 +798,7 @@ export async function cancelRequest(session, id, { reason } = {}) {
   const why = requireReason(reason, "ยกเลิก");
   doc.status = "cancelled";
   addEvent(doc, session, "cancelled", why);
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -830,7 +839,7 @@ export async function saveHrSummary(session, id, hrSummary) {
   if (n !== 3 || a.status !== "pending") throw new OffsiteError("แก้ไขส่วนสำหรับฝ่ายบุคคลไม่ได้ในขั้นนี้", 409);
   applyHrSummary(doc, hrSummary);
   addEvent(doc, session, "hr_summary_saved", a.approverName);
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -855,7 +864,7 @@ export async function approveStep(session, id, { step, hrSummary } = {}, opts) {
   addPastApprover(doc, emp._id);
   addEvent(doc, session, `step${n}_approved`, `${a.approverName}${self ? ` (${SELF_APPROVAL_LABEL})` : ""}`);
   await activateNext(doc, session, deps); // 409 here → nothing saved
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -868,7 +877,7 @@ export async function reconfirmStep(session, id, { step } = {}, opts) {
   addPastApprover(doc, emp._id);
   addEvent(doc, session, `step${n}_reconfirmed`, a.approverName);
   await activateNext(doc, session, deps);
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
@@ -880,7 +889,7 @@ export async function rejectStep(session, id, { step, reason } = {}) {
   addPastApprover(doc, emp._id);
   addEvent(doc, session, `step${n}_rejected`, `${a.approverName}: ${why}`);
   markReturned(doc, session, { step: n, byName: a.approverName, reason: why });
-  await save(doc);
+  await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
