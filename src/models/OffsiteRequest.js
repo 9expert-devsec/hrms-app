@@ -42,6 +42,33 @@ const ApprovalSchema = new Schema(
     signedAt: { type: Date, default: null },
     confirmedAt: { type: Date, default: null },
     reason: { type: String, default: "" },
+    // The approver is the creator or a member of this request (allowed, but tagged).
+    selfApproval: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+/** Why the request was last returned (rejection at step 2/3, or a member decline = step 0). */
+const ReturnInfoSchema = new Schema(
+  {
+    at: Date,
+    step: Number,
+    byName: String,
+    reason: String,
+    revision: Number,
+  },
+  { _id: false }
+);
+
+/** What changed between the returned revision and the resent one. */
+const ChangeSummarySchema = new Schema(
+  {
+    fromRevision: Number,
+    toRevision: Number,
+    fields: { type: [String], default: [] }, // offsiteRules.CHANGE_FIELD_LABELS keys
+    membersAdded: { type: [String], default: [] }, // names
+    membersRemoved: { type: [String], default: [] },
+    memberSetChanged: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -58,7 +85,8 @@ const EventSchema = new Schema(
 
 const OffsiteRequestSchema = new Schema(
   {
-    docNo: { type: String, required: true, unique: true }, // OS-2569-0001
+    // OS-2569-0001, assigned at the FIRST send of invitations (drafts have none).
+    docNo: { type: String, default: undefined },
     createdBy: { type: Schema.Types.ObjectId, ref: "Employee", required: true },
     createdByUser: { type: Schema.Types.ObjectId, ref: "User", required: true },
 
@@ -92,10 +120,25 @@ const OffsiteRequestSchema = new Schema(
     // Job details (lib/offsiteRules.detailsKey) as last sent to members: a
     // resend with different details re-invites everyone.
     sentDetailsKey: { type: String, default: "" },
+    // Everyone who ever approved or rejected a step (read access + "ที่ฉันเคยอนุมัติ").
+    pastApprovers: { type: [{ type: Schema.Types.ObjectId, ref: "Employee" }], default: [] },
+    returnInfo: { type: ReturnInfoSchema, default: null },
+    // Internal: details + members as they were when returned; compared on resend.
+    returnSnapshot: { type: Schema.Types.Mixed, default: null },
+    changeSummary: { type: ChangeSummarySchema, default: null },
     events: { type: [EventSchema], default: [] },
   },
   { timestamps: true, optimisticConcurrency: true }
 );
+
+// Unique only once assigned. Replaces OS-1's plain unique `docNo_1`, which
+// must be dropped where it exists (it would treat every draft's missing
+// docNo as a duplicate null).
+OffsiteRequestSchema.index(
+  { docNo: 1 },
+  { unique: true, name: "docNo_unique_when_set", partialFilterExpression: { docNo: { $type: "string" } } }
+);
+OffsiteRequestSchema.index({ pastApprovers: 1 });
 
 OffsiteRequestSchema.index({ createdBy: 1, createdAt: -1 });
 OffsiteRequestSchema.index({ "members.employee": 1, status: 1 });

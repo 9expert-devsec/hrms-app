@@ -11,6 +11,10 @@ import {
   respondToInvitation,
   submitStep1,
   cancelRequest,
+  approveStep,
+  rejectStep,
+  reconfirmStep,
+  saveHrSummary,
   OffsiteError,
   offsiteErrorResponse,
 } from "@/lib/offsite";
@@ -50,6 +54,10 @@ export async function PATCH(req, ctx) {
  *   decline  — an invited member declines (reason required)
  *   submit   — creator signs step 1
  *   cancel   — creator cancels (reason required)
+ *   approve  — the active step's approver signs { step?, hrSummary? (step 3) }
+ *   reject   — the active step's approver declines { step?, reason }
+ *   reconfirm — a needs_reconfirm step's approver confirms { step? }
+ *   hr_summary — step 3 approver saves the HR section { hrSummary }
  */
 export async function POST(req, ctx) {
   const { id } = await ctx.params;
@@ -65,6 +73,14 @@ export async function POST(req, ctx) {
         return submitStep1(session, id);
       case "cancel":
         return cancelRequest(session, id, { reason: body.reason });
+      case "approve":
+        return approveStep(session, id, { step: body.step, hrSummary: body.hrSummary });
+      case "reject":
+        return rejectStep(session, id, { step: body.step, reason: body.reason });
+      case "reconfirm":
+        return reconfirmStep(session, id, { step: body.step });
+      case "hr_summary":
+        return saveHrSummary(session, id, body.hrSummary);
       default:
         throw new OffsiteError("action ไม่ถูกต้อง", 400);
     }

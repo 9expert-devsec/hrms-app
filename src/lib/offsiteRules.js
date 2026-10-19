@@ -168,22 +168,107 @@ export function detailsKey(r) {
 
 export const PROGRESS_STEPS = ["สมาชิกตอบรับ", "ผู้สร้างเซ็น", "บัญชี", "HR", "อนุมัติแล้ว"];
 
+/** Approval statuses in which a step is the one being acted on. */
+export const ACTIVE_APPROVAL_STATUSES = ["pending", "needs_reconfirm"];
+
+/** The step (2 or 3) waiting for its approver while in_approval, or null. */
+export function activeStepOf(r) {
+  if (r?.status !== "in_approval") return null;
+  const a = (r.approvals || []).find((x) => x.step >= 2 && ACTIVE_APPROVAL_STATUSES.includes(x.status));
+  return a ? a.step : null;
+}
+
 /**
  * Progress-bar position (index into PROGRESS_STEPS) for a request:
- * draft / inviting / returned → 0, members_ready → 1, in_approval → the
- * pending step (2 or 3), approved → 4. A cancelled request reports where it
- * stopped, with `cancelled: true`.
+ * draft / inviting → 0, members_ready → 1, in_approval → the active step
+ * (2 or 3), approved → 4, returned → the step that rejected (0 for a member
+ * decline). A cancelled request reports where it stopped, with `cancelled`.
  */
 export function progressOf(r) {
   const approvals = Array.isArray(r?.approvals) ? r.approvals : [];
   const byStep = (n) => approvals.find((a) => a.step === n);
-  const position = (() => {
-    if (r?.status === "approved") return 4;
-    if (r?.status === "members_ready") return 1;
+  const firstOpen = () => {
     if (byStep(1)?.status !== "approved") return 0;
     if (byStep(2)?.status !== "approved") return 2;
     if (byStep(3)?.status !== "approved") return 3;
     return 4;
+  };
+  const position = (() => {
+    switch (r?.status) {
+      case "approved":
+        return 4;
+      case "members_ready":
+        return 1;
+      case "draft":
+      case "inviting":
+        return 0;
+      case "returned": {
+        const rejected = approvals.find((a) => a.status === "rejected");
+        return rejected ? rejected.step : 0;
+      }
+      default:
+        return firstOpen();
+    }
   })();
   return { position, cancelled: r?.status === "cancelled", done: r?.status === "approved" };
 }
+
+/** What a step asks of its approver after a return. */
+export const APPROVAL_ASK_LABELS = {
+  needs_resign: "เซ็นใหม่",
+  needs_reconfirm: "ตรวจสอบและยืนยันอีกครั้ง",
+};
+
+export const SELF_APPROVAL_LABEL = "อนุมัติคำขอที่ตนเองอยู่ในกลุ่ม";
+
+/* ── HR section "สำหรับฝ่ายบุคคล" (step 3) ──────────────────────── */
+
+export const DEFAULT_ALLOWANCE_PER_PERSON = 500; // company policy
+
+/** Display order = ALLOWANCE_OPTIONS. `…` is where the amount goes. */
+export const ALLOWANCE_OPTION_LABELS = {
+  per_person: "เบี้ยเลี้ยง … บาท/ท่าน",
+  per_person_plus_travel: "เบี้ยเลี้ยง … บาท/ท่าน และค่าเดินทางตามจริง (กรณีไปทำงานมากกว่า 1 ที่)",
+  travel_actual: "ค่าเดินทางตามจริง",
+  no_allowance: "ไม่เบิกเบี้ยเลี้ยง",
+};
+
+/** Options that pay a per-person allowance (amount shown and required). */
+export function allowanceNeedsAmount(option) {
+  return option === "per_person" || option === "per_person_plus_travel";
+}
+
+/** Validate the HR section. Returns { field: message } (empty = valid). */
+export function validateHrSummary(input = {}) {
+  const errors = {};
+  if (!ALLOWANCE_OPTIONS.includes(input.allowanceOption)) {
+    errors.allowanceOption = "กรุณาเลือกรายการเบี้ยเลี้ยง";
+    return errors;
+  }
+  if (allowanceNeedsAmount(input.allowanceOption)) {
+    const n = Number(input.amountPerPerson);
+    if (input.amountPerPerson === "" || input.amountPerPerson == null) errors.amountPerPerson = "กรุณากรอกจำนวนเงินต่อท่าน";
+    else if (!Number.isInteger(n) || n <= 0) errors.amountPerPerson = "จำนวนเงินต้องเป็นจำนวนเต็มบวก";
+    else if (n > 100000) errors.amountPerPerson = "จำนวนเงินสูงเกินไป";
+  }
+  if (clean(input.note).length > 1000) errors.note = "หมายเหตุยาวเกิน 1000 ตัวอักษร";
+  return errors;
+}
+
+/** "รวม N ท่าน × X บาท = Y บาท" parts, or null when the option pays no allowance. */
+export function allowanceTotal(hrSummary, memberCount) {
+  if (!allowanceNeedsAmount(hrSummary?.allowanceOption)) return null;
+  const amount = Number(hrSummary.amountPerPerson);
+  if (!Number.isInteger(amount) || amount <= 0) return null;
+  return { count: memberCount, amount, total: memberCount * amount };
+}
+
+export function formatBaht(n) {
+  return Number(n).toLocaleString("th-TH");
+}
+
+/** Labels for the "สิ่งที่เปลี่ยนจากครั้งก่อน" list. */
+export const CHANGE_FIELD_LABELS = {
+  ...OFFSITE_FIELD_LABELS,
+  duties: "หน้าที่ของสมาชิก",
+};
