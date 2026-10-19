@@ -40,6 +40,7 @@ export const HRMS_PAGES = [
       { key: "self_leave_balance", label: "วันลาคงเหลือ", href: "/dashboard/leave/balance", match: "prefix" },
       { key: "leave_calendar", label: "ปฏิทินการลา", href: "/dashboard/leave/calendar", match: "prefix" },
       { key: "self_leave_document", label: "เอกสารการลา", href: "/dashboard/leave/document", match: "prefix" },
+      { key: "offsite_self", label: "ทำงานนอกสถานที่", href: "/dashboard/offsite", match: "prefix" },
     ],
   },
   {

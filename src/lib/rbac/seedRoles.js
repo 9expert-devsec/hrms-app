@@ -14,7 +14,7 @@
  *     for roles that never had them in the menu.
  */
 
-/** Self-service keys (10) plus the dashboard — pre-ticked on every role. */
+/** Self-service keys (11) plus the dashboard — pre-ticked on every role. */
 export const SELF = [
   "dashboard",
   "self_profile",
@@ -27,6 +27,7 @@ export const SELF = [
   "self_leave_balance",
   "leave_calendar",
   "self_leave_document",
+  "offsite_self",
 ];
 
 export const SEED_ROLES = [
