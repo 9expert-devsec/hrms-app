@@ -4,21 +4,30 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Plus, MapPin, CalendarDays, Clock } from "lucide-react";
-import { formatWorkDateTh, PROGRESS_STEPS } from "@/lib/offsiteRules";
-import { CARD, NAVY, SLATE, BLUE, Button, ErrorBox, StatusChip, MemberStatusChip, api } from "./ui";
+import { APPROVAL_ASK_LABELS, formatWorkDateTh, PROGRESS_STEPS } from "@/lib/offsiteRules";
+import { CARD, NAVY, SLATE, BLUE, Button, Chip, ErrorBox, StatusChip, MemberStatusChip, api } from "./ui";
 
+// `countKey`: field of GET /api/offsite/count shown as a red count on the tab.
 const TABS = [
   { key: "mine", label: "คำขอของฉัน" },
-  { key: "invites", label: "คำเชิญที่รอฉัน" },
+  { key: "invites", label: "คำเชิญที่รอฉัน", countKey: "invites" },
+  { key: "approvals", label: "รอฉันอนุมัติ", countKey: "approvals" },
   { key: "member", label: "ที่ฉันร่วมเดินทาง" },
+  { key: "approved_by_me", label: "ที่ฉันเคยอนุมัติ" },
 ];
+
+const EMPTY = {
+  invites: "ไม่มีคำเชิญที่รอคุณตอบ",
+  approvals: "ไม่มีคำขอที่รอคุณอนุมัติ",
+  approved_by_me: "ยังไม่มีคำขอที่คุณเคยอนุมัติ",
+};
 
 export default function OffsiteList() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = TABS.some((t) => t.key === searchParams.get("tab")) ? searchParams.get("tab") : "mine";
   const [items, setItems] = useState(null);
-  const [inviteCount, setInviteCount] = useState(0);
+  const [counts, setCounts] = useState({});
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -28,7 +37,7 @@ export default function OffsiteList() {
       .then((j) => setItems(j.items || []))
       .catch((e) => setError(e.message));
     api("/api/offsite/count")
-      .then((j) => setInviteCount(j.invites || 0))
+      .then(setCounts)
       .catch(() => {});
   }, [tab]);
 
@@ -54,9 +63,9 @@ export default function OffsiteList() {
               style={{ background: active ? BLUE : "#FFFFFF", color: active ? "#FFFFFF" : NAVY, border: "1px solid rgba(0,92,255,0.15)" }}
             >
               {t.label}
-              {t.key === "invites" && inviteCount > 0 && (
+              {t.countKey && counts[t.countKey] > 0 && (
                 <span className="rounded-full px-1.5 text-xs font-bold" style={{ background: "#DC2626", color: "#FFFFFF" }}>
-                  {inviteCount}
+                  {counts[t.countKey]}
                 </span>
               )}
             </Link>
@@ -68,7 +77,7 @@ export default function OffsiteList() {
       {!items && !error && <Loader2 className="animate-spin" size={18} />}
       {items && items.length === 0 && (
         <div className="p-8 text-center text-sm" style={{ ...CARD, color: SLATE }}>
-          {tab === "invites" ? "ไม่มีคำเชิญที่รอคุณตอบ" : "ยังไม่มีคำขอ"}
+          {EMPTY[tab] || "ยังไม่มีคำขอ"}
         </div>
       )}
 
@@ -79,7 +88,7 @@ export default function OffsiteList() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-xs" style={{ color: SLATE }}>
-                    {it.docNo}
+                    {it.docNo || "ยังไม่ออกเลข"}
                     {tab !== "mine" && ` · โดย ${it.creatorNameTh}`}
                   </div>
                   <div className="font-semibold" style={{ color: NAVY }}>{it.jobName}</div>
@@ -92,6 +101,11 @@ export default function OffsiteList() {
                 <div className="flex flex-col items-end gap-1">
                   <StatusChip status={it.status} />
                   {tab !== "mine" && it.myStatus && <MemberStatusChip status={it.myStatus} />}
+                  {tab === "approvals" && it.activeStepStatus && (
+                    <Chip tone={it.activeStepStatus === "needs_reconfirm" ? "amber" : "blue"}>
+                      ขั้นที่ {it.activeStep} · {APPROVAL_ASK_LABELS[it.activeStepStatus] || "รออนุมัติ"}
+                    </Chip>
+                  )}
                   <span className="text-xs" style={{ color: SLATE }}>
                     ตอบรับ {it.acceptedCount}/{it.memberCount} · {it.status === "cancelled" ? "ยกเลิก" : PROGRESS_STEPS[it.progress.position]}
                   </span>
