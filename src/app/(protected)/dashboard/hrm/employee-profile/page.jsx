@@ -22,7 +22,9 @@ import {
   KeyRound,
   ArrowLeft,
   PenLine,
+  MapPin,
 } from "lucide-react";
+import OffsiteHistory from "../../../../../components/offsite/OffsiteHistory";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +71,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
   if (!isSelf && !access.canView) notFound();
 
   const canManage = canAccess(session.user, "employees");
+  const canSeeOffsite = canAccess(session.user, "offsite_hr");
   // Bank details and emergency contact: owner, employees holders, superadmin.
   const canSeeSensitive = isSelf || access.canSeePrivate;
   const canEdit = isSelf || canManage;
@@ -237,6 +240,13 @@ export default async function EmployeeProfilePage({ searchParams }) {
               <Info label="Date of Join" value={fmtDate(e.dateOfJoin)} />
             </dl>
           </Card>
+
+          {/* HR view (offsite_hr / superadmin): approved off-site work. */}
+          {canSeeOffsite && (
+            <Card title="ประวัติทำงานนอกสถานที่" Icon={MapPin}>
+              <OffsiteHistory employeeId={String(e._id)} />
+            </Card>
+          )}
 
           <Card title="Emergency Contact" Icon={ShieldAlert}>
             {emgPrimary ? (

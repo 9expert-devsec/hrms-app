@@ -18,6 +18,7 @@ import {
   RotateCcw,
   AlertTriangle,
   UserCheck,
+  Printer,
 } from "lucide-react";
 import {
   APPROVAL_ASK_LABELS,
@@ -245,6 +246,11 @@ export default function OffsiteDetail({ id }) {
           <ArrowLeft size={14} /> กลับ
         </Link>
         <div className="flex flex-wrap gap-2">
+          {v.canPrint && (
+            <Button variant="secondary" onClick={() => router.push(`/dashboard/offsite/${r._id}/print`)}>
+              <Printer size={14} /> พิมพ์ / PDF
+            </Button>
+          )}
           {v.canEdit && (
             <Button variant="secondary" onClick={() => router.push(`/dashboard/offsite/${r._id}/edit`)}>
               <Pencil size={14} /> แก้ไข

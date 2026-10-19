@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Plus, MapPin, CalendarDays, Clock } from "lucide-react";
 import { APPROVAL_ASK_LABELS, formatWorkDateTh, PROGRESS_STEPS } from "@/lib/offsiteRules";
 import { CARD, NAVY, SLATE, BLUE, Button, Chip, ErrorBox, StatusChip, MemberStatusChip, api } from "./ui";
+import OffsiteHistory from "./OffsiteHistory";
 
 // `countKey`: field of GET /api/offsite/count shown as a red count on the tab.
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
   { key: "approvals", label: "รอฉันอนุมัติ", countKey: "approvals" },
   { key: "member", label: "ที่ฉันร่วมเดินทาง" },
   { key: "approved_by_me", label: "ที่ฉันเคยอนุมัติ" },
+  { key: "history", label: "ประวัติของฉัน" },
 ];
 
 const EMPTY = {
@@ -33,9 +35,11 @@ export default function OffsiteList() {
   useEffect(() => {
     setItems(null);
     setError("");
-    api(`/api/offsite/requests?box=${tab}`)
-      .then((j) => setItems(j.items || []))
-      .catch((e) => setError(e.message));
+    if (tab !== "history") {
+      api(`/api/offsite/requests?box=${tab}`)
+        .then((j) => setItems(j.items || []))
+        .catch((e) => setError(e.message));
+    }
     api("/api/offsite/count")
       .then(setCounts)
       .catch(() => {});
@@ -73,8 +77,15 @@ export default function OffsiteList() {
         })}
       </div>
 
+      {tab === "history" && (
+        <section className="space-y-3 p-5" style={CARD}>
+          <h2 style={{ color: NAVY, fontWeight: 600 }}>ประวัติทำงานนอกสถานที่ของฉัน</h2>
+          <OffsiteHistory />
+        </section>
+      )}
+
       <ErrorBox>{error}</ErrorBox>
-      {!items && !error && <Loader2 className="animate-spin" size={18} />}
+      {tab !== "history" && !items && !error && <Loader2 className="animate-spin" size={18} />}
       {items && items.length === 0 && (
         <div className="p-8 text-center text-sm" style={{ ...CARD, color: SLATE }}>
           {EMPTY[tab] || "ยังไม่มีคำขอ"}
