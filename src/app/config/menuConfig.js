@@ -43,6 +43,7 @@ import {
   CalendarOff,
   KeyRound,
   MapPin,
+  FolderOpen,
 } from "lucide-react";
 
 export const menuConfig = [
@@ -154,6 +155,14 @@ export const menuConfig = [
             pageKey: "offsite_self",
             // Count from components/useMenuBadges.js (invitations waiting for me).
             badgeKey: "offsite_invites",
+          },
+          {
+            key: "time.offsite-all",
+            type: "link",
+            icon: FolderOpen,
+            label: "คำขอทำงานนอกสถานที่ทั้งหมด",
+            href: "/dashboard/offsite/all",
+            pageKey: "offsite_hr",
           },
           {
             key: "time.ot-approve",

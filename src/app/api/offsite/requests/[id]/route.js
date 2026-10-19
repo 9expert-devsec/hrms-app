@@ -3,7 +3,7 @@
 // are enforced in lib/offsite.js.
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
-import { requirePageApi } from "@/lib/rbac/guard";
+import { requireAnyPageApi } from "@/lib/rbac/guard";
 import {
   getRequest,
   updateRequest,
@@ -23,8 +23,9 @@ export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
+// offsite_hr holders may read (lib/offsite.js grants them no actions).
 async function run(tag, fn) {
-  const gate = await requirePageApi("offsite_self");
+  const gate = await requireAnyPageApi(["offsite_self", "offsite_hr"]);
   if (gate.res) return gate.res;
   try {
     await dbConnect();

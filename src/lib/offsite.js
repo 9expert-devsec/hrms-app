@@ -6,6 +6,7 @@ import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import Counter from "@/models/Counter";
 import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
+import { canAccess } from "@/lib/rbac/access";
 import { HEAD_FIELDS } from "@/lib/hod";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 import {
@@ -260,8 +261,15 @@ function inRequest(doc, empId) {
   return str(doc.createdBy) === me || (doc.members || []).some((m) => str(m.employee) === me);
 }
 
+/** HR-wide read (offsite_hr) or superadmin: every request except drafts (superadmin: drafts too). */
+export function hasHrView(user) {
+  return user?.isSuperadmin === true || canAccess(user, "offsite_hr");
+}
+
 function canRead(doc, empId, user) {
   if (user?.isSuperadmin === true) return true;
+  // offsite_hr reads everything but drafts; reading grants no actions.
+  if (canAccess(user, "offsite_hr") && doc.status !== "draft") return true;
   const me = str(empId);
   if (!me) return false;
   if (inRequest(doc, me)) return true;
@@ -269,12 +277,17 @@ function canRead(doc, empId, user) {
   return (doc.approvals || []).some((a) => str(a.approver) === me);
 }
 
-async function loadOwn(session, id) {
+/**
+ * The request and the caller's employee. `readOnly` lets an HR-view holder
+ * without a linked employee read (emp = null); every write needs an employee.
+ */
+async function loadOwn(session, id, { readOnly = false } = {}) {
   if (!mongoose.isValidObjectId(id)) throw new OffsiteError("ไม่พบคำขอ", 404);
-  const [doc, emp] = await Promise.all([OffsiteRequest.findById(id), viewerEmployee(session)]);
+  const [doc, emp] = await Promise.all([OffsiteRequest.findById(id), getOwnEmployee(session, VIEWER_FIELDS)]);
+  if (!emp && !(readOnly && hasHrView(session.user))) throw new OffsiteError("บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน", 403);
   if (!doc) throw new OffsiteError("ไม่พบคำขอ", 404);
-  if (!canRead(doc, emp._id, session.user)) throw new OffsiteError("ไม่มีสิทธิ์เข้าถึงคำขอนี้", 403);
-  return { doc, emp, isCreator: str(doc.createdBy) === str(emp._id) };
+  if (!canRead(doc, emp?._id, session.user)) throw new OffsiteError("ไม่มีสิทธิ์เข้าถึงคำขอนี้", 403);
+  return { doc, emp, isCreator: !!emp && str(doc.createdBy) === str(emp._id) };
 }
 
 function requireCreator(isCreator) {
@@ -397,7 +410,7 @@ function serialize(doc) {
   };
 }
 
-function viewerFlags(doc, empId, isCreator) {
+function viewerFlags(doc, empId, isCreator, user) {
   const me = str(empId);
   const mine = doc.members.find((m) => str(m.employee) === me) || null;
   const active = activeStepOf(doc);
@@ -418,18 +431,134 @@ function viewerFlags(doc, empId, isCreator) {
     canReconfirm: isActiveApprover && a.status === "needs_reconfirm",
     canReject: isActiveApprover,
     canEditHr: isActiveApprover && active === 3 && a.status === "pending",
+    // Printable form: the creator, offsite_hr holders, superadmin.
+    canPrint: isCreator || (hasHrView(user) && doc.status !== "draft") || user?.isSuperadmin === true,
   };
 }
 
-function result(doc, emp, isCreator) {
-  return { request: serialize(doc), viewer: viewerFlags(doc, emp._id, isCreator) };
+// `user` is session.user; every caller passes it (writes run with a session).
+function result(doc, emp, isCreator, user) {
+  return { request: serialize(doc), viewer: viewerFlags(doc, emp?._id, isCreator, user) };
 }
 
 /* ── reads ─────────────────────────────────────────────────── */
 
 export async function getRequest(session, id) {
-  const { doc, emp, isCreator } = await loadOwn(session, id);
-  return result(doc, emp, isCreator);
+  const { doc, emp, isCreator } = await loadOwn(session, id, { readOnly: true });
+  return result(doc, emp, isCreator, session.user);
+}
+
+/**
+ * The printable form ("แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่"): the
+ * creator, offsite_hr holders (not drafts) and superadmin. Members and
+ * approvers use the detail page — 403 here.
+ */
+export async function getPrintable(session, id) {
+  const { doc, isCreator } = await loadOwn(session, id, { readOnly: true });
+  const user = session.user;
+  if (!(isCreator || user?.isSuperadmin === true || (canAccess(user, "offsite_hr") && doc.status !== "draft"))) {
+    throw new OffsiteError("เฉพาะผู้สร้างคำขอและฝ่ายบุคคลเท่านั้นที่พิมพ์แบบฟอร์มได้", 403);
+  }
+  return serialize(doc);
+}
+
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+/**
+ * HR-wide list (offsite_hr; the route guards it). Every status but draft.
+ * Filters: status, month "YYYY-MM" (workDate), department (creator's
+ * department snapshot), q (docNo, job name, creator / member names — Thai
+ * from the snapshots, English and nicknames via the Employee name fields;
+ * every word must match). Newest work date first, paged.
+ */
+export async function listAllRequests({ status, month, department, q, page = 1, pageSize = 20 } = {}) {
+  const and = [{ status: { $ne: "draft" } }];
+  if (status && status !== "draft") and.push({ status });
+  const m = typeof month === "string" ? month.match(MONTH_RE) : null;
+  if (m) {
+    const from = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
+    const to = new Date(Date.UTC(Number(m[1]), Number(m[2]), 1));
+    and.push({ workDate: { $gte: from, $lt: to } });
+  }
+  if (clean(department)) and.push({ creatorDepartment: clean(department) });
+
+  for (const word of clean(q).split(/\s+/).filter(Boolean).slice(0, 5)) {
+    const rx = new RegExp(escapeRegex(word), "i");
+    const empIds = (
+      await Employee.find({ $or: [{ firstName: rx }, { lastName: rx }, { firstNameTh: rx }, { lastNameTh: rx }, { nickName: rx }] })
+        .select("_id")
+        .limit(500)
+        .lean()
+    ).map((e) => e._id);
+    and.push({
+      $or: [{ docNo: rx }, { jobName: rx }, { creatorNameTh: rx }, { "members.nameSnapshot": rx }, ...(empIds.length ? [{ "members.employee": { $in: empIds } }] : [])],
+    });
+  }
+
+  const query = { $and: and };
+  const size = Math.min(Math.max(Number(pageSize) || 20, 1), 100);
+  const current = Math.max(Number(page) || 1, 1);
+  const [total, docs, departments] = await Promise.all([
+    OffsiteRequest.countDocuments(query),
+    OffsiteRequest.find(query).select(LIST_PROJECTION).sort({ workDate: -1, createdAt: -1 }).skip((current - 1) * size).limit(size).lean(),
+    OffsiteRequest.distinct("creatorDepartment", { status: { $ne: "draft" } }),
+  ]);
+  return {
+    total,
+    page: current,
+    pageSize: size,
+    departments: departments.filter(Boolean).sort(),
+    items: docs.map((d) => ({
+      _id: str(d._id),
+      docNo: d.docNo || null,
+      jobName: d.jobName,
+      workDate: d.workDate,
+      creatorNameTh: d.creatorNameTh,
+      creatorDepartment: d.creatorDepartment,
+      memberCount: (d.members || []).length,
+      status: d.status,
+      activeStep: activeStepOf(d),
+      progress: progressOf(d),
+    })),
+  };
+}
+
+/**
+ * Approved off-site work of one employee (as a member — the creator is one),
+ * for a Gregorian `year` (null = the latest year with history). Rows use the
+ * member's stored nameSnapshot / duty. Also returns the years available.
+ */
+export async function listHistory(employeeId, year = null) {
+  if (!mongoose.isValidObjectId(employeeId)) throw new OffsiteError("รหัสพนักงานไม่ถูกต้อง", 400);
+  const base = { status: "approved", "members.employee": new mongoose.Types.ObjectId(String(employeeId)) };
+  const years = (
+    await OffsiteRequest.aggregate([{ $match: base }, { $group: { _id: { $year: "$workDate" } } }, { $sort: { _id: -1 } }])
+  ).map((y) => y._id);
+  const y = Number(year) || years[0] || new Date().getUTCFullYear();
+  const docs = await OffsiteRequest.find({ ...base, workDate: { $gte: new Date(Date.UTC(y, 0, 1)), $lt: new Date(Date.UTC(y + 1, 0, 1)) } })
+    .select("docNo jobName workDate startTime endTime placeName leader members.employee members.nameSnapshot members.duty")
+    .sort({ workDate: -1 })
+    .lean();
+  return {
+    year: y,
+    years: years.includes(y) ? years : [y, ...years].sort((a, b) => b - a),
+    items: docs.map((d) => {
+      const m = d.members.find((x) => str(x.employee) === str(employeeId));
+      return {
+        _id: str(d._id),
+        docNo: d.docNo,
+        jobName: d.jobName,
+        workDate: d.workDate,
+        startTime: d.startTime,
+        endTime: d.endTime,
+        placeName: d.placeName,
+        nameSnapshot: m?.nameSnapshot || "",
+        duty: m?.duty || "",
+        isLeader: str(d.leader) === str(employeeId),
+      };
+    }),
+  };
 }
 
 const activeApprovalMatch = (me) => ({
@@ -521,7 +650,7 @@ export async function createRequest(session, input = {}) {
   });
   addEvent(doc, session, "created", fields.jobName);
   await save(doc);
-  return result(doc, emp, true);
+  return result(doc, emp, true, session.user);
 }
 
 export async function updateRequest(session, id, input = {}) {
@@ -534,7 +663,7 @@ export async function updateRequest(session, id, input = {}) {
   doc.leader = input.leader;
   addEvent(doc, session, "updated");
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /**
@@ -602,7 +731,7 @@ export async function sendInvitations(session, id, opts) {
   // Last, so a refused send (409 above) consumes no number.
   if (!doc.docNo) doc.docNo = await nextDocNo();
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /** A member answers their invitation: { action: "accept" | "decline", reason }. */
@@ -632,7 +761,7 @@ export async function respondToInvitation(session, id, { action, reason } = {}, 
     throw new OffsiteError("action ต้องเป็น accept หรือ decline", 400);
   }
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /** Step 1: the creator signs (or re-signs); step 2 becomes active. */
@@ -650,7 +779,7 @@ export async function submitStep1(session, id, opts) {
   addEvent(doc, session, "step1_signed", nameOf(emp));
   await activateNext(doc, session, deps);
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 export async function cancelRequest(session, id, { reason } = {}) {
@@ -661,7 +790,7 @@ export async function cancelRequest(session, id, { reason } = {}) {
   doc.status = "cancelled";
   addEvent(doc, session, "cancelled", why);
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /* ── writes: approvers (steps 2–3) ─────────────────────────── */
@@ -702,7 +831,7 @@ export async function saveHrSummary(session, id, hrSummary) {
   applyHrSummary(doc, hrSummary);
   addEvent(doc, session, "hr_summary_saved", a.approverName);
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /**
@@ -727,7 +856,7 @@ export async function approveStep(session, id, { step, hrSummary } = {}, opts) {
   addEvent(doc, session, `step${n}_approved`, `${a.approverName}${self ? ` (${SELF_APPROVAL_LABEL})` : ""}`);
   await activateNext(doc, session, deps); // 409 here → nothing saved
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /** ยืนยันอีกครั้ง: a needs_reconfirm step's approver confirms; the earlier signature is kept. */
@@ -740,7 +869,7 @@ export async function reconfirmStep(session, id, { step } = {}, opts) {
   addEvent(doc, session, `step${n}_reconfirmed`, a.approverName);
   await activateNext(doc, session, deps);
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /** ไม่อนุมัติ: required reason; the request goes back to the creator. */
@@ -752,7 +881,7 @@ export async function rejectStep(session, id, { step, reason } = {}) {
   addEvent(doc, session, `step${n}_rejected`, `${a.approverName}: ${why}`);
   markReturned(doc, session, { step: n, byName: a.approverName, reason: why });
   await save(doc);
-  return result(doc, emp, isCreator);
+  return result(doc, emp, isCreator, session.user);
 }
 
 /** OffsiteError → JSON response body + status; anything else is a 500. */

@@ -88,6 +88,24 @@ export function formatWorkDateTh(value) {
   return d.toLocaleDateString("th-TH", { timeZone: "UTC", year: "numeric", month: "short", day: "numeric" });
 }
 
+export const THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+
+/** Work date → { day, month (Thai name), yearBE } for "ในวันที่ … เดือน … พ.ศ. …". */
+export function workDateParts(value) {
+  const d = value ? new Date(value) : null;
+  if (!d || isNaN(d.getTime())) return { day: "", month: "", yearBE: "" };
+  return { day: d.getUTCDate(), month: THAI_MONTHS[d.getUTCMonth()], yearBE: d.getUTCFullYear() + 543 };
+}
+
+/** Timestamp → "19 ตุลาคม 2569" (Asia/Bangkok, Buddhist year). */
+export function formatDateLongTh(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  const [y, m, day] = d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }).split("-").map(Number);
+  return `${day} ${THAI_MONTHS[m - 1]} ${y + 543}`;
+}
+
 /** Timestamp in Thai with time (Asia/Bangkok). */
 export function formatDateTimeTh(value) {
   if (!value) return "";

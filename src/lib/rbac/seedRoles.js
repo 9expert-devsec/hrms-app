@@ -59,6 +59,7 @@ export const SEED_ROLES = [
       "scope_ot_all",
       "scope_leave_hr_step",
       "scope_leave_documents_all",
+      "offsite_hr",
     ],
     isSystem: true,
     isSuperadmin: false,

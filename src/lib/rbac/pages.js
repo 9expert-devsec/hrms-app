@@ -59,6 +59,8 @@ export const HRMS_PAGES = [
       { key: "shift_assign", label: "กำหนดเวลาพนักงาน", href: "/dashboard/attendance/assign-shift", match: "prefix" },
       { key: "holidays", label: "วันหยุด", href: "/dashboard/attendance/holidays", match: "prefix" },
       { key: "attendance_report", label: "รายงานเวลาทำงาน", href: "/dashboard/attendance/report", match: "prefix" },
+      // Read every off-site request (not drafts), print forms, see anyone's history.
+      { key: "offsite_hr", label: "คำขอทำงานนอกสถานที่ทั้งหมด", href: "/dashboard/offsite/all", match: "prefix" },
       // Scope keys — widen data, never a route.
       { key: "scope_attendance_all", label: "ดูเวลาทำงานของพนักงานทุกคน", href: null, match: "none" },
       { key: "scope_ot_all", label: "อนุมัติ OT ได้ทุกแผนก", href: null, match: "none" },
