@@ -3,6 +3,7 @@
 // middleware still guards /dashboard/* (this path: offsite_self OR offsite_hr,
 // lib/rbac/access.js canAccessPath).
 import Link from "next/link";
+import { Sarabun } from "next/font/google";
 import { notFound, redirect } from "next/navigation";
 import { requireAnyPage } from "@/lib/rbac/guard";
 import { OFFSITE_PRINT_PAGES } from "@/lib/rbac/access";
@@ -11,6 +12,14 @@ import { getPrintable, OffsiteError } from "@/lib/offsite";
 import { formatDateLongTh } from "@/lib/offsiteRules";
 import OffsitePrintForm, { PRINT_CSS } from "../../../../../../components/offsite/OffsitePrintForm";
 import PrintButton from "../../../../../../components/offsite/PrintButton";
+
+// The official form's font family (TH Sarabun New's free successor), this page only.
+const sarabun = Sarabun({
+  subsets: ["thai", "latin"],
+  weight: ["400", "700"],
+  variable: "--font-sarabun",
+  display: "swap",
+});
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่" };
@@ -32,9 +41,9 @@ export default async function OffsitePrintPage({ params }) {
   const printedAt = `${formatDateLongTh(now)} ${now.toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" })} น.`;
 
   return (
-    <div className="os-page">
+    <div className={`pf-screen ${sarabun.variable}`}>
       <style>{PRINT_CSS}</style>
-      <div className="os-toolbar no-print">
+      <div className="pf-toolbar no-print">
         <Link href={`/dashboard/offsite/${r._id}`} style={{ color: "#5E6A7E" }}>
           ← กลับไปหน้าคำขอ
         </Link>
