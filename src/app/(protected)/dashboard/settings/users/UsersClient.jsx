@@ -18,6 +18,7 @@ import {
   UserPlus,
   Link2,
   Unlink,
+  MoreHorizontal,
 } from "lucide-react";
 import { accountActionBlock, accountDeleteBlock, linkActionBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
 import ResetPasswordDialog from "../../../../../components/ResetPasswordDialog";
@@ -329,7 +330,7 @@ export default function UsersClient({ initial, actor }) {
 
       {/* ── Table ──────────────────────────────── */}
       <div style={{ ...CARD, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 980 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
           <thead>
             <tr style={{ background: ICE }}>
               <th style={thStyle}>ผู้ใช้</th>
@@ -432,20 +433,8 @@ export default function UsersClient({ initial, actor }) {
                     )}
                   </td>
                   <td style={{ ...tdStyle, fontSize: 13, color: SLATE }}>{fmtDateTime(u.lastLoginAt)}</td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    <div className="inline-flex gap-2">
-                      {u.lockedUntil && (
-                        <span title={unlockBlock?.error}>
-                          <button
-                            onClick={() => setConfirm({ user: u, action: "unlock" })}
-                            disabled={!!unlockBlock}
-                            style={{ ...actionBtn("#92400E"), opacity: unlockBlock ? 0.45 : 1 }}
-                          >
-                            <LockOpen size={13} />
-                            ปลดล็อก
-                          </button>
-                        </span>
-                      )}
+                  <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
+                    <div className="inline-flex items-center gap-2">
                       <span title={resetBlock?.error}>
                         <button
                           onClick={() => setResetFor(u)}
@@ -456,62 +445,43 @@ export default function UsersClient({ initial, actor }) {
                           รีเซ็ตรหัสผ่าน
                         </button>
                       </span>
-                      <span title={emailBlock?.error}>
-                        <button
-                          onClick={() => setEditingEmail({ user: u, value: u.email, error: "" })}
-                          disabled={!!emailBlock}
-                          style={{ ...actionBtn(BLUE), opacity: emailBlock ? 0.45 : 1 }}
-                        >
-                          <Mail size={13} />
-                          แก้ไขอีเมล
-                        </button>
-                      </span>
-                      <span title={linkBlock?.error}>
-                        {u.employee ? (
-                          <button
-                            onClick={() => setConfirm({ user: u, action: "unlink" })}
-                            disabled={!!linkBlock}
-                            style={{ ...actionBtn(SLATE), opacity: linkBlock ? 0.45 : 1 }}
-                          >
-                            <Unlink size={13} />
-                            ยกเลิกการผูก
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setPicker({ mode: "link", user: u })}
-                            disabled={!!linkBlock}
-                            style={{ ...actionBtn(BLUE), opacity: linkBlock ? 0.45 : 1 }}
-                          >
-                            <Link2 size={13} />
-                            ผูกพนักงาน
-                          </button>
-                        )}
-                      </span>
-                      <span title={statusBlock?.error}>
-                        <button
-                          onClick={() => setConfirm({ user: u, action: statusAction })}
-                          disabled={!!statusBlock}
-                          style={{
-                            ...actionBtn(statusAction === "suspend" ? "#991B1B" : "#065F46"),
-                            opacity: statusBlock ? 0.45 : 1,
-                          }}
-                        >
-                          {statusAction === "suspend" ? <Ban size={13} /> : <CheckCircle2 size={13} />}
-                          {statusAction === "suspend" ? "ระงับบัญชี" : "เปิดใช้งาน"}
-                        </button>
-                      </span>
-                      {actor.isSuperadmin && (
-                        <span title={deleteBlock?.error}>
-                          <button
-                            onClick={() => setDeleting({ user: u, typed: "" })}
-                            disabled={!!deleteBlock}
-                            style={{ ...actionBtn("#991B1B"), opacity: deleteBlock ? 0.45 : 1 }}
-                          >
-                            <Trash2 size={13} />
-                            ลบบัญชี
-                          </button>
-                        </span>
-                      )}
+                      {/* Only the items this viewer may use on this row (blocked ones are left out). */}
+                      <RowMenu
+                        label={`การดำเนินการเพิ่มเติมสำหรับ ${u.email}`}
+                        items={[
+                          !emailBlock && {
+                            key: "email",
+                            label: "แก้ไขอีเมล",
+                            Icon: Mail,
+                            onClick: () => setEditingEmail({ user: u, value: u.email, error: "" }),
+                          },
+                          !linkBlock &&
+                            (u.employee
+                              ? { key: "unlink", label: "ยกเลิกการผูก", Icon: Unlink, onClick: () => setConfirm({ user: u, action: "unlink" }) }
+                              : { key: "link", label: "ผูกพนักงาน", Icon: Link2, onClick: () => setPicker({ mode: "link", user: u }) }),
+                          !statusBlock && {
+                            key: "status",
+                            label: statusAction === "suspend" ? "ระงับบัญชี" : "เปิดใช้งาน",
+                            Icon: statusAction === "suspend" ? Ban : CheckCircle2,
+                            onClick: () => setConfirm({ user: u, action: statusAction }),
+                          },
+                          u.lockedUntil &&
+                            !unlockBlock && {
+                              key: "unlock",
+                              label: "ปลดล็อก",
+                              Icon: LockOpen,
+                              onClick: () => setConfirm({ user: u, action: "unlock" }),
+                            },
+                          actor.isSuperadmin &&
+                            !deleteBlock && {
+                              key: "delete",
+                              label: "ลบบัญชี",
+                              Icon: Trash2,
+                              danger: true,
+                              onClick: () => setDeleting({ user: u, typed: "" }),
+                            },
+                        ].filter(Boolean)}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -721,6 +691,95 @@ export default function UsersClient({ initial, actor }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * "…" menu of a row's secondary actions. Positioned `fixed` from the button
+ * so the table's overflow container never clips it; closes on outside click,
+ * Escape, scroll and resize. Danger items (ลบบัญชี) go last, after a divider.
+ */
+function RowMenu({ label, items }) {
+  const [pos, setPos] = useState(null); // { top, right } while open
+  const ordered = [...items.filter((i) => !i.danger), ...items.filter((i) => i.danger)];
+
+  useEffect(() => {
+    if (!pos) return;
+    const close = () => setPos(null);
+    const onKey = (e) => e.key === "Escape" && close();
+    const onDown = (e) => {
+      if (!e.target.closest?.("[data-row-menu]")) close();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [pos]);
+
+  if (!ordered.length) return <span style={{ display: "inline-block", width: 32 }} aria-hidden="true" />;
+
+  function toggle(e) {
+    if (pos) return setPos(null);
+    const r = e.currentTarget.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  }
+
+  return (
+    <span data-row-menu>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={!!pos}
+        style={{ ...actionBtn(SLATE), padding: "6px 8px" }}
+        data-testid="row-menu"
+      >
+        <MoreHorizontal size={15} />
+      </button>
+      {pos && (
+        <div
+          role="menu"
+          className="rounded-xl py-1"
+          style={{
+            position: "fixed",
+            top: pos.top,
+            right: pos.right,
+            zIndex: 40,
+            minWidth: 180,
+            background: "#FFFFFF",
+            border: "1px solid rgba(0,92,255,0.12)",
+            boxShadow: "0 8px 24px rgba(13,27,42,0.16)",
+            textAlign: "left",
+          }}
+        >
+          {ordered.map((item, i) => (
+            <div key={item.key}>
+              {item.danger && i > 0 && <div style={{ height: 1, background: "rgba(0,92,255,0.08)", margin: "4px 0" }} />}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setPos(null);
+                  item.onClick();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 hover:bg-slate-50"
+                style={{ color: item.danger ? "#991B1B" : NAVY, fontSize: 13, fontWeight: item.danger ? 600 : 500 }}
+              >
+                <item.Icon size={14} />
+                {item.label}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </span>
   );
 }
 
