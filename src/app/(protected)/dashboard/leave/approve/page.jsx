@@ -21,7 +21,8 @@ import {
   Inbox,
   X,
 } from "lucide-react";
-import SignaturePad from "../../../../../components/SignaturePad";
+import MySignaturePicker from "../../../../../components/MySignaturePicker";
+import { saveMySignature } from "../../../../../components/offsite/SignatureConfirm";
 import Avatar from "../../../../../components/Avatar";
 import SignatureDisplay from "../../../../../components/SignatureDisplay";
 import AttachmentViewer, { hasAttachments } from "../../../../../components/AttachmentViewer";
@@ -72,7 +73,9 @@ export default function LeaveApprovePage() {
   /* ── modal state ───────────────────────── */
   const [modal, setModal] = useState(null); // { item, action: 'approve'|'reject' }
   const [note, setNote] = useState("");
-  const [signature, setSignature] = useState(null);
+  // { png, saveAsMine } from MySignaturePicker, or null. `png` is this leave's own copy.
+  const [sig, setSig] = useState(null);
+  const signature = sig?.png || null;
   const [submitting, setSubmitting] = useState(false);
 
   /* ── permission-based config (src/lib/rbac) ── */
@@ -162,9 +165,17 @@ export default function LeaveApprovePage() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.message || "Error");
+      // "บันทึกเป็นลายเซ็นหลักของฉัน": the drawn one becomes my saved signature.
+      if (modal.action === "approve" && sig?.saveAsMine) {
+        try {
+          await saveMySignature(sig.png);
+        } catch (err) {
+          console.warn("[leave] could not save signature:", err?.message);
+        }
+      }
       setModal(null);
       setNote("");
-      setSignature(null);
+      setSig(null);
       await load();
     } catch (err) {
       alert(err.message);
@@ -176,7 +187,7 @@ export default function LeaveApprovePage() {
   function openModal(item, action) {
     setModal({ item, action });
     setNote("");
-    setSignature(null);
+    setSig(null);
   }
 
   if (authStatus === "loading" || tab === null) {
@@ -468,12 +479,7 @@ export default function LeaveApprovePage() {
             {/* Signature pad — only for approve action */}
             {modal.action === "approve" && (
               <div className="mb-4">
-                <SignaturePad
-                  label="ลายเซ็นผู้อนุมัติ"
-                  required
-                  onSave={(base64) => setSignature(base64)}
-                  onClear={() => setSignature(null)}
-                />
+                <MySignaturePicker label="ลายเซ็นผู้อนุมัติ" onChange={setSig} />
               </div>
             )}
 

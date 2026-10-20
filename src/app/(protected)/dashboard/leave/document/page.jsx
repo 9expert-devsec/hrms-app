@@ -413,6 +413,14 @@ function DocumentDetail({ id }) {
         >
           {/* Header */}
           <div style={{ textAlign: "center", marginBottom: 32 }}>
+            {/* Same asset as the off-site print form; a plain img so it prints. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/logo-blue-ink.png"
+              alt="9Expert"
+              data-testid="leave-doc-logo"
+              style={{ height: 40, width: "auto", display: "block", margin: "0 auto 16px" }}
+            />
             <h1 style={{ color: NAVY, fontSize: 28, fontWeight: 700, marginBottom: 4 }}>ใบลา</h1>
             <p style={{ color: SLATE, fontSize: 14 }}>9Expert Training</p>
             <div
@@ -520,6 +528,7 @@ function DocumentDetail({ id }) {
                 <SignatureDisplay
                   signature={leave.hodSignature}
                   label="ลายเซ็นหัวหน้าแผนก"
+                  signerName={leave.hodApproverName || undefined}
                   signedAt={leave.hodApprovedAt}
                 />
               )}
@@ -527,7 +536,7 @@ function DocumentDetail({ id }) {
                 <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>หมายเหตุ: {leave.hodApproverNote}</p>
               )}
               {leave.hodApproverId && (
-                <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>ผู้อนุมัติ: {accountLabel(leave.hodApproverId)}</p>
+                <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>ผู้อนุมัติ: {leave.hodApproverName || accountLabel(leave.hodApproverId)}</p>
               )}
             </div>
 
@@ -575,6 +584,7 @@ function DocumentDetail({ id }) {
                   <SignatureDisplay
                     signature={leave.hrSignature}
                     label="ลายเซ็น HR"
+                    signerName={leave.hrApproverName || undefined}
                     signedAt={leave.hrApprovedAt}
                   />
                   {leave.hrApproverNote && (
@@ -583,7 +593,7 @@ function DocumentDetail({ id }) {
                 </div>
               )}
               {leave.hrApproverId && (
-                <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>ผู้อนุมัติ: {accountLabel(leave.hrApproverId)}</p>
+                <p style={{ color: SLATE, fontSize: 12, marginTop: 4 }}>ผู้อนุมัติ: {leave.hrApproverName || accountLabel(leave.hrApproverId)}</p>
               )}
             </div>
           </div>

@@ -17,7 +17,8 @@ import {
   FileText as FileTextIcon,
   X as XIcon,
 } from "lucide-react";
-import SignaturePad from "./../../../../../components/SignaturePad";
+import MySignaturePicker from "./../../../../../components/MySignaturePicker";
+import { saveMySignature } from "./../../../../../components/offsite/SignatureConfirm";
 import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
 
 /* ── design tokens ─────────────────────────────────── */
@@ -73,7 +74,9 @@ export default function LeaveRequestPage() {
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [attachments, setAttachments] = useState([]); // [{ url, publicId, name, type, size, status }]
-  const [employeeSignature, setEmployeeSignature] = useState(null);
+  // { png, saveAsMine } from MySignaturePicker, or null. `png` is this leave's own copy.
+  const [sig, setSig] = useState(null);
+  const employeeSignature = sig?.png || null;
   const [submitting, setSubmitting] = useState(false);
 
   const totalDays = useMemo(
@@ -115,6 +118,14 @@ export default function LeaveRequestPage() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.message || "Error");
+      // "บันทึกเป็นลายเซ็นหลักของฉัน": the drawn one becomes my saved signature.
+      if (sig?.saveAsMine) {
+        try {
+          await saveMySignature(sig.png);
+        } catch (err) {
+          console.warn("[leave] could not save signature:", err?.message);
+        }
+      }
       router.push("/dashboard/leave/history");
     } catch (err) {
       alert(err.message);
@@ -413,12 +424,7 @@ export default function LeaveRequestPage() {
 
         {/* Signature */}
         <div>
-          <SignaturePad
-            label="ลายเซ็นผู้ขอลา"
-            required
-            onSave={(base64) => setEmployeeSignature(base64)}
-            onClear={() => setEmployeeSignature(null)}
-          />
+          <MySignaturePicker label="ลายเซ็นผู้ขอลา" onChange={setSig} />
         </div>
 
         {/* Submit */}

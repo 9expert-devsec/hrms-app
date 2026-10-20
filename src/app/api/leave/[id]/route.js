@@ -5,7 +5,9 @@ import { requireAnyPageApi } from "@/lib/rbac/guard";
 import { canSeeLeaveDocument } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
+import Employee from "@/models/Employee";
 import { deletedAccount } from "@/lib/deletedAccount";
+import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 
 /* ---------- GET ---------- */
 export async function GET(_req, { params }) {
@@ -39,6 +41,21 @@ export async function GET(_req, { params }) {
     const raw = await Leave.findById(id).select("hodApproverId hrApproverId").lean();
     for (const field of ["hodApproverId", "hrApproverId"]) {
       if (!leave[field] && raw?.[field]) leave[field] = deletedAccount(raw[field]);
+    }
+
+    // Approvers are stored as User ids; the document shows the person's name
+    // (their linked employee, formal Thai first). Read-only, not stored.
+    const approverIds = ["hodApproverId", "hrApproverId"].map((f) => raw?.[f]).filter(Boolean);
+    if (approverIds.length) {
+      const emps = await Employee.find({ userId: { $in: approverIds } })
+        .select(`userId ${EMPLOYEE_NAME_FIELDS}`)
+        .lean();
+      const nameOf = (uid) => {
+        const emp = emps.find((e) => String(e.userId) === String(uid));
+        return emp ? employeeFullNameTh(emp) || employeeDisplayName(emp) : null;
+      };
+      leave.hodApproverName = raw?.hodApproverId ? nameOf(raw.hodApproverId) : null;
+      leave.hrApproverName = raw?.hrApproverId ? nameOf(raw.hrApproverId) : null;
     }
 
     return NextResponse.json({ ok: true, leave });
