@@ -41,6 +41,8 @@ export default function LoginClient() {
   const router = useRouter();
   const search = useSearchParams();
   const queryError = search.get("error");
+  // Set by the reset-password page after a successful ลืมรหัสผ่าน.
+  const resetDone = search.get("reset") === "1";
   const callbackUrl = safeCallbackUrl(search.get("callbackUrl"));
 
   const errorFromQuery = useMemo(() => {
@@ -140,6 +142,16 @@ export default function LoginClient() {
           <p className="mt-2 text-[15px] text-[var(--text-secondary)]">
             กรุณาเข้าสู่ระบบด้วยบัญชีผู้ใช้งานของบริษัท
           </p>
+
+          {resetDone && !errorText && (
+            <div
+              role="status"
+              className="mt-6 rounded-[var(--9e-radius-md)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+              data-testid="reset-success"
+            >
+              ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว — เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย
+            </div>
+          )}
 
           <form onSubmit={onSubmit} className="mt-8 space-y-5">
             <div>
