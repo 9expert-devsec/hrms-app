@@ -155,7 +155,7 @@ export async function GET(req, ctx) {
   <div class="card">
     <div class="head">
       <div class="brand">
-        <img src="https://dummyimage.com/24x24/111/fff.png&text=9" width="24" height="24" alt="logo" />
+        <img src="/brand/logo-blue-ink.png" width="73" height="24" alt="9Expert" style="height:24px;width:auto;" />
         <b>HRMS • Leave Request</b>
       </div>
       <div style="color:#64748b;font-size:12px;">เลขที่คำขอ: ${String(
