@@ -31,6 +31,7 @@ import {
   validateHrSummary,
 } from "@/lib/offsiteRules";
 import OffsiteProgress from "./OffsiteProgress";
+import { refreshInbox } from "../inbox/InboxProvider";
 import SignatureConfirm from "./SignatureConfirm";
 import HrSection from "./HrSection";
 import { CARD, INPUT_STYLE, NAVY, SLATE, BLUE, Button, Chip, ErrorBox, StatusChip, MemberStatusChip, api } from "./ui";
@@ -197,7 +198,8 @@ export default function OffsiteDetail({ id }) {
     try {
       setData(await api(`/api/offsite/requests/${id}`, { method: "POST", body: { action, ...extra } }));
       setPanel(null);
-      router.refresh(); // menu badge
+      router.refresh();
+      refreshInbox(); // bell, sidebar badge, dashboard card
     } catch (e) {
       if (e.body?.errors && (action === "approve" || action === "hr_summary")) setHrErrors(e.body.errors);
       setError(e.message);

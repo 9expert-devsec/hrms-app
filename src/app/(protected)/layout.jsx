@@ -8,6 +8,7 @@ import Sidebar from "./../../components/Sidebar";
 import Topbar from "./../../components/Topbar";
 import SelfServiceGate from "./../../components/SelfServiceGate";
 import NavTracker from "./../../components/NavTracker";
+import InboxProvider from "./../../components/inbox/InboxProvider";
 
 export default async function ProtectedLayout({ children }) {
   // Is this account linked to an employee? (Employee.userId — read from the
@@ -20,6 +21,8 @@ export default async function ProtectedLayout({ children }) {
   }
 
   return (
+    // One shared "รอคุณดำเนินการ" count for the sidebar badges, the top-bar bell and the pages.
+    <InboxProvider>
     <div
       style={{
         display: "flex",
@@ -49,5 +52,6 @@ export default async function ProtectedLayout({ children }) {
         </main>
       </div>
     </div>
+    </InboxProvider>
   );
 }

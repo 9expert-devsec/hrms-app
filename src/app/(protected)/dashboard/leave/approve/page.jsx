@@ -27,6 +27,7 @@ import Avatar from "../../../../../components/Avatar";
 import SignatureDisplay from "../../../../../components/SignatureDisplay";
 import AttachmentViewer, { hasAttachments } from "../../../../../components/AttachmentViewer";
 import { employeeDisplayName } from "@/lib/employeeName";
+import { refreshInbox } from "../../../../../components/inbox/InboxProvider";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -176,6 +177,7 @@ export default function LeaveApprovePage() {
       setModal(null);
       setNote("");
       setSig(null);
+      refreshInbox(); // bell, sidebar badge, dashboard card
       await load();
     } catch (err) {
       alert(err.message);

@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
 import Avatar from "../../../../../components/Avatar";
 import { employeeDisplayName } from "@/lib/employeeName";
+import { refreshInbox } from "../../../../../components/inbox/InboxProvider";
 import {
   CheckSquare,
   Loader2,
@@ -153,6 +154,7 @@ export default function OTApprovePage() {
       if (!res.ok) throw new Error(j?.message || "ดำเนินการไม่สำเร็จ");
 
       setModal(null);
+      refreshInbox(); // bell, sidebar badge, dashboard card
       load();
     } catch (err) {
       alert(err.message || "ดำเนินการไม่สำเร็จ");
