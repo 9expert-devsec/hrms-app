@@ -4,9 +4,10 @@
  *
  * buildOffsiteEmail(type, ctx) → { subject, html, text }
  *   ctx = { request (plain OffsiteRequest), recipientName, url,
+ *           recipientIsCreator?, recipientIsLeader?,
  *           returnInfo?, changeSummary?, cancelReason? }
  */
-import { CHANGE_FIELD_LABELS, formatWorkDateTh } from "../offsiteRules.js";
+import { changeSummaryLines, formatWorkDateTh } from "../offsiteRules.js";
 
 export const OFFSITE_EMAIL_TYPES = [
   "offsite_invite",
@@ -21,18 +22,29 @@ export const OFFSITE_EMAIL_TYPES = [
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-/** Per type: subject (after "[HRMS] docNo"), heading, intro line, button label. */
+/**
+ * Per type: subject (after "[HRMS] docNo"), intro line, button label.
+ * `ctx.recipientIsLeader` / `recipientIsCreator` pick the wording where the
+ * team leader and the creator get the same email for different reasons.
+ */
 const COPY = {
   offsite_invite: (r) => ({
     subject: `คุณได้รับคำเชิญร่วมงานนอกสถานที่: ${r.jobName}`,
     intro: `${r.creatorNameTh} เชิญคุณร่วมปฏิบัติงานนอกสถานที่ กรุณาเปิดคำขอเพื่ออ่านรายละเอียด แล้วลงนามยอมรับหรือปฏิเสธ`,
     button: "เปิดคำเชิญ",
   }),
-  offsite_members_ready: () => ({
-    subject: "สมาชิกตอบรับครบแล้ว — ส่งแบบฟอร์มได้",
-    intro: "สมาชิกทุกคนตอบรับคำเชิญแล้ว คุณสามารถลงนามและส่งแบบฟอร์มเพื่อขออนุมัติได้",
-    button: "ส่งแบบฟอร์ม",
-  }),
+  offsite_members_ready: (r, ctx) =>
+    ctx.recipientIsLeader
+      ? {
+          subject: "สมาชิกตอบรับครบแล้ว — รอคุณลงนามในฐานะหัวหน้าทีม",
+          intro: "สมาชิกทุกคนตอบรับคำเชิญแล้ว คุณเป็นหัวหน้าทีมของคำขอนี้ กรุณาลงนาม (ขั้นที่ 1) เพื่อส่งแบบฟอร์มขออนุมัติ",
+          button: "ลงนามและส่งแบบฟอร์ม",
+        }
+      : {
+          subject: "สมาชิกตอบรับครบแล้ว — รอหัวหน้าทีมลงนาม",
+          intro: `สมาชิกทุกคนตอบรับคำเชิญแล้ว ขั้นต่อไปคือหัวหน้าทีม (${leaderName(r)}) ลงนามเพื่อส่งแบบฟอร์มขออนุมัติ คุณไม่ต้องดำเนินการใด ๆ`,
+          button: "ดูคำขอ",
+        },
   offsite_approval_pending: (r) => ({
     subject: `รอคุณอนุมัติ: ${r.jobName}`,
     intro: "มีคำขอทำงานนอกสถานที่รอให้คุณพิจารณาอนุมัติ",
@@ -43,16 +55,30 @@ const COPY = {
     intro: "คำขอที่คุณเคยอนุมัติถูกส่งกลับและส่งใหม่ กรุณาตรวจสอบสิ่งที่เปลี่ยนแล้วกด “ยืนยันอีกครั้ง” (ไม่ต้องเซ็นใหม่)",
     button: "ตรวจสอบและยืนยัน",
   }),
-  offsite_returned: () => ({
-    subject: "คำขอถูกส่งกลับให้แก้ไข",
-    intro: "คำขอทำงานนอกสถานที่ของคุณถูกส่งกลับ กรุณาแก้ไขแล้วส่งอีกครั้ง",
-    button: "แก้ไขคำขอ",
-  }),
-  offsite_approved: () => ({
-    subject: "คำขอของคุณได้รับการอนุมัติแล้ว",
-    intro: "คำขอทำงานนอกสถานที่ของคุณได้รับการอนุมัติครบทุกขั้นแล้ว",
-    button: "ดูคำขอ",
-  }),
+  offsite_returned: (r, ctx) =>
+    ctx.recipientIsCreator
+      ? {
+          subject: "คำขอถูกส่งกลับให้แก้ไข",
+          intro: "คำขอทำงานนอกสถานที่ของคุณถูกส่งกลับ กรุณาแก้ไขแล้วส่งอีกครั้ง",
+          button: "แก้ไขคำขอ",
+        }
+      : {
+          subject: "คำขอที่คุณเป็นหัวหน้าทีมถูกส่งกลับให้แก้ไข",
+          intro: "คำขอทำงานนอกสถานที่ที่คุณเป็นหัวหน้าทีมถูกส่งกลับ ผู้สร้างคำขอจะแก้ไขแล้วส่งอีกครั้ง",
+          button: "ดูคำขอ",
+        },
+  offsite_approved: (r, ctx) =>
+    ctx.recipientIsCreator
+      ? {
+          subject: "คำขอของคุณได้รับการอนุมัติแล้ว",
+          intro: "คำขอทำงานนอกสถานที่ของคุณได้รับการอนุมัติครบทุกขั้นแล้ว",
+          button: "ดูคำขอ",
+        }
+      : {
+          subject: "คำขอที่คุณเป็นหัวหน้าทีมได้รับการอนุมัติแล้ว",
+          intro: "คำขอทำงานนอกสถานที่ที่คุณเป็นหัวหน้าทีมได้รับการอนุมัติครบทุกขั้นแล้ว",
+          button: "ดูคำขอ",
+        },
   offsite_cancelled: () => ({
     subject: "คำขอถูกยกเลิก",
     intro: "คำขอทำงานนอกสถานที่ต่อไปนี้ถูกยกเลิกโดยผู้สร้างคำขอ ไม่ต้องดำเนินการใด ๆ เพิ่มเติม",
@@ -72,18 +98,20 @@ function extraLines(type, ctx) {
 
 function changeList(type, ctx) {
   if (type !== "offsite_reconfirm" || !ctx.changeSummary) return [];
-  const s = ctx.changeSummary;
-  const items = [
-    ...(s.fields || []).map((f) => `แก้ไข${CHANGE_FIELD_LABELS[f] || f}`),
-    ...(s.membersAdded || []).map((n) => `เพิ่มสมาชิก: ${n}`),
-    ...(s.membersRemoved || []).map((n) => `นำสมาชิกออก: ${n}`),
-  ];
+  const items = changeSummaryLines(ctx.changeSummary);
   return items.length ? items : ["ไม่มีการเปลี่ยนแปลงข้อมูล"];
+}
+
+/** The team leader's name (step 1 approver, else the member entry). */
+function leaderName(r) {
+  const step1 = (r.approvals || []).find((a) => a.step === 1);
+  if (step1?.approverName) return step1.approverName;
+  return (r.members || []).find((m) => String(m.employee) === String(r.leader))?.nameSnapshot || "-";
 }
 
 export function buildOffsiteEmail(type, ctx) {
   const r = ctx.request;
-  const copy = COPY[type](r);
+  const copy = COPY[type](r, ctx);
   const subject = `[HRMS] ${r.docNo || ""} ${copy.subject}`.replace(/\s+/g, " ").trim();
   const facts = [
     ["เลขที่เอกสาร", r.docNo || "-"],
@@ -91,6 +119,7 @@ export function buildOffsiteEmail(type, ctx) {
     ["วันที่ทำงาน", `${formatWorkDateTh(r.workDate)} เวลา ${r.startTime}–${r.endTime} น.`],
     ["สถานที่", r.placeName],
     ["ผู้สร้างคำขอ", r.creatorNameTh],
+    ["หัวหน้าทีม", leaderName(r)],
     ...extraLines(type, ctx),
   ];
   const changes = changeList(type, ctx);

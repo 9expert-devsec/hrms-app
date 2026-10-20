@@ -6,7 +6,9 @@
 export const OFFSITE_STATUSES = ["draft", "inviting", "members_ready", "in_approval", "returned", "approved", "cancelled"];
 export const MEMBER_STATUSES = ["invited", "accepted", "declined"];
 export const APPROVAL_STATUSES = ["waiting", "pending", "approved", "rejected", "needs_reconfirm", "needs_resign"];
-export const APPROVAL_ROLES = ["creator", "accounting_head", "hr_head"];
+// Step 1 is signed by the team leader. `creator` is legacy (requests whose
+// step 1 the creator signed before OS-4): read and printed, never written.
+export const APPROVAL_ROLES = ["leader", "creator", "accounting_head", "hr_head"];
 export const TRAVEL_MODES = ["self_from_company", "company_van", "from_lodging"];
 export const ALLOWANCE_OPTIONS = ["per_person", "per_person_plus_travel", "travel_actual", "no_allowance"];
 
@@ -36,6 +38,7 @@ export const TRAVEL_MODE_LABELS = {
 };
 
 export const APPROVAL_ROLE_LABELS = {
+  leader: "หัวหน้าทีม",
   creator: "ผู้สร้างคำขอ",
   accounting_head: "หัวหน้าฝ่ายบัญชี",
   hr_head: "หัวหน้าฝ่ายบุคคล",
@@ -184,7 +187,7 @@ export function detailsKey(r) {
   ]);
 }
 
-export const PROGRESS_STEPS = ["สมาชิกตอบรับ", "ผู้สร้างเซ็น", "บัญชี", "HR", "อนุมัติแล้ว"];
+export const PROGRESS_STEPS = ["สมาชิกตอบรับ", "หัวหน้าทีมเซ็น", "บัญชี", "HR", "อนุมัติแล้ว"];
 
 /** Approval statuses in which a step is the one being acted on. */
 export const ACTIVE_APPROVAL_STATUSES = ["pending", "needs_reconfirm"];
@@ -290,3 +293,19 @@ export const CHANGE_FIELD_LABELS = {
   ...OFFSITE_FIELD_LABELS,
   duties: "หน้าที่ของสมาชิก",
 };
+
+/**
+ * "สิ่งที่เปลี่ยนจากครั้งก่อน" as text lines (detail page and email). A leader
+ * change is listed with names; summaries from before OS-4 carry it as the
+ * plain "leader" field instead.
+ */
+export function changeSummaryLines(s) {
+  if (!s) return [];
+  const leaderChange = s.leaderChange?.to ? `เปลี่ยนหัวหน้าทีม: ${s.leaderChange.from || "-"} → ${s.leaderChange.to}` : null;
+  return [
+    ...(s.fields || []).filter((f) => !(leaderChange && f === "leader")).map((f) => `แก้ไข${CHANGE_FIELD_LABELS[f] || f}`),
+    ...(leaderChange ? [leaderChange] : []),
+    ...(s.membersAdded || []).map((n) => `เพิ่มสมาชิก: ${n}`),
+    ...(s.membersRemoved || []).map((n) => `นำสมาชิกออก: ${n}`),
+  ];
+}

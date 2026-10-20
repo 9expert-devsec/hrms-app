@@ -14,11 +14,11 @@ import { employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
  * failure is logged in EmailLog, never thrown.
  *
  *   invitations_sent          → members invited in this revision   (offsite_invite)
- *   members_ready             → creator                            (offsite_members_ready)
+ *   members_ready             → leader (signs step 1) + creator, as information (offsite_members_ready)
  *   step2/3_pending           → that step's approver               (offsite_approval_pending)
  *   step2/3_reconfirm_pending → that step's approver               (offsite_reconfirm)
- *   returned                  → creator                            (offsite_returned)
- *   approved                  → creator                            (offsite_approved)
+ *   returned                  → creator + leader                   (offsite_returned)
+ *   approved                  → creator + leader                   (offsite_approved)
  *   cancelled                 → members still invited + the active step's approver (offsite_cancelled)
  */
 
@@ -36,6 +36,7 @@ export function planEmails(r, events) {
     if (e.type === "invitations_sent") {
       for (const mem of r.members) if (mem.status === "invited" && mem.invitedInRevision === r.revision) add("offsite_invite", mem.employee);
     } else if (e.type === "members_ready") {
+      add("offsite_members_ready", r.leader);
       add("offsite_members_ready", r.createdBy);
     } else if ((m = e.type.match(/^step([23])_pending$/))) {
       add("offsite_approval_pending", approverOf(Number(m[1])));
@@ -43,8 +44,10 @@ export function planEmails(r, events) {
       add("offsite_reconfirm", approverOf(Number(m[1])));
     } else if (e.type === "returned") {
       add("offsite_returned", r.createdBy);
+      add("offsite_returned", r.leader);
     } else if (e.type === "approved") {
       add("offsite_approved", r.createdBy);
+      add("offsite_approved", r.leader);
     } else if (e.type === "cancelled") {
       for (const mem of r.members) if (mem.status === "invited") add("offsite_cancelled", mem.employee);
       for (const a of r.approvals || []) if (a.step >= 2 && ACTIVE_APPROVAL_STATUSES.includes(a.status)) add("offsite_cancelled", a.approver);
@@ -76,6 +79,8 @@ async function deliver(r, plan, actorUserId, events) {
       const { subject, html, text } = buildOffsiteEmail(type, {
         request: r,
         recipientName: who?.name || "",
+        recipientIsCreator: employeeId === str(r.createdBy),
+        recipientIsLeader: employeeId === str(r.leader),
         url,
         returnInfo: r.returnInfo,
         changeSummary: r.changeSummary,

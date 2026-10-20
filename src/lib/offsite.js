@@ -38,11 +38,17 @@ import {
  *     └─(edit)── returned ◀──────────── reject at step 2 / 3 ───────────┘   └─▶ approved
  *   anything before approved ──cancel──▶ cancelled
  *
+ * Step 1 is signed by the team leader (`leader`, always a member). A creator
+ * who is the leader is auto-accepted on send; any other creator is invited
+ * and accepts like every member. The creator alone edits, sends and cancels.
+ *
  * Resend after a return (sendInvitations):
  *   - member set changed → new members invited; every step that had moved
  *     becomes needs_resign (step 1 included) and signs afresh in order;
  *   - members unchanged  → approved steps become needs_reconfirm (step 1 is
- *     reconfirmed by the resend itself); the rejecting step signs afresh.
+ *     reconfirmed by the resend itself); the rejecting step signs afresh;
+ *   - leader changed (members unchanged) → as above, except step 1, which
+ *     the new leader signs afresh.
  *
  * Head lookup is injectable: write functions take `opts.resolveHead(code)`
  * (default resolveDepartmentHead). The app never passes it; it exists so a
@@ -235,7 +241,8 @@ function readInput(input, creatorId) {
 
 /**
  * Members from the (validated) form, creator first. Existing entries keep
- * their answer; an accepted member whose duty changed must accept again.
+ * their answer; an accepted member whose duty changed must accept again (a
+ * creator who leads is re-accepted automatically on send).
  */
 async function buildMembers(inputMembers, creator, existing = []) {
   const wanted = new Map([[str(creator._id), ""]]); // creator first
@@ -256,7 +263,7 @@ async function buildMembers(inputMembers, creator, existing = []) {
     const prev = old.get(id);
     const base = { employee: id, nameSnapshot: nameOf(byId.get(id)), duty };
     if (!prev) return { ...base, status: "invited", signature: "", respondedAt: null, declineReason: "", invitedInRevision: null };
-    if (prev.status === "accepted" && prev.duty !== duty && id !== str(creator._id)) {
+    if (prev.status === "accepted" && prev.duty !== duty) {
       return { ...base, status: "invited", signature: "", respondedAt: null, declineReason: "", invitedInRevision: null };
     }
     return { ...prev, ...base };
@@ -299,6 +306,10 @@ async function loadOwn(session, id, { readOnly = false } = {}) {
   return { doc, emp, isCreator: !!emp && str(doc.createdBy) === str(emp._id) };
 }
 
+function isLeader(doc, empId) {
+  return !!empId && str(doc.leader) === str(empId);
+}
+
 function requireCreator(isCreator) {
   if (!isCreator) throw new OffsiteError("เฉพาะผู้สร้างคำขอเท่านั้นที่ทำรายการนี้ได้", 403);
 }
@@ -331,7 +342,10 @@ function markReturned(doc, session, { step, byName, reason }) {
   addEvent(doc, session, "returned", step ? `ขั้นที่ ${step}: ${reason}` : reason);
 }
 
-/** What changed since the snapshot: { fields, membersAdded, membersRemoved, memberSetChanged }. */
+/**
+ * What changed since the snapshot: { fields, membersAdded, membersRemoved,
+ * memberSetChanged, leaderChange? { from, to } (names) }.
+ */
 function diffSnapshot(snapshot, doc) {
   const now = takeSnapshot(doc);
   const fields = SNAPSHOT_FIELDS.filter((k) => str(snapshot.details?.[k]) !== str(now.details[k]));
@@ -340,7 +354,10 @@ function diffSnapshot(snapshot, doc) {
   const membersAdded = now.members.filter((m) => !before.has(m.employee)).map((m) => m.nameSnapshot);
   const membersRemoved = (snapshot.members || []).filter((m) => !after.has(m.employee)).map((m) => m.nameSnapshot);
   if (now.members.some((m) => before.has(m.employee) && clean(before.get(m.employee).duty) !== clean(m.duty))) fields.push("duties");
-  return { fields, membersAdded, membersRemoved, memberSetChanged: membersAdded.length > 0 || membersRemoved.length > 0 };
+  const leaderChange = fields.includes("leader")
+    ? { from: before.get(str(snapshot.details?.leader))?.nameSnapshot || "", to: after.get(now.details.leader)?.nameSnapshot || "" }
+    : undefined;
+  return { fields, membersAdded, membersRemoved, memberSetChanged: membersAdded.length > 0 || membersRemoved.length > 0, leaderChange };
 }
 
 const clearSign = { signature: "", signedAt: null, confirmedAt: null, reason: "", selfApproval: false };
@@ -361,6 +378,25 @@ function resetApprovals(doc, memberSetChanged, now) {
       a.set({ status: "needs_resign", ...clearSign });
     }
   }
+}
+
+/**
+ * Step 1 belongs to the team leader: point it at `doc.leader` (name from the
+ * member list). A step 1 already signed stays as it is — unless `resign` and
+ * the leader changed, when the new leader signs afresh (needs_resign).
+ * Returns true when that happened.
+ */
+function pointStep1AtLeader(doc, { resign = false } = {}) {
+  const a = stepOf(doc, 1);
+  const leaderId = str(doc.leader);
+  const name = doc.members.find((m) => str(m.employee) === leaderId)?.nameSnapshot || "";
+  if (a.status === "approved") {
+    if (!resign || str(a.approver) === leaderId) return false;
+    a.set({ role: "leader", approver: doc.leader, approverName: name, status: "needs_resign", ...clearSign });
+    return true;
+  }
+  a.set({ role: "leader", approver: doc.leader || null, approverName: name });
+  return false;
 }
 
 /**
@@ -425,15 +461,18 @@ function viewerFlags(doc, empId, isCreator, user) {
   const active = activeStepOf(doc);
   const a = active ? stepOf(doc, active) : null;
   const isActiveApprover = !!a && str(a.approver) === me;
+  const leads = isLeader(doc, me);
   return {
     employeeId: me,
     isCreator,
+    isLeader: leads,
     inRequest: inRequest(doc, me),
     memberStatus: mine?.status || null,
     canEdit: isCreator && ALLOWED_FROM.update.includes(doc.status),
     canSend: isCreator && ALLOWED_FROM.send.includes(doc.status),
-    canRespond: !isCreator && doc.status === "inviting" && mine?.status === "invited",
-    canSubmit: isCreator && doc.status === "members_ready",
+    // A creator who leads is auto-accepted; any other creator answers like a member.
+    canRespond: !(isCreator && leads) && doc.status === "inviting" && mine?.status === "invited",
+    canSubmit: leads && doc.status === "members_ready",
     canCancel: isCreator && ALLOWED_FROM.cancel.includes(doc.status),
     activeStep: active,
     canApprove: isActiveApprover && a.status === "pending",
@@ -570,17 +609,21 @@ export async function listHistory(employeeId, year = null) {
   };
 }
 
+// Waiting for my signature: step 2/3 is mine, or I lead a members_ready request (step 1).
 const activeApprovalMatch = (me) => ({
-  status: "in_approval",
-  approvals: { $elemMatch: { step: { $gte: 2 }, approver: me, status: { $in: ACTIVE_APPROVAL_STATUSES } } },
+  $or: [
+    { status: "in_approval", approvals: { $elemMatch: { step: { $gte: 2 }, approver: me, status: { $in: ACTIVE_APPROVAL_STATUSES } } } },
+    { status: "members_ready", leader: me },
+  ],
 });
-const invitesMatch = (me) => ({ status: "inviting", members: { $elemMatch: { employee: me, status: "invited" } }, createdBy: { $ne: me } });
+// A creator who leads is accepted on send, so a creator still "invited" is not the leader.
+const invitesMatch = (me) => ({ status: "inviting", members: { $elemMatch: { employee: me, status: "invited" } } });
 
 /**
  * The caller's lists. `box`: "mine" (created by me), "invites" (waiting for
  * my answer), "member" (requests I am on, created by someone else),
- * "approvals" (the active step is mine), "approved_by_me" (I approved or
- * rejected a step at some point).
+ * "approvals" (the active step is mine, step 1 included), "approved_by_me"
+ * (I approved or rejected a step at some point).
  */
 export async function listRequests(session, box = "mine") {
   const emp = await viewerEmployee(session);
@@ -595,7 +638,7 @@ export async function listRequests(session, box = "mine") {
   const docs = await OffsiteRequest.find(query).select(LIST_PROJECTION).sort({ workDate: -1, createdAt: -1 }).limit(200).lean();
   return docs.map((d) => {
     const mine = (d.members || []).find((m) => str(m.employee) === str(me));
-    const active = activeStepOf(d);
+    const active = activeStepOf(d) ?? (d.status === "members_ready" && str(d.leader) === str(me) ? 1 : null);
     return {
       _id: str(d._id),
       docNo: d.docNo || null,
@@ -650,13 +693,14 @@ export async function createRequest(session, input = {}) {
     leader: input.leader,
     members,
     approvals: [
-      { step: 1, role: "creator", approver: emp._id, approverName: nameOf(emp), status: "waiting" },
+      { step: 1, role: "leader", status: "waiting" },
       { step: 2, role: "accounting_head", status: "waiting" },
       { step: 3, role: "hr_head", status: "waiting" },
     ],
     status: "draft",
     revision: 0,
   });
+  pointStep1AtLeader(doc);
   addEvent(doc, session, "created", fields.jobName);
   await save(doc, session);
   return result(doc, emp, true, session.user);
@@ -670,14 +714,16 @@ export async function updateRequest(session, id, input = {}) {
   doc.set(fields);
   doc.members = await buildMembers(input.members, emp, doc.members);
   doc.leader = input.leader;
+  pointStep1AtLeader(doc); // a signed step 1 is settled on send
   addEvent(doc, session, "updated");
   await save(doc, session);
   return result(doc, emp, isCreator, session.user);
 }
 
 /**
- * Send (or resend) invitations. The creator is auto-accepted with their saved
- * signature. On a resend, members who already accepted stay accepted — unless
+ * Send (or resend) invitations. A creator who is the team leader is
+ * auto-accepted with their saved signature; any other creator is invited
+ * like a member. On a resend, members who already accepted stay accepted — unless
  * the job details (name, date, time, place) changed since the last send, in
  * which case everyone is invited again. Declined members still listed and
  * members not yet sent an invitation are invited; pending ones stay pending.
@@ -695,7 +741,8 @@ export async function sendInvitations(session, id, opts) {
     { ...plain, workDate: plain.workDate?.toISOString().slice(0, 10), members: plain.members.map((m) => ({ employee: str(m.employee), duty: m.duty })), leader: str(plain.leader) },
     emp._id
   );
-  const creatorPng = await requireSignature(emp._id);
+  const creatorLeads = isLeader(doc, emp._id);
+  const creatorPng = creatorLeads ? await requireSignature(emp._id) : null;
 
   const now = new Date();
   const revision = (doc.revision || 0) + 1;
@@ -707,17 +754,22 @@ export async function sendInvitations(session, id, opts) {
     const changes = diffSnapshot(doc.returnSnapshot, doc);
     doc.changeSummary = { fromRevision: doc.returnSnapshot.revision, toRevision: revision, ...changes };
     resetApprovals(doc, changes.memberSetChanged, now);
+    const newLeaderSigns = pointStep1AtLeader(doc, { resign: true });
     doc.returnSnapshot = null;
     addEvent(
       doc,
       session,
       "approvals_reset",
-      changes.memberSetChanged ? "รายชื่อสมาชิกเปลี่ยน — ทุกขั้นต้องเซ็นใหม่" : "รายชื่อสมาชิกเหมือนเดิม — ขั้นที่อนุมัติแล้วยืนยันอีกครั้ง"
+      changes.memberSetChanged
+        ? "รายชื่อสมาชิกเปลี่ยน — ทุกขั้นต้องเซ็นใหม่"
+        : `รายชื่อสมาชิกเหมือนเดิม — ขั้นที่อนุมัติแล้วยืนยันอีกครั้ง${newLeaderSigns ? " (หัวหน้าทีมเปลี่ยน — หัวหน้าทีมคนใหม่เซ็นขั้นที่ 1)" : ""}`
     );
+  } else {
+    pointStep1AtLeader(doc, { resign: true });
   }
 
   for (const m of doc.members) {
-    if (str(m.employee) === str(emp._id)) {
+    if (creatorLeads && str(m.employee) === str(emp._id)) {
       if (m.status !== "accepted" || detailsChanged || !m.signature) {
         m.set({ status: "accepted", signature: creatorPng, respondedAt: now, declineReason: "", invitedInRevision: revision });
       }
@@ -749,7 +801,7 @@ export async function respondToInvitation(session, id, { action, reason } = {}, 
   const { doc, emp, isCreator } = await loadOwn(session, id);
   const member = doc.members.find((m) => str(m.employee) === str(emp._id));
   if (!member) throw new OffsiteError("คุณไม่ได้อยู่ในรายชื่อสมาชิกของคำขอนี้", 403);
-  if (isCreator) throw new OffsiteError("ผู้สร้างคำขอตอบรับโดยอัตโนมัติเมื่อส่งคำเชิญ", 409);
+  if (isCreator && isLeader(doc, emp._id)) throw new OffsiteError("ผู้สร้างคำขอที่เป็นหัวหน้าทีมตอบรับโดยอัตโนมัติเมื่อส่งคำเชิญ", 409);
   assertFrom(doc, "respond");
   if (member.status !== "invited") {
     throw new OffsiteError(`คุณตอบคำเชิญนี้แล้ว (${MEMBER_STATUS_LABELS[member.status] || member.status})`, 409);
@@ -773,18 +825,20 @@ export async function respondToInvitation(session, id, { action, reason } = {}, 
   return result(doc, emp, isCreator, session.user);
 }
 
-/** Step 1: the creator signs (or re-signs); step 2 becomes active. */
+/** Step 1: the team leader signs (or re-signs); step 2 becomes active. */
 export async function submitStep1(session, id, opts) {
   const deps = withDefaults(opts);
   const { doc, emp, isCreator } = await loadOwn(session, id);
-  requireCreator(isCreator);
+  if (!isLeader(doc, emp._id)) throw new OffsiteError("เฉพาะหัวหน้าทีมเท่านั้นที่ลงนามขั้นที่ 1 ได้", 403);
   assertFrom(doc, "submit");
   if (!allAccepted(doc)) throw new OffsiteError("สมาชิกยังตอบรับไม่ครบทุกคน", 409);
   const png = await requireSignature(emp._id);
 
   const now = new Date();
-  stepOf(doc, 1).set({ approver: emp._id, approverName: nameOf(emp), status: "approved", signature: png, signedAt: now, confirmedAt: now, reason: "", selfApproval: false });
-  doc.set(await creatorSnapshot(emp));
+  // The leader is always a member, so step 1 is never a tagged self-approval.
+  stepOf(doc, 1).set({ role: "leader", approver: emp._id, approverName: nameOf(emp), status: "approved", signature: png, signedAt: now, confirmedAt: now, reason: "", selfApproval: false });
+  const creator = isCreator ? emp : await Employee.findById(doc.createdBy).select(VIEWER_FIELDS).lean();
+  if (creator) doc.set(await creatorSnapshot(creator));
   addEvent(doc, session, "step1_signed", nameOf(emp));
   await activateNext(doc, session, deps);
   await save(doc, session);

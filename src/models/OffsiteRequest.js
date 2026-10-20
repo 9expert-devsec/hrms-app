@@ -34,7 +34,8 @@ const ApprovalSchema = new Schema(
   {
     step: { type: Number, enum: [1, 2, 3], required: true },
     role: { type: String, enum: APPROVAL_ROLES, required: true },
-    // Resolved when the step becomes active (step 1: the creator).
+    // Resolved when the step becomes active (step 1: the team leader, kept in
+    // step with `leader`; legacy role "creator" = signed by the creator).
     approver: { type: Schema.Types.ObjectId, ref: "Employee", default: null },
     approverName: { type: String, default: "" },
     status: { type: String, enum: APPROVAL_STATUSES, default: "waiting" },
@@ -42,7 +43,8 @@ const ApprovalSchema = new Schema(
     signedAt: { type: Date, default: null },
     confirmedAt: { type: Date, default: null },
     reason: { type: String, default: "" },
-    // The approver is the creator or a member of this request (allowed, but tagged).
+    // Steps 2–3: the approver is the creator or a member of this request
+    // (allowed, but tagged). Never set on step 1.
     selfApproval: { type: Boolean, default: false },
   },
   { _id: false }
@@ -69,6 +71,8 @@ const ChangeSummarySchema = new Schema(
     membersAdded: { type: [String], default: [] }, // names
     membersRemoved: { type: [String], default: [] },
     memberSetChanged: { type: Boolean, default: false },
+    // Names; set only when the team leader changed.
+    leaderChange: { type: new Schema({ from: String, to: String }, { _id: false }), default: undefined },
   },
   { _id: false }
 );

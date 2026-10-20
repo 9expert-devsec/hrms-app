@@ -10,7 +10,6 @@ import {
   Pencil,
   Send,
   XCircle,
-  FileSignature,
   MapPin,
   CalendarDays,
   Clock,
@@ -23,10 +22,10 @@ import {
 import {
   APPROVAL_ASK_LABELS,
   APPROVAL_ROLE_LABELS,
-  CHANGE_FIELD_LABELS,
   DEFAULT_ALLOWANCE_PER_PERSON,
   SELF_APPROVAL_LABEL,
   TRAVEL_MODE_LABELS,
+  changeSummaryLines,
   formatDateTimeTh,
   formatWorkDateTh,
   validateHrSummary,
@@ -45,7 +44,7 @@ const EVENT_LABELS = {
   returned: "ส่งกลับให้ผู้สร้างแก้ไข",
   members_ready: "สมาชิกตอบรับครบ",
   approvals_reset: "ปรับขั้นการอนุมัติหลังส่งใหม่",
-  step1_signed: "ผู้สร้างลงนาม (ขั้นที่ 1)",
+  step1_signed: "ลงนามขั้นที่ 1",
   step2_pending: "รอหัวหน้าฝ่ายบัญชีลงนาม",
   step3_pending: "รอหัวหน้าฝ่ายบุคคลลงนาม",
   step2_reconfirm_pending: "รอหัวหน้าฝ่ายบัญชียืนยันอีกครั้ง",
@@ -130,24 +129,18 @@ function ReasonForm({ label, confirmLabel, onSubmit, onClose, busy }) {
   );
 }
 
-/** "สิ่งที่เปลี่ยนจากครั้งก่อน" — fields changed and members added/removed. */
+/** "สิ่งที่เปลี่ยนจากครั้งก่อน" — fields changed, leader change, members added/removed. */
 function ChangeSummary({ summary }) {
-  const nothing = !summary.fields.length && !summary.membersAdded.length && !summary.membersRemoved.length;
+  const lines = changeSummaryLines(summary);
   return (
     <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", color: "#1E3A8A" }} data-testid="change-summary">
       <div className="font-semibold">สิ่งที่เปลี่ยนจากครั้งก่อน (ครั้งที่ {summary.fromRevision} → {summary.toRevision})</div>
-      {nothing ? (
+      {!lines.length ? (
         <div className="mt-1">ไม่มีการเปลี่ยนแปลงข้อมูล — ส่งใหม่เพื่อขอพิจารณาอีกครั้ง</div>
       ) : (
         <ul className="mt-1 list-disc pl-5">
-          {summary.fields.map((f) => (
-            <li key={f}>แก้ไข{CHANGE_FIELD_LABELS[f] || f}</li>
-          ))}
-          {summary.membersAdded.map((n) => (
-            <li key={`+${n}`}>เพิ่มสมาชิก: {n}</li>
-          ))}
-          {summary.membersRemoved.map((n) => (
-            <li key={`-${n}`}>นำสมาชิกออก: {n}</li>
+          {lines.map((line) => (
+            <li key={line}>{line}</li>
           ))}
         </ul>
       )}
@@ -173,7 +166,7 @@ export default function OffsiteDetail({ id }) {
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState(searchParams.get("error") || "");
   const [busy, setBusy] = useState(null);
-  const [panel, setPanel] = useState(null); // decline | cancel | submit | reject
+  const [panel, setPanel] = useState(null); // decline | cancel | reject
   const [hr, setHr] = useState(null);
   const [hrErrors, setHrErrors] = useState({});
 
@@ -224,7 +217,14 @@ export default function OffsiteDetail({ id }) {
   const isApproverHere = v.canApprove || v.canReconfirm;
   const showChanges = r.changeSummary && r.changeSummary.toRevision === r.revision && r.status !== "returned" && r.status !== "draft";
 
-  const notes = [`${accepted}/${r.members.length} คน`, step(1).status === "approved" ? formatDateTimeTh(step(1).signedAt) : stepNote(step(1)), stepNote(step(2)), stepNote(step(3)), ""];
+  const step1Waiting = r.status === "members_ready"; // all accepted; the leader signs step 1
+  const notes = [
+    `${accepted}/${r.members.length} คน`,
+    step(1).status === "approved" ? formatDateTimeTh(step(1).signedAt) : step1Waiting ? `รอ ${step(1).approverName}` : stepNote(step(1)),
+    stepNote(step(2)),
+    stepNote(step(3)),
+    "",
+  ];
 
   const approveWithHr = () => {
     if (v.activeStep === 3) {
@@ -384,7 +384,8 @@ export default function OffsiteDetail({ id }) {
       {v.canRespond && (
         <Section title="คำเชิญของคุณ">
           <p className="text-sm" style={{ color: NAVY }}>
-            {r.creatorNameTh} เชิญคุณไปปฏิบัติงานนอกสถานที่ หน้าที่ของคุณ: <b>{mine?.duty || "-"}</b>
+            {v.isCreator ? "คุณสร้างคำขอนี้และเป็นสมาชิก (ไม่ใช่หัวหน้าทีม) กรุณาลงนามยอมรับเพื่อยืนยันการเข้าร่วม" : `${r.creatorNameTh} เชิญคุณไปปฏิบัติงานนอกสถานที่`}
+            {v.isLeader && " — คุณเป็นหัวหน้าทีม เมื่อสมาชิกตอบรับครบ คุณจะลงนามขั้นที่ 1"} หน้าที่ของคุณ: <b>{mine?.duty || "-"}</b>
             <br />
             <span style={{ color: SLATE }}>อ่านรายละเอียดด้านล่าง แล้วลงนามเพื่อยอมรับ หรือปฏิเสธพร้อมเหตุผล</span>
           </p>
@@ -405,32 +406,34 @@ export default function OffsiteDetail({ id }) {
       )}
 
       {/* ── Creator actions ───────────────────────── */}
-      {v.isCreator && ["draft", "returned", "inviting", "members_ready"].includes(r.status) && (
+      {v.canSend && (
         <Section title="การดำเนินการของผู้สร้าง">
           <div className="flex flex-wrap gap-3">
-            {v.canSend && (
-              <Button onClick={() => act("send")} disabled={!!busy}>
-                {busy === "send" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                {r.status === "returned" ? "ส่งคำเชิญอีกครั้ง" : "ส่งคำเชิญ"}
-              </Button>
-            )}
-            {["inviting", "members_ready"].includes(r.status) && (
-              <Button onClick={() => setPanel("submit")} disabled={!v.canSubmit || panel === "submit"} data-testid="submit-form">
-                <FileSignature size={14} /> {step(1).status === "needs_resign" ? "เซ็นใหม่และส่งแบบฟอร์ม" : "ส่งแบบฟอร์ม"}
-              </Button>
-            )}
+            <Button onClick={() => act("send")} disabled={!!busy}>
+              {busy === "send" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {r.status === "returned" ? "ส่งคำเชิญอีกครั้ง" : "ส่งคำเชิญ"}
+            </Button>
           </div>
-          {r.status === "inviting" && <p className="text-xs" style={{ color: SLATE }}>ส่งแบบฟอร์มได้เมื่อสมาชิกทุกคนตอบรับแล้ว ({accepted}/{r.members.length})</p>}
-          {panel === "submit" && v.canSubmit && (
-            <div className="rounded-xl p-4" style={{ background: "#F8FAFD" }}>
-              <SignatureConfirm
-                title={step(1).status === "needs_resign" ? "ขั้นที่ 1 — ผู้สร้างคำขอเซ็นใหม่ (รายชื่อสมาชิกเปลี่ยน)" : "ขั้นที่ 1 — ผู้สร้างคำขอลงนาม"}
-                note="เมื่อยืนยัน แบบฟอร์มจะส่งต่อให้หัวหน้าฝ่ายบัญชี (ขั้นที่ 2)"
-                confirmLabel="ยืนยันและส่งแบบฟอร์ม"
-                busy={busy === "submit"}
-                onConfirm={() => act("submit")}
-              />
-            </div>
+        </Section>
+      )}
+
+      {/* ── Step 1: the team leader signs ─────────── */}
+      {(v.isLeader || v.isCreator) && ["inviting", "members_ready"].includes(r.status) && (
+        <Section title="ขั้นที่ 1 — หัวหน้าทีมลงนาม" highlight={v.canSubmit}>
+          {v.canSubmit ? (
+            <SignatureConfirm
+              title={step(1).status === "needs_resign" ? "เซ็นใหม่ในฐานะหัวหน้าทีม (รายชื่อสมาชิกหรือหัวหน้าทีมเปลี่ยน)" : "ลงนามในฐานะหัวหน้าทีม"}
+              note="สมาชิกทุกคนตอบรับแล้ว เมื่อยืนยัน แบบฟอร์มจะส่งต่อให้หัวหน้าฝ่ายบัญชี (ขั้นที่ 2)"
+              confirmLabel="ยืนยันและส่งแบบฟอร์ม"
+              busy={busy === "submit"}
+              onConfirm={() => act("submit")}
+            />
+          ) : (
+            <p className="text-sm" style={{ color: SLATE }} data-testid="step1-wait">
+              {r.status === "inviting"
+                ? `รอสมาชิกตอบรับให้ครบ (${accepted}/${r.members.length}) — จากนั้น${v.isLeader ? "คุณ" : `หัวหน้าทีม (${step(1).approverName})`}จะลงนามขั้นที่ 1 เพื่อส่งแบบฟอร์ม`
+                : `สมาชิกตอบรับครบแล้ว — รอหัวหน้าทีม (${step(1).approverName}) ลงนามขั้นที่ 1`}
+            </p>
           )}
         </Section>
       )}
@@ -513,7 +516,9 @@ export default function OffsiteDetail({ id }) {
                 <div className="mt-1 text-sm font-medium" style={{ color: NAVY }}>
                   {a.status === "approved" || a.status === "needs_reconfirm"
                     ? a.approverName
-                    : a.status === "pending"
+                    : n === 1 && step1Waiting
+                      ? `รอ${APPROVAL_ROLE_LABELS[a.role]} (${a.approverName})`
+                      : a.status === "pending"
                       ? `รอ${APPROVAL_ROLE_LABELS[a.role]} (${a.approverName})`
                       : a.status === "rejected"
                         ? `${a.approverName} — ไม่อนุมัติ`

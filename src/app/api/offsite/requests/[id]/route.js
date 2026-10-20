@@ -51,9 +51,9 @@ export async function PATCH(req, ctx) {
 /**
  * Actions. Body { action, reason? }:
  *   send     — creator sends / resends invitations
- *   accept   — an invited member signs and accepts
+ *   accept   — an invited member signs and accepts (the creator too, unless they lead)
  *   decline  — an invited member declines (reason required)
- *   submit   — creator signs step 1
+ *   submit   — the team leader signs step 1
  *   cancel   — creator cancels (reason required)
  *   approve  — the active step's approver signs { step?, hrSummary? (step 3) }
  *   reject   — the active step's approver declines { step?, reason }

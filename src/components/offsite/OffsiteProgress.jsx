@@ -5,7 +5,7 @@ import { PROGRESS_STEPS } from "@/lib/offsiteRules";
 import { BLUE, NAVY, SLATE, LIME } from "./ui";
 
 /**
- * สมาชิกตอบรับ → ผู้สร้างเซ็น → บัญชี → HR → อนุมัติแล้ว. `progress` comes
+ * สมาชิกตอบรับ → หัวหน้าทีมเซ็น → บัญชี → HR → อนุมัติแล้ว. `progress` comes
  * from lib/offsiteRules.progressOf; `notes[i]` is a small line under step i.
  */
 export default function OffsiteProgress({ progress, notes = [] }) {
