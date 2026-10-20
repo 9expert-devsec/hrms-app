@@ -51,8 +51,12 @@ const EmployeeSchema = new Schema(
       ref: "Department",
       required: true,
     },
-    signatureDataUrl: { type: String, default: "" }, // PNG data URL
-    signatureUpdatedAt: { type: Date },
+    // Legacy (unread since round 18): signatures live in EmployeeSignature,
+    // read/written only through /api/signature. Kept as a backup until a
+    // later round drops it; select:false keeps it out of every query, so it
+    // can never reach the browser. scripts/migrate-signatures.mjs reads it raw.
+    signatureDataUrl: { type: String, default: "", select: false },
+    signatureUpdatedAt: { type: Date, select: false },
 
     emergency: {
       firstName: String,

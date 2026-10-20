@@ -12,6 +12,7 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
+import { saveMySignature } from "../../../../../components/offsite/SignatureConfirm";
 
 /* ---------- config ---------- */
 const UNLIMITED = new Set(["WFH", "ERR", "OFFSITE"]); // ประเภทที่ไม่จำกัดจำนวนครั้ง
@@ -134,14 +135,15 @@ export default function LeaveRequestClient({ initial }) {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch("/api/employees/me/signature", {
+        // The one signature store (EmployeeSignature), shared with off-site.
+        const res = await fetch("/api/signature", {
           cache: "no-store",
         });
-        const j = await res.json().catch(() => ({}));
+        const j = res.ok ? await res.json().catch(() => ({})) : {};
         if (!alive) return;
-        setSavedSig(j?.signatureDataUrl || "");
-        setUseSaved(Boolean(j?.signatureDataUrl));
-        setShowPad(!j?.signatureDataUrl);
+        setSavedSig(j?.png || "");
+        setUseSaved(Boolean(j?.png));
+        setShowPad(!j?.png);
       } catch {
       } finally {
         if (alive) setLoadingSig(false);
@@ -241,6 +243,17 @@ export default function LeaveRequestClient({ initial }) {
         ?.includes("application/json");
       const j = okJson ? await res.json() : {};
       if (!res.ok) throw new Error(j?.message || `HTTP ${res.status}`);
+
+      // A newly drawn signature becomes "my signature" (EmployeeSignature,
+      // shared with off-site). The request keeps its own copy either way.
+      if (sigDataUrl && sigDataUrl !== savedSig) {
+        try {
+          const saved = await saveMySignature(sigDataUrl);
+          setSavedSig(saved?.png || sigDataUrl);
+        } catch (err) {
+          console.warn("[leave] could not save signature:", err?.message);
+        }
+      }
 
       alert("ส่งคำขอเรียบร้อย");
       setReason("");

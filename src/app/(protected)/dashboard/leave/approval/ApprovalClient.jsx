@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
+import { saveMySignature } from "../../../../../components/offsite/SignatureConfirm";
 
 function cls(...xs) { return xs.filter(Boolean).join(" "); }
 const fmtDR = (s,e) => {
@@ -66,7 +67,7 @@ export default function ApprovalClient() {
   const [sigOpen, setSigOpen] = useState(null); // { id, row }
   const onApproveClick = (row) => setSigOpen({ id: row._id, row });
 
-  const onApproveWithSignature = async (signatureDataUrl) => {
+  const onApproveWithSignature = async (signatureDataUrl, { saveAsMine = false } = {}) => {
     if (!sigOpen?.id) return;
     try {
       const res = await fetch(`/api/leave/requests/${sigOpen.id}/approve`, {
@@ -76,6 +77,14 @@ export default function ApprovalClient() {
       });
       const j = await res.json().catch(()=> ({}));
       if (!res.ok) throw new Error(j?.message || "approve failed");
+      // Ticked "บันทึกลายเซ็นนี้เป็นลายเซ็นหลักของฉัน": the drawn one becomes my signature.
+      if (saveAsMine) {
+        try {
+          await saveMySignature(signatureDataUrl);
+        } catch (err) {
+          console.warn("[leave] could not save signature:", err?.message);
+        }
+      }
       setSigOpen(null);
       await load(); // อัปเดตรายการและเอกสารล่าสุด
     } catch (e) {
@@ -240,17 +249,19 @@ function SignatureModal({ onClose, onSubmit }) {
   const [savedSig, setSavedSig] = useState("");
   const [useSaved, setUseSaved] = useState(true);
   const [showPad, setShowPad] = useState(false);
+  const [saveAsMine, setSaveAsMine] = useState(true); // a drawn signature → EmployeeSignature
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const r = await fetch("/api/employees/me/signature", { cache: "no-store" });
-        const j = await r.json().catch(()=> ({}));
+        // The one signature store (EmployeeSignature), shared with off-site.
+        const r = await fetch("/api/signature", { cache: "no-store" });
+        const j = r.ok ? await r.json().catch(()=> ({})) : {};
         if (!alive) return;
-        setSavedSig(j?.signatureDataUrl || "");
-        setUseSaved(!!j?.signatureDataUrl);
-        setShowPad(!j?.signatureDataUrl);
+        setSavedSig(j?.png || "");
+        setUseSaved(!!j?.png);
+        setShowPad(!j?.png);
       } catch {} finally { if (alive) setLoadingSig(false); }
     })();
     return () => { alive = false; };
@@ -275,13 +286,14 @@ function SignatureModal({ onClose, onSubmit }) {
 
   const submit = () => {
     let dataUrl = "";
-    if (useSaved && savedSig) dataUrl = savedSig;
+    const drawn = !(useSaved && savedSig);
+    if (!drawn) dataUrl = savedSig;
     else {
       const cvs = padRef.current;
       dataUrl = cvs?.toDataURL("image/png") || "";
     }
     if (!/^data:image\/png;base64,/.test(dataUrl)) return alert("กรุณาลงลายเซ็น");
-    onSubmit(dataUrl);
+    onSubmit(dataUrl, { saveAsMine: drawn && saveAsMine });
   };
 
   return (
@@ -325,12 +337,10 @@ function SignatureModal({ onClose, onSubmit }) {
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <button onClick={clearPad} className="rounded bg-white/10 hover:bg-white/15 px-3 py-1.5 text-slate-200">ล้าง</button>
-                  {!savedSig && (
-                    <label className="text-slate-400 text-sm inline-flex items-center gap-2">
-                      <input type="checkbox" checked={useSaved} onChange={(e)=>setUseSaved(e.target.checked)} />
-                      บันทึกลายเซ็นนี้เป็นลายเซ็นหลักของฉัน (ถ้ามี API รองรับ)
-                    </label>
-                  )}
+                  <label className="text-slate-400 text-sm inline-flex items-center gap-2">
+                    <input type="checkbox" checked={saveAsMine} onChange={(e)=>setSaveAsMine(e.target.checked)} />
+                    บันทึกลายเซ็นนี้เป็นลายเซ็นหลักของฉัน
+                  </label>
                 </div>
               </div>
             )}
