@@ -1,10 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users, Search, KeyRound, Ban, CheckCircle2, Check, X, Loader2, LockOpen, Trash2, Mail } from "lucide-react";
-import { accountActionBlock, accountDeleteBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
+import {
+  Users,
+  Search,
+  KeyRound,
+  Ban,
+  CheckCircle2,
+  Check,
+  X,
+  Loader2,
+  LockOpen,
+  Trash2,
+  Mail,
+  UserPlus,
+  Link2,
+  Unlink,
+} from "lucide-react";
+import { accountActionBlock, accountDeleteBlock, linkActionBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
 import ResetPasswordDialog from "../../../../../components/ResetPasswordDialog";
+import TempPasswordDialog from "../../../../../components/TempPasswordDialog";
 
 /* ── design tokens (same as the other settings pages) ───────── */
 const NAVY = "#0D1B2A";
@@ -55,10 +72,12 @@ export default function UsersClient({ initial, actor }) {
   const [deleting, setDeleting] = useState(null); // { user, typed } — superadmin delete dialog
   const [roleFilter, setRoleFilter] = useState("all");
 
-  const [confirm, setConfirm] = useState(null); // { user, action: "suspend" | "activate" | "unlock" }
+  const [confirm, setConfirm] = useState(null); // { user, action: "suspend" | "activate" | "unlock" | "unlink" }
   const [busy, setBusy] = useState(false);
   const [resetFor, setResetFor] = useState(null); // user — ResetPasswordDialog
   const [editingEmail, setEditingEmail] = useState(null); // { user, value, error }
+  const [picker, setPicker] = useState(null); // { mode: "create" } | { mode: "link", user } — EmployeePicker
+  const [created, setCreated] = useState(null); // { email, tempPassword } — shown once
   const [toast, setToast] = useState(null);
 
   const roleByKey = useMemo(() => new Map(data.roles.map((r) => [r.key, r])), [data.roles]);
@@ -106,6 +125,12 @@ export default function UsersClient({ initial, actor }) {
         if (!res.ok || !j.ok) throw new Error(j.message || j.error || "ปลดล็อกไม่สำเร็จ");
         setConfirm(null);
         showToast("ปลดล็อกบัญชีแล้ว");
+      } else if (action === "unlink") {
+        const res = await fetch(`/api/employees/${user.employee._id}/account`, { method: "DELETE" });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) throw new Error(j.message || j.error || "ยกเลิกการผูกไม่สำเร็จ");
+        setConfirm(null);
+        showToast("ยกเลิกการผูกแล้ว — บัญชียังอยู่ พร้อมบทบาทเดิม");
       } else {
         const res = await fetch(`/api/users/${user._id}/status`, {
           method: "PATCH",
@@ -186,7 +211,42 @@ export default function UsersClient({ initial, actor }) {
     }
   }
 
+  /** Picker choice: create an account for the employee, or link them to `picker.user`. */
+  async function runPicked(emp) {
+    if (!picker) return;
+    setBusy(true);
+    try {
+      const res =
+        picker.mode === "create"
+          ? await fetch(`/api/employees/${emp._id}/account`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({}), // employee's email, role employee
+            })
+          : await fetch(`/api/employees/${emp._id}/account`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: picker.user._id }),
+            });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) throw new Error(j.message || j.error || "บันทึกไม่สำเร็จ");
+      setPicker(null);
+      if (picker.mode === "create") setCreated({ email: j.account?.email || emp.email, tempPassword: j.tempPassword });
+      else showToast(`ผูก ${picker.user.email} กับ ${emp.name} แล้ว`);
+      router.refresh();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const confirmCopy = {
+    unlink: {
+      title: "ยกเลิกการผูกพนักงาน",
+      body: "บัญชีจะยังอยู่พร้อมบทบาทเดิม แต่จะไม่เห็นข้อมูลของพนักงานคนนี้อีก — ผูกใหม่ได้ภายหลัง",
+      cta: "ยกเลิกการผูก",
+    },
     suspend: {
       title: "ระงับบัญชี",
       body: "ผู้ใช้จะเข้าสู่ระบบไม่ได้ และการใช้งานที่เปิดอยู่จะถูกตัดภายในประมาณ 5 นาที",
@@ -207,20 +267,29 @@ export default function UsersClient({ initial, actor }) {
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto" }} className="space-y-6">
       {/* ── Header ─────────────────────────────── */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div
           className="flex h-10 w-10 items-center justify-center rounded-xl"
           style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
         >
           <Users size={22} strokeWidth={1.8} />
         </div>
-        <div>
+        <div style={{ flex: "1 1 320px" }}>
           <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>ผู้ใช้</h1>
           <p style={{ color: SLATE, fontSize: 13 }}>
-            บัญชีเข้าสู่ระบบทั้งหมด — รีเซ็ตรหัสผ่าน แก้ไขอีเมล ระงับ/เปิดใช้งาน ปลดล็อก
+            บัญชีเข้าสู่ระบบทั้งหมด — รีเซ็ตรหัสผ่าน แก้ไขอีเมล ระงับ/เปิดใช้งาน ปลดล็อก สร้างบัญชีและผูกพนักงาน
             {actor.isSuperadmin ? " และกำหนดบทบาท" : ""}
           </p>
         </div>
+        <button
+          onClick={() => setPicker({ mode: "create" })}
+          className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5"
+          style={{ background: BLUE, color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
+          data-testid="create-account-for-employee"
+        >
+          <UserPlus size={15} />
+          สร้างบัญชีให้พนักงาน
+        </button>
       </div>
 
       {/* ── Filters ────────────────────────────── */}
@@ -279,6 +348,7 @@ export default function UsersClient({ initial, actor }) {
               const statusAction = u.status === "suspended" ? "activate" : "suspend";
               const statusBlock = actionBlock(u, statusAction);
               const unlockBlock = u.lockedUntil ? actionBlock(u, "unlock") : null;
+              const linkBlock = linkActionBlock({ actor, target: targetOf(u), action: u.employee ? "unlink" : "link" });
               const deleteBlock = actor.isSuperadmin
                 ? accountDeleteBlock({ actor, target: targetOf(u), activeSuperadminCount: data.activeSuperadminCount })
                 : null;
@@ -333,7 +403,12 @@ export default function UsersClient({ initial, actor }) {
                     {u.employee ? (
                       <>
                         <span style={{ color: SLATE }}>#{u.employee.empAutoId ?? "-"}</span>{" "}
-                        <span style={{ color: NAVY }}>{u.employee.name || "-"}</span>
+                        <Link
+                          href={`/dashboard/hrm/employee-profile?id=${u.employee._id}`}
+                          style={{ color: BLUE, textDecoration: "underline", textUnderlineOffset: 2 }}
+                        >
+                          {u.employee.name || "-"}
+                        </Link>
                         {u.employee.emailMismatch && (
                           <div className="mt-1" title="อีเมลของบัญชีไม่ตรงกับอีเมลพนักงาน">
                             <Pill bg="#FEF3C7" color="#92400E">อีเมลไม่ตรงกับพนักงาน</Pill>
@@ -391,6 +466,27 @@ export default function UsersClient({ initial, actor }) {
                           แก้ไขอีเมล
                         </button>
                       </span>
+                      <span title={linkBlock?.error}>
+                        {u.employee ? (
+                          <button
+                            onClick={() => setConfirm({ user: u, action: "unlink" })}
+                            disabled={!!linkBlock}
+                            style={{ ...actionBtn(SLATE), opacity: linkBlock ? 0.45 : 1 }}
+                          >
+                            <Unlink size={13} />
+                            ยกเลิกการผูก
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setPicker({ mode: "link", user: u })}
+                            disabled={!!linkBlock}
+                            style={{ ...actionBtn(BLUE), opacity: linkBlock ? 0.45 : 1 }}
+                          >
+                            <Link2 size={13} />
+                            ผูกพนักงาน
+                          </button>
+                        )}
+                      </span>
                       <span title={statusBlock?.error}>
                         <button
                           onClick={() => setConfirm({ user: u, action: statusAction })}
@@ -438,7 +534,10 @@ export default function UsersClient({ initial, actor }) {
           <h3 id="confirm-title" style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
             {confirmCopy[confirm.action].title}
           </h3>
-          <p style={{ color: NAVY, fontSize: 14, marginTop: 8 }}>{confirm.user.email}</p>
+          <p style={{ color: NAVY, fontSize: 14, marginTop: 8 }}>
+            {confirm.user.email}
+            {confirm.action === "unlink" && confirm.user.employee ? ` ↔ ${confirm.user.employee.name}` : ""}
+          </p>
           <p style={{ color: SLATE, fontSize: 14, marginTop: 8 }}>{confirmCopy[confirm.action].body}</p>
           <div className="flex justify-end gap-3 mt-6">
             <button onClick={() => setConfirm(null)} disabled={busy} style={secondaryBtn}>
@@ -449,7 +548,7 @@ export default function UsersClient({ initial, actor }) {
               disabled={busy}
               className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5"
               style={{
-                background: confirm.action === "suspend" ? "#991B1B" : BLUE,
+                background: confirm.action === "suspend" || confirm.action === "unlink" ? "#991B1B" : BLUE,
                 color: "#FFFFFF",
                 fontSize: 13,
                 fontWeight: 600,
@@ -582,6 +681,28 @@ export default function UsersClient({ initial, actor }) {
         </Dialog>
       )}
 
+      {/* ── Employee picker: create an account / link to this account ── */}
+      {picker && (
+        <EmployeePicker
+          title={picker.mode === "create" ? "สร้างบัญชีให้พนักงาน" : `ผูกพนักงานกับ ${picker.user.email}`}
+          note={
+            picker.mode === "create"
+              ? "เลือกพนักงานที่ยังไม่มีบัญชี — บัญชีใหม่ใช้อีเมลของพนักงาน บทบาท employee และรหัสผ่านชั่วคราว (ผู้ใช้ต้องเปลี่ยนเมื่อเข้าสู่ระบบครั้งแรก)"
+              : "เลือกพนักงานที่ยังไม่มีบัญชี — ผู้ใช้จะเห็นข้อมูลของพนักงานคนนี้หลังผูก"
+          }
+          cta={picker.mode === "create" ? "สร้างบัญชี" : "ผูกพนักงาน"}
+          employees={data.employeesWithoutAccount || []}
+          busy={busy}
+          onPick={runPicked}
+          onClose={() => !busy && setPicker(null)}
+        />
+      )}
+
+      {/* ── New account's temporary password (shown once) ── */}
+      {created && (
+        <TempPasswordDialog email={created.email} tempPassword={created.tempPassword} onClose={() => setCreated(null)} />
+      )}
+
       {/* ── Toast ─────────────────────────────── */}
       {toast && (
         <div
@@ -600,6 +721,76 @@ export default function UsersClient({ initial, actor }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Pick one employee with no account (search: Thai / English name, nickname). */
+function EmployeePicker({ title, note, cta, employees, busy, onPick, onClose }) {
+  const [q, setQ] = useState("");
+  const [chosen, setChosen] = useState(null);
+  const needle = q.trim().toLowerCase();
+  const list = needle ? employees.filter((e) => (e.nameSearch || e.name || "").toLowerCase().includes(needle)) : employees;
+  return (
+    <Dialog onClose={onClose} labelledBy="picker-title">
+      <h3 id="picker-title" style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
+        {title}
+      </h3>
+      <p style={{ color: SLATE, fontSize: 13, marginTop: 6 }}>{note}</p>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="ค้นหาชื่อไทย / อังกฤษ / ชื่อเล่น…"
+        aria-label="ค้นหาพนักงาน"
+        style={{ ...inputStyle, marginTop: 14 }}
+        autoFocus
+      />
+      <ul
+        className="mt-3 overflow-y-auto"
+        style={{ maxHeight: 280, border: "1px solid rgba(0,92,255,0.10)", borderRadius: 10 }}
+        role="listbox"
+        aria-label="พนักงานที่ยังไม่มีบัญชี"
+      >
+        {list.map((e) => (
+          <li key={e._id}>
+            <button
+              type="button"
+              role="option"
+              aria-selected={chosen?._id === e._id}
+              onClick={() => setChosen(e)}
+              className="w-full text-left px-3 py-2"
+              style={{ background: chosen?._id === e._id ? "rgba(0,92,255,0.08)" : "#FFFFFF", borderBottom: "1px solid rgba(0,92,255,0.06)" }}
+            >
+              <div style={{ color: NAVY, fontSize: 14, fontWeight: 600 }}>
+                {e.name || "-"}
+                {e.nickName ? <span style={{ color: SLATE, fontWeight: 400 }}> ({e.nickName})</span> : null}
+              </div>
+              <div style={{ color: SLATE, fontSize: 12 }}>
+                {[e.nameEn !== e.name ? e.nameEn : null, e.department, e.position, e.email].filter(Boolean).join(" · ")}
+              </div>
+            </button>
+          </li>
+        ))}
+        {list.length === 0 && (
+          <li style={{ padding: 16, color: SLATE, fontSize: 13, textAlign: "center" }}>
+            {employees.length ? "ไม่พบพนักงานที่ตรงคำค้น" : "พนักงานทุกคนมีบัญชีแล้ว"}
+          </li>
+        )}
+      </ul>
+      <div className="flex justify-end gap-3 mt-6">
+        <button onClick={onClose} disabled={busy} style={secondaryBtn}>
+          ยกเลิก
+        </button>
+        <button
+          onClick={() => chosen && onPick(chosen)}
+          disabled={busy || !chosen}
+          className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 disabled:opacity-50"
+          style={{ background: BLUE, color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
+        >
+          {busy && <Loader2 size={15} className="animate-spin" />}
+          {cta}
+        </button>
+      </div>
+    </Dialog>
   );
 }
 

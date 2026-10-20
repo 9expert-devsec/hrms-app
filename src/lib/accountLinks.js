@@ -6,8 +6,9 @@ import { findRole } from "@/lib/rbac/resolveRole";
 import { assertAssignableRole, countActiveSuperadmins, RoleError } from "@/lib/rbac/roles";
 import { linkActionBlock, accountDeleteBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
+import { canAccess } from "@/lib/rbac/access";
 import { AccountError, newAccountPassword } from "@/lib/accounts";
-import { employeeDisplayName } from "@/lib/employeeName";
+import { employeeDisplayName, employeeNameEn, employeeNameSearchText } from "@/lib/employeeName";
 
 /**
  * Employee ↔ account links. Employee.userId is THE link and it is one-to-one:
@@ -16,16 +17,30 @@ import { employeeDisplayName } from "@/lib/employeeName";
  * but has no self-service data. User.employeeId is kept as a mirror on every
  * write here (older rows only have Employee.userId).
  *
- * Who: employees holders and the superadmin create / link / unlink (guard
- * rails in rbac/accountRules.js linkActionBlock); only the superadmin deletes
- * an account (accountDeleteBlock). Deleting keeps the employee and all
- * history; screens show "บัญชีถูกลบ" where a deleted account was referenced.
+ * Who: employees holders (the employee edit page), users_manage holders (the
+ * users page) and the superadmin create / link / unlink — ONE check,
+ * canManageEmployeeAccounts, applied inside every function here; guard rails
+ * in rbac/accountRules.js linkActionBlock. Only the superadmin deletes an
+ * account (accountDeleteBlock). Deleting keeps the employee and all history;
+ * screens show "บัญชีถูกลบ" where a deleted account was referenced.
  *
  * Callers must have called dbConnect() first. Errors are AccountError
  * (`status` = the HTTP status, Thai message).
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Page keys that may create / link / unlink employee accounts (routes gate on these). */
+export const ACCOUNT_LINK_PAGES = ["employees", "users_manage"];
+
+/** employees, users_manage or superadmin (canAccess covers the superadmin). */
+export function canManageEmployeeAccounts(user) {
+  return ACCOUNT_LINK_PAGES.some((key) => canAccess(user, key));
+}
+
+function assertAccountManager(actor) {
+  if (!canManageEmployeeAccounts(actor)) throw new AccountError("ไม่มีสิทธิ์จัดการบัญชีของพนักงาน", 403);
+}
 
 const sameEmail = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
@@ -99,6 +114,7 @@ export function accountSummary(emp, user) {
  * never sees superadmin accounts there (they could not link them).
  */
 export async function getEmployeeAccount(employeeId, { actor }) {
+  assertAccountManager(actor);
   const emp = await loadEmployee(employeeId);
   const user = await liveLinkedUser(emp);
 
@@ -117,12 +133,38 @@ export async function getEmployeeAccount(employeeId, { actor }) {
 }
 
 /**
+ * Employees with no account (none linked, or a dangling link to a deleted
+ * one), for the users page pickers. Names, department and position only —
+ * no private data; `email` is what a new account would sign in with.
+ */
+export async function listEmployeesWithoutAccount({ actor }) {
+  assertAccountManager(actor);
+  const userIds = await User.distinct("_id");
+  const emps = await Employee.find({ userId: { $nin: userIds } })
+    .select("_id empAutoId firstName lastName titleTh firstNameTh lastNameTh nickName department position email")
+    .sort({ firstNameTh: 1, firstName: 1 })
+    .lean();
+  return emps.map((e) => ({
+    _id: String(e._id),
+    empAutoId: e.empAutoId ?? null,
+    name: employeeDisplayName(e),
+    nameEn: employeeNameEn(e),
+    nickName: e.nickName || "",
+    nameSearch: employeeNameSearchText(e),
+    department: e.department || "",
+    position: e.position || "",
+    email: e.email || "",
+  }));
+}
+
+/**
  * Create an account for an employee who has none. Email defaults to the
  * employee's; the role is "employee" unless a superadmin picks another
  * (assertAssignableRole). Returns { account, tempPassword } — the temporary
  * password exists only in this return value (round 9).
  */
 export async function createAccountForEmployee(employeeId, { email, role } = {}, { actor }) {
+  assertAccountManager(actor);
   const emp = await loadEmployee(employeeId);
   if (await liveLinkedUser(emp)) throw new AccountError("พนักงานคนนี้มีบัญชีแล้ว", 409);
 
@@ -153,6 +195,7 @@ export async function createAccountForEmployee(employeeId, { email, role } = {},
 
 /** Link the employee to an existing account that no employee links to. */
 export async function linkAccount(employeeId, userId, { actor }) {
+  assertAccountManager(actor);
   const emp = await loadEmployee(employeeId);
   if (await liveLinkedUser(emp)) throw new AccountError("พนักงานคนนี้มีบัญชีแล้ว — ยกเลิกการผูกก่อน", 409);
   const target = await loadUser(userId);
@@ -164,6 +207,7 @@ export async function linkAccount(employeeId, userId, { actor }) {
 
 /** Unlink: Employee.userId → null. The account stays, with its role. */
 export async function unlinkAccount(employeeId, { actor }) {
+  assertAccountManager(actor);
   const emp = await loadEmployee(employeeId);
   if (!emp.userId) throw new AccountError("พนักงานคนนี้ยังไม่ได้ผูกบัญชี", 409);
 

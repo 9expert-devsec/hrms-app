@@ -38,8 +38,9 @@ export function accountActionBlock({ actor, target, action, activeSuperadminCoun
 }
 
 /**
- * Linking an account to an employee, or unlinking it (employees holders and
- * the superadmin): a non-superadmin never touches a superadmin account, and
+ * Linking an account to an employee, or unlinking it (employees holders,
+ * users_manage holders and the superadmin — lib/accountLinks.js
+ * canManageEmployeeAccounts): a non-superadmin never touches a superadmin account, and
  * nobody links or unlinks their own account (linking yourself to an employee
  * would hand you that person's self-service data and head-of-department
  * rights). `action` = "link" | "unlink".

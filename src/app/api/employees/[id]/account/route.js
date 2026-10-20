@@ -4,6 +4,7 @@ import dbConnect from "@/lib/mongoose";
 import { requireAnyPageApi } from "@/lib/rbac/guard";
 import { AccountError } from "@/lib/accounts";
 import {
+  ACCOUNT_LINK_PAGES,
   getEmployeeAccount,
   createAccountForEmployee,
   linkAccount,
@@ -12,7 +13,8 @@ import {
 
 /**
  * The employee's login account (lib/accountLinks.js), for employees holders
- * and the superadmin:
+ * (employee edit page), users_manage holders (users page) and the superadmin
+ * — the permission check itself lives in lib/accountLinks.js:
  *   GET    → { account | null, candidates: unlinked accounts }
  *   POST   { email?, role? } → create one (temporary password, shown once)
  *   PUT    { userId }        → link an existing unlinked account
@@ -23,7 +25,7 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 async function run(handler, label) {
   try {
-    const gate = await requireAnyPageApi(["employees"]);
+    const gate = await requireAnyPageApi(ACCOUNT_LINK_PAGES);
     if (gate.res) return gate.res;
     await dbConnect();
     return await handler(gate.session.user);

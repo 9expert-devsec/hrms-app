@@ -64,9 +64,11 @@ export function canViewLeaveDocument(user, { ownerEmployeeId, ownerDepartmentId 
 
 /**
  * Another employee's profile.
- *   canView: `employees` holders, the superadmin, a head of the target's
+ *   canView: `employees` holders, `users_manage` holders (IT — to find the
+ *            person behind an account), the superadmin, a head of the target's
  *            department, or a member of the same department (ทีมของฉัน links).
- *   canSeePrivate (bank, emergency contact): the owner, `employees`, superadmin.
+ *   canSeePrivate (bank, emergency contact): the owner, `employees`, superadmin
+ *            — never users_manage alone.
  * `viewerDepartmentCode` is session.user.department (the viewer's code).
  */
 export function profileAccess(user, { targetEmployeeId, targetDepartmentId, targetDepartmentCode }) {
@@ -76,7 +78,7 @@ export function profileAccess(user, { targetEmployeeId, targetDepartmentId, targ
   const sameDepartment =
     !!user.department && !!targetDepartmentCode && String(user.department) === String(targetDepartmentCode);
   return {
-    canView: self || manager || isHeadOf(user, targetDepartmentId) || sameDepartment,
+    canView: self || manager || canAccess(user, "users_manage") || isHeadOf(user, targetDepartmentId) || sameDepartment,
     canSeePrivate: self || manager,
   };
 }
