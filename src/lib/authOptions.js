@@ -18,6 +18,9 @@ import {
 // updateOne whose filter excludes a currently-locked account, so parallel
 // attempts can't skip the threshold and a locked account is never pushed
 // into a longer lock.
+/** Session lifetime (round 18): 7 days. */
+export const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+
 const notLocked = (now) => ({ $or: [{ lockedUntil: null }, { lockedUntil: { $lte: now } }] });
 
 /** Count a wrong password. Returns true when the account is now locked. */
@@ -75,7 +78,12 @@ async function recordSuccessfulSignIn(userId) {
 
 export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
-  session: { strategy: "jwt" },
+  // 7 days, rolling: next-auth re-issues the JWT cookie (now + maxAge) on every
+  // /api/auth/session call, so an active session keeps extending; an idle one
+  // ends 7 days after its last refresh. Sessions issued earlier (30-day
+  // default) take the 7-day lifetime at their next refresh.
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS },
+  jwt: { maxAge: SESSION_MAX_AGE_SECONDS },
   pages: { signIn: "/login" },
   providers: [
     CredentialsProvider({

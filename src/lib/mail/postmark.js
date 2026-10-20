@@ -16,6 +16,9 @@ import EmailLog from "@/models/EmailLog";
  */
 
 const MESSAGE_STREAM = "outbound";
+// postmark 5.x (native fetch, no axios): `timeout` is seconds and a TOTAL
+// deadline for the request (AbortSignal.timeout); 4.x treated it as an
+// inactivity timeout. A timeout rejects like any other error → logged as failed.
 const TIMEOUT_SECONDS = 5;
 
 export function mailConfig() {
