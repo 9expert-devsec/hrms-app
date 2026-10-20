@@ -14,6 +14,7 @@ const TYPE_LABELS = {
   offsite_returned: "ส่งกลับให้แก้ไข",
   offsite_approved: "อนุมัติแล้ว",
   offsite_cancelled: "ยกเลิก",
+  password_reset: "ตั้งรหัสผ่านใหม่", // superadmin only (the API narrows others to off-site types)
 };
 const STATUS_TONE = { sent: "green", failed: "red", skipped: "grey" };
 

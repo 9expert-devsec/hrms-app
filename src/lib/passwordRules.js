@@ -10,6 +10,23 @@ export const PASSWORD_MIN_LENGTH = 8;
 /** Where a user with mustChangePassword is sent (outside /dashboard). */
 export const CHANGE_PASSWORD_PATH = "/account/password";
 
+/* ── ลืมรหัสผ่าน (lib/passwordReset.js) ─────────────────────────────── */
+
+/**
+ * Reset emails go ONLY to company addresses: several accounts use placeholder
+ * addresses elsewhere that may belong to strangers.
+ */
+export const COMPANY_EMAIL_DOMAIN = "9expert.co.th";
+export const RESET_LINK_TTL_MINUTES = 30;
+
+export function isCompanyEmail(email) {
+  return String(email ?? "").trim().toLowerCase().endsWith(`@${COMPANY_EMAIL_DOMAIN}`);
+}
+
+/** The one answer to every forgot-password request (no account enumeration). */
+export const FORGOT_PASSWORD_GENERIC_MESSAGE =
+  "ถ้าอีเมลนี้เป็นบัญชีในระบบ เราได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปแล้ว (ใช้ได้กับอีเมล @9expert.co.th เท่านั้น — อีเมลอื่นกรุณาติดต่อฝ่ายไอที)";
+
 /**
  * Validate a new password. Returns a Thai error message, or null when valid.
  * `currentPassword` (optional) must differ from the new one.
