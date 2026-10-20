@@ -45,8 +45,10 @@ import {
  * Resend after a return (sendInvitations):
  *   - member set changed → new members invited; every step that had moved
  *     becomes needs_resign (step 1 included) and signs afresh in order;
- *   - members unchanged  → approved steps become needs_reconfirm (step 1 is
- *     reconfirmed by the resend itself); the rejecting step signs afresh;
+ *   - members unchanged  → approved steps become needs_reconfirm; the
+ *     rejecting step signs afresh. Step 1: a creator who leads reconfirms by
+ *     the resend itself; any other leader reconfirms it (reconfirmStep1)
+ *     before step 2 activates;
  *   - leader changed (members unchanged) → as above, except step 1, which
  *     the new leader signs afresh.
  *
@@ -367,12 +369,13 @@ const clearSign = { signature: "", signedAt: null, confirmedAt: null, reason: ""
  * Steps that never moved ("waiting") stay waiting.
  */
 function resetApprovals(doc, memberSetChanged, now) {
+  const creatorLeads = str(doc.leader) === str(doc.createdBy);
   for (const a of doc.approvals) {
     if (a.status === "waiting") continue;
     if (memberSetChanged) {
       a.set({ status: "needs_resign", ...clearSign });
     } else if (a.status === "approved") {
-      if (a.step === 1) a.confirmedAt = now; // reconfirmed by the resend itself
+      if (a.step === 1 && creatorLeads) a.confirmedAt = now; // the creator's resend reconfirms it
       else a.status = "needs_reconfirm"; // signature kept
     } else if (a.status === "rejected" || a.status === "pending") {
       a.set({ status: "needs_resign", ...clearSign });
@@ -382,15 +385,15 @@ function resetApprovals(doc, memberSetChanged, now) {
 
 /**
  * Step 1 belongs to the team leader: point it at `doc.leader` (name from the
- * member list). A step 1 already signed stays as it is — unless `resign` and
- * the leader changed, when the new leader signs afresh (needs_resign).
- * Returns true when that happened.
+ * member list). A step 1 already signed (approved, or awaiting the leader's
+ * reconfirm) stays as it is — unless `resign` and the leader changed, when
+ * the new leader signs afresh (needs_resign). Returns true when that happened.
  */
 function pointStep1AtLeader(doc, { resign = false } = {}) {
   const a = stepOf(doc, 1);
   const leaderId = str(doc.leader);
   const name = doc.members.find((m) => str(m.employee) === leaderId)?.nameSnapshot || "";
-  if (a.status === "approved") {
+  if (a.status === "approved" || a.status === "needs_reconfirm") {
     if (!resign || str(a.approver) === leaderId) return false;
     a.set({ role: "leader", approver: doc.leader, approverName: name, status: "needs_resign", ...clearSign });
     return true;
@@ -472,7 +475,10 @@ function viewerFlags(doc, empId, isCreator, user) {
     canSend: isCreator && ALLOWED_FROM.send.includes(doc.status),
     // A creator who leads is auto-accepted; any other creator answers like a member.
     canRespond: !(isCreator && leads) && doc.status === "inviting" && mine?.status === "invited",
-    canSubmit: leads && doc.status === "members_ready",
+    canSubmit: leads && doc.status === "members_ready" && stepOf(doc, 1).status !== "needs_reconfirm",
+    canReconfirmStep1: leads && doc.status === "members_ready" && stepOf(doc, 1).status === "needs_reconfirm",
+    // The creator never declines their own invitation (they edit or cancel instead).
+    canDecline: !isCreator,
     canCancel: isCreator && ALLOWED_FROM.cancel.includes(doc.status),
     activeStep: active,
     canApprove: isActiveApprover && a.status === "pending",
@@ -762,7 +768,13 @@ export async function sendInvitations(session, id, opts) {
       "approvals_reset",
       changes.memberSetChanged
         ? "รายชื่อสมาชิกเปลี่ยน — ทุกขั้นต้องเซ็นใหม่"
-        : `รายชื่อสมาชิกเหมือนเดิม — ขั้นที่อนุมัติแล้วยืนยันอีกครั้ง${newLeaderSigns ? " (หัวหน้าทีมเปลี่ยน — หัวหน้าทีมคนใหม่เซ็นขั้นที่ 1)" : ""}`
+        : `รายชื่อสมาชิกเหมือนเดิม — ขั้นที่อนุมัติแล้วยืนยันอีกครั้ง${
+            newLeaderSigns
+              ? " (หัวหน้าทีมเปลี่ยน — หัวหน้าทีมคนใหม่เซ็นขั้นที่ 1)"
+              : stepOf(doc, 1).status === "needs_reconfirm"
+                ? " (หัวหน้าทีมยืนยันขั้นที่ 1 อีกครั้ง)"
+                : ""
+          }`
     );
   } else {
     pointStep1AtLeader(doc, { resign: true });
@@ -814,6 +826,9 @@ export async function respondToInvitation(session, id, { action, reason } = {}, 
     addEvent(doc, session, "member_accepted", member.nameSnapshot);
     if (allAccepted(doc)) await afterMembersAccepted(doc, session, deps);
   } else if (action === "decline") {
+    if (isCreator) {
+      throw new OffsiteError("ผู้สร้างคำขอปฏิเสธคำเชิญของตัวเองไม่ได้ — หากต้องการเปลี่ยนแปลง ให้ “ยกเลิกคำขอ” หรือ “แก้ไข” เมื่อคำขอถูกส่งกลับ", 409);
+    }
     const why = requireReason(reason, "ปฏิเสธ");
     member.set({ status: "declined", signature: "", respondedAt: now, declineReason: why });
     addEvent(doc, session, "member_declined", `${member.nameSnapshot}: ${why}`);
@@ -832,6 +847,7 @@ export async function submitStep1(session, id, opts) {
   if (!isLeader(doc, emp._id)) throw new OffsiteError("เฉพาะหัวหน้าทีมเท่านั้นที่ลงนามขั้นที่ 1 ได้", 403);
   assertFrom(doc, "submit");
   if (!allAccepted(doc)) throw new OffsiteError("สมาชิกยังตอบรับไม่ครบทุกคน", 409);
+  if (stepOf(doc, 1).status === "needs_reconfirm") throw new OffsiteError("ขั้นที่ 1 ต้อง “ยืนยันอีกครั้ง” ไม่ต้องเซ็นใหม่", 409);
   const png = await requireSignature(emp._id);
 
   const now = new Date();
@@ -840,6 +856,26 @@ export async function submitStep1(session, id, opts) {
   const creator = isCreator ? emp : await Employee.findById(doc.createdBy).select(VIEWER_FIELDS).lean();
   if (creator) doc.set(await creatorSnapshot(creator));
   addEvent(doc, session, "step1_signed", nameOf(emp));
+  await activateNext(doc, session, deps);
+  await save(doc, session);
+  return result(doc, emp, isCreator, session.user);
+}
+
+/**
+ * ยืนยันอีกครั้ง (step 1): after a content-only resend, a leader who is not
+ * the creator confirms the step they signed before (signature kept); then
+ * step 2 activates (needs_reconfirm or fresh, as activateNext decides).
+ */
+export async function reconfirmStep1(session, id, opts) {
+  const deps = withDefaults(opts);
+  const { doc, emp, isCreator } = await loadOwn(session, id);
+  if (!isLeader(doc, emp._id)) throw new OffsiteError("เฉพาะหัวหน้าทีมเท่านั้นที่ยืนยันขั้นที่ 1 ได้", 403);
+  assertFrom(doc, "submit");
+  if (!allAccepted(doc)) throw new OffsiteError("สมาชิกยังตอบรับไม่ครบทุกคน", 409);
+  const a = stepOf(doc, 1);
+  if (a.status !== "needs_reconfirm") throw new OffsiteError("ขั้นที่ 1 ไม่ได้รอการยืนยันอีกครั้ง", 409);
+  a.set({ status: "approved", confirmedAt: new Date() });
+  addEvent(doc, session, "step1_reconfirmed", a.approverName);
   await activateNext(doc, session, deps);
   await save(doc, session);
   return result(doc, emp, isCreator, session.user);

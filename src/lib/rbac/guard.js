@@ -45,6 +45,15 @@ export async function requirePage(pageKey) {
   return session;
 }
 
+/** requirePage for a page any of these keys opens (e.g. the off-site print form). */
+export async function requireAnyPage(pageKeys = []) {
+  const session = await getServerSession(authOptions);
+  if (!isCurrent(session)) redirect("/login");
+  if (mustChangePassword(session)) redirect(CHANGE_PASSWORD_PATH);
+  if (!pageKeys.some((key) => canOpenPage(session.user, key))) redirect("/403");
+  return session;
+}
+
 /** For pages that have no registry key (deny by default). */
 export function requireSuperadminPage() {
   return requirePage(null);

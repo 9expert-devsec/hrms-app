@@ -10,6 +10,7 @@ import {
   sendInvitations,
   respondToInvitation,
   submitStep1,
+  reconfirmStep1,
   cancelRequest,
   approveStep,
   rejectStep,
@@ -52,12 +53,12 @@ export async function PATCH(req, ctx) {
  * Actions. Body { action, reason? }:
  *   send     — creator sends / resends invitations
  *   accept   — an invited member signs and accepts (the creator too, unless they lead)
- *   decline  — an invited member declines (reason required)
+ *   decline  — an invited member declines (reason required; never the creator)
  *   submit   — the team leader signs step 1
  *   cancel   — creator cancels (reason required)
  *   approve  — the active step's approver signs { step?, hrSummary? (step 3) }
  *   reject   — the active step's approver declines { step?, reason }
- *   reconfirm — a needs_reconfirm step's approver confirms { step? }
+ *   reconfirm — a needs_reconfirm step's approver confirms { step? }; step 1 = the team leader
  *   hr_summary — step 3 approver saves the HR section { hrSummary }
  */
 export async function POST(req, ctx) {
@@ -79,7 +80,7 @@ export async function POST(req, ctx) {
       case "reject":
         return rejectStep(session, id, { step: body.step, reason: body.reason });
       case "reconfirm":
-        return reconfirmStep(session, id, { step: body.step });
+        return Number(body.step) === 1 ? reconfirmStep1(session, id) : reconfirmStep(session, id, { step: body.step });
       case "hr_summary":
         return saveHrSummary(session, id, body.hrSummary);
       default:

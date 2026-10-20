@@ -1,9 +1,11 @@
 // Printable off-site form. Lives in the (print) route group so the app's
 // sidebar / topbar (the (protected) layout) are not rendered at all; the
-// middleware still guards /dashboard/* (offsite_self).
+// middleware still guards /dashboard/* (this path: offsite_self OR offsite_hr,
+// lib/rbac/access.js canAccessPath).
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { requirePage } from "@/lib/rbac/guard";
+import { requireAnyPage } from "@/lib/rbac/guard";
+import { OFFSITE_PRINT_PAGES } from "@/lib/rbac/access";
 import dbConnect from "@/lib/mongoose";
 import { getPrintable, OffsiteError } from "@/lib/offsite";
 import { formatDateLongTh } from "@/lib/offsiteRules";
@@ -14,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่" };
 
 export default async function OffsitePrintPage({ params }) {
-  const session = await requirePage("offsite_self");
+  const session = await requireAnyPage(OFFSITE_PRINT_PAGES);
   const { id } = await params;
   await dbConnect();
 

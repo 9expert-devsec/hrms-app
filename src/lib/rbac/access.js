@@ -49,9 +49,18 @@ export function canOpenPage(user, pageKey) {
 }
 
 /**
+ * The printable off-site form (/dashboard/offsite/<id>/print) sits under the
+ * offsite_self prefix but is also HR's: offsite_self OR offsite_hr may open
+ * the page; lib/offsite.js getPrintable then decides per request.
+ */
+export const OFFSITE_PRINT_PAGES = ["offsite_self", "offsite_hr"];
+const OFFSITE_PRINT_RE = /^\/dashboard\/offsite\/[^/]+\/print\/?$/;
+
+/**
  * May `user` open this pathname? Unregistered paths resolve to null and are
  * therefore superadmin-only (deny by default).
  */
 export function canAccessPath(user, pathname) {
+  if (OFFSITE_PRINT_RE.test(pathname || "")) return OFFSITE_PRINT_PAGES.some((key) => canAccess(user, key));
   return canOpenPage(user, resolvePageKey(pathname));
 }

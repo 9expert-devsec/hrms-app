@@ -45,6 +45,7 @@ const EVENT_LABELS = {
   members_ready: "สมาชิกตอบรับครบ",
   approvals_reset: "ปรับขั้นการอนุมัติหลังส่งใหม่",
   step1_signed: "ลงนามขั้นที่ 1",
+  step1_reconfirmed: "หัวหน้าทีมยืนยันขั้นที่ 1 อีกครั้ง",
   step2_pending: "รอหัวหน้าฝ่ายบัญชีลงนาม",
   step3_pending: "รอหัวหน้าฝ่ายบุคคลลงนาม",
   step2_reconfirm_pending: "รอหัวหน้าฝ่ายบัญชียืนยันอีกครั้ง",
@@ -392,14 +393,14 @@ export default function OffsiteDetail({ id }) {
           <div className="grid gap-6 md:grid-cols-[1fr_auto]">
             <SignatureConfirm title="ลงนามยอมรับ" confirmLabel="ยืนยัน (ยอมรับคำเชิญ)" busy={busy === "accept"} onConfirm={() => act("accept")} />
             <div>
-              {panel !== "decline" && (
+              {v.canDecline && panel !== "decline" && (
                 <Button variant="ghost" onClick={() => setPanel("decline")}>
                   <XCircle size={14} /> ปฏิเสธ
                 </Button>
               )}
             </div>
           </div>
-          {panel === "decline" && (
+          {v.canDecline && panel === "decline" && (
             <ReasonForm label="เหตุผลที่ปฏิเสธ" confirmLabel="ยืนยันการปฏิเสธ" busy={busy === "decline"} onClose={() => setPanel(null)} onSubmit={(reason) => act("decline", { reason })} />
           )}
         </Section>
@@ -419,8 +420,21 @@ export default function OffsiteDetail({ id }) {
 
       {/* ── Step 1: the team leader signs ─────────── */}
       {(v.isLeader || v.isCreator) && ["inviting", "members_ready"].includes(r.status) && (
-        <Section title="ขั้นที่ 1 — หัวหน้าทีมลงนาม" highlight={v.canSubmit}>
-          {v.canSubmit ? (
+        <Section title="ขั้นที่ 1 — หัวหน้าทีมลงนาม" highlight={v.canSubmit || v.canReconfirmStep1}>
+          {v.canReconfirmStep1 ? (
+            <div className="space-y-3" data-testid="step1-reconfirm">
+              <p className="text-sm" style={{ color: NAVY }}>
+                คุณลงนามขั้นที่ 1 ไปแล้วเมื่อ {formatDateTimeTh(step(1).signedAt)} แต่คำขอถูกส่งกลับและส่งใหม่ — กรุณาตรวจสอบ “สิ่งที่เปลี่ยนจากครั้งก่อน” แล้วยืนยันอีกครั้ง (ใช้ลายเซ็นเดิม ไม่ต้องเซ็นใหม่)
+              </p>
+              {step(1).signature && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={step(1).signature} alt="ลายเซ็นเดิม" style={{ height: 48, width: "auto", background: "#fff" }} />
+              )}
+              <Button onClick={() => act("reconfirm", { step: 1 })} disabled={!!busy}>
+                {busy === "reconfirm" ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} ยืนยันอีกครั้ง
+              </Button>
+            </div>
+          ) : v.canSubmit ? (
             <SignatureConfirm
               title={step(1).status === "needs_resign" ? "เซ็นใหม่ในฐานะหัวหน้าทีม (รายชื่อสมาชิกหรือหัวหน้าทีมเปลี่ยน)" : "ลงนามในฐานะหัวหน้าทีม"}
               note="สมาชิกทุกคนตอบรับแล้ว เมื่อยืนยัน แบบฟอร์มจะส่งต่อให้หัวหน้าฝ่ายบัญชี (ขั้นที่ 2)"
@@ -432,7 +446,9 @@ export default function OffsiteDetail({ id }) {
             <p className="text-sm" style={{ color: SLATE }} data-testid="step1-wait">
               {r.status === "inviting"
                 ? `รอสมาชิกตอบรับให้ครบ (${accepted}/${r.members.length}) — จากนั้น${v.isLeader ? "คุณ" : `หัวหน้าทีม (${step(1).approverName})`}จะลงนามขั้นที่ 1 เพื่อส่งแบบฟอร์ม`
-                : `สมาชิกตอบรับครบแล้ว — รอหัวหน้าทีม (${step(1).approverName}) ลงนามขั้นที่ 1`}
+                : step(1).status === "needs_reconfirm"
+                  ? `สมาชิกตอบรับครบแล้ว — รอหัวหน้าทีม (${step(1).approverName}) ยืนยันขั้นที่ 1 อีกครั้ง`
+                  : `สมาชิกตอบรับครบแล้ว — รอหัวหน้าทีม (${step(1).approverName}) ลงนามขั้นที่ 1`}
             </p>
           )}
         </Section>

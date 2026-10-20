@@ -14,7 +14,8 @@ import { employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
  * failure is logged in EmailLog, never thrown.
  *
  *   invitations_sent          → members invited in this revision   (offsite_invite)
- *   members_ready             → leader (signs step 1) + creator, as information (offsite_members_ready)
+ *   members_ready             → leader (signs step 1) + creator, as information (offsite_members_ready);
+ *                               leader to reconfirm step 1 instead      (offsite_reconfirm)
  *   step2/3_pending           → that step's approver               (offsite_approval_pending)
  *   step2/3_reconfirm_pending → that step's approver               (offsite_reconfirm)
  *   returned                  → creator + leader                   (offsite_returned)
@@ -31,12 +32,13 @@ export function planEmails(r, events) {
     if (employeeId && !plan.some((p) => p.type === type && p.employeeId === str(employeeId))) plan.push({ type, employeeId: str(employeeId) });
   };
   const approverOf = (n) => (r.approvals || []).find((a) => a.step === n)?.approver;
+  const stepStatus = (n) => (r.approvals || []).find((a) => a.step === n)?.status;
   for (const e of events) {
     let m;
     if (e.type === "invitations_sent") {
       for (const mem of r.members) if (mem.status === "invited" && mem.invitedInRevision === r.revision) add("offsite_invite", mem.employee);
     } else if (e.type === "members_ready") {
-      add("offsite_members_ready", r.leader);
+      add(stepStatus(1) === "needs_reconfirm" ? "offsite_reconfirm" : "offsite_members_ready", r.leader);
       add("offsite_members_ready", r.createdBy);
     } else if ((m = e.type.match(/^step([23])_pending$/))) {
       add("offsite_approval_pending", approverOf(Number(m[1])));
