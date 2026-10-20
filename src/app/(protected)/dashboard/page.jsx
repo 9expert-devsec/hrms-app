@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   ];
 
   const quickLinks = [
-    { title: "Leave Requests", desc: "Review pending approvals", href: "/dashboard/leave/approval", Icon: ClipboardList },
+    { title: "Leave Requests", desc: "Review pending approvals", href: "/dashboard/leave/approve", Icon: ClipboardList },
     { title: "Employee Directory", desc: "Browse all team members", href: "/dashboard/hrm/employee", Icon: Contact },
     { title: "My Profile", desc: "View & edit your profile", href: "/dashboard/hrm/employee-profile", Icon: UserCircle },
   ];
