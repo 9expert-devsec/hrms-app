@@ -4,6 +4,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UserMenu from "./UserMenu";
+import InboxBell from "./inbox/InboxBell";
 import dbConnect from "@/lib/mongoose";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 
@@ -57,8 +58,9 @@ export default async function Topbar() {
           />
         </div>
 
-        {/* User menu (ครบเดิม) */}
-        <div className="ml-auto">
+        {/* "รอคุณดำเนินการ" bell, then the user menu (ครบเดิม) */}
+        <div className="ml-auto flex items-center gap-2">
+          <InboxBell />
           <UserMenu
             user={{
               ...session.user,

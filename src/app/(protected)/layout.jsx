@@ -9,6 +9,7 @@ import Topbar from "./../../components/Topbar";
 import SelfServiceGate from "./../../components/SelfServiceGate";
 import NavTracker from "./../../components/NavTracker";
 import InboxProvider from "./../../components/inbox/InboxProvider";
+import InboxTitle from "./../../components/inbox/InboxTitle";
 
 export default async function ProtectedLayout({ children }) {
   // Is this account linked to an employee? (Employee.userId — read from the
@@ -34,6 +35,7 @@ export default async function ProtectedLayout({ children }) {
       }}
     >
       <NavTracker />
+      <InboxTitle />
       <Sidebar />
       <div
         style={{

@@ -1,5 +1,6 @@
 // src/app/(protected)/dashboard/page.jsx
 import { requirePage } from "@/lib/rbac/guard";
+import InboxCard from "../../../components/inbox/InboxCard";
 import {
   Users,
   Building2,
@@ -35,6 +36,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8 p-2">
+      {/* "มี N รายการรอคุณดำเนินการ" — only when something waits */}
+      <InboxCard />
+
       {/* ── Hero Section ──────────────────────────────────────────── */}
       <section
         className="relative overflow-hidden rounded-3xl p-8 md:p-10"
