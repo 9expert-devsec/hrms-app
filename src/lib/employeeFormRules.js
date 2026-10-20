@@ -8,8 +8,9 @@
  * Employee schema (on edit). The Thai name is required on create; on edit
  * only once a value is stored, because it may not be cleared (round 12).
  *
- * Format rules (10-digit phone, email shape) are stricter than the server,
- * which only checks presence. On edit they apply only to a value that was
+ * The server validates with this same module (POST /api/employees,
+ * PUT /api/employees/[id], PATCH /api/employees/me) — round 21. Format rules
+ * (10-digit phone, email shape) apply on edit only to a value that was
  * changed, so an existing record with an older format (e.g. a 9-digit
  * landline) can still be saved when another field is edited.
  */
@@ -101,6 +102,22 @@ export function validateEmployeeForm(values = {}, { mode = "create", createLogin
   }
   if (!(mode === "create" && createLogin)) delete errors.accountEmail;
   return errors;
+}
+
+/** Position level (from the department's position list): 1–6, as the schema. */
+export const LEVEL_MIN = 1;
+export const LEVEL_MAX = 6;
+export const LEVEL_ERROR = `ระดับของตำแหน่งต้องอยู่ระหว่าง ${LEVEL_MIN}–${LEVEL_MAX} — กรุณาเลือกตำแหน่งใหม่`;
+
+export function isValidLevel(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= LEVEL_MIN && n <= LEVEL_MAX;
+}
+
+/** The first error (form order) as { field, message }, or null. */
+export function firstFormError(errors = {}) {
+  const field = Object.keys(errors)[0];
+  return field ? { field, message: errors[field] } : null;
 }
 
 /**

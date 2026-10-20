@@ -12,7 +12,7 @@ import { canAccess } from "@/lib/rbac/access";
 import { assertAssignableRole, RoleError } from "@/lib/rbac/roles";
 import { newAccountPassword } from "@/lib/accounts";
 import { thaiNameError } from "@/lib/employeeName";
-import { fieldFromServerError } from "@/lib/employeeFormRules";
+import { fieldFromServerError, firstFormError, isValidLevel, LEVEL_ERROR, validateEmployeeForm } from "@/lib/employeeFormRules";
 
 // Which Thai-name field a thaiNameError message is about (for the form).
 const thaiErrorField = (message) => fieldFromServerError({ message });
@@ -92,13 +92,23 @@ export async function POST(req) {
     const genderMap  = { "ชาย":"male","หญิง":"female","อื่น ๆ":"other", male:"male", female:"female", other:"other" };
     const gender     = genderMap[g("gender")] || "other";
 
-    if (!firstName || !lastName || !dateOfJoin || !phone || !email || !birthday || !address)
-      return NextResponse.json({ ok:false, message:"ข้อมูลจำเป็นไม่ครบ" }, { status:400 });
-
     // Thai title / first / last name: required for a new employee (lib/employeeName.js).
     const titleTh     = g("titleTh");
     const firstNameTh = g("firstNameTh");
     const lastNameTh  = g("lastNameTh");
+
+    // The form's own rules (lib/employeeFormRules.js): required fields,
+    // 10-digit phone, email shape, Thai title — same messages as the form.
+    const createLogin  = g("createLogin").toLowerCase() === "true";
+    const accountEmail = g("accountEmail");
+    const formError = firstFormError(
+      validateEmployeeForm(
+        { titleTh, firstNameTh, lastNameTh, firstName, lastName, departmentId, positionId, dateOfJoin, phone, email, birthday, address, accountEmail },
+        { mode: "create", createLogin }
+      )
+    );
+    if (formError) return NextResponse.json({ ok:false, ...formError }, { status:400, headers:NO_STORE });
+    if (!isValidLevel(level)) return NextResponse.json({ ok:false, message:LEVEL_ERROR, field:"positionId" }, { status:400, headers:NO_STORE });
     const thaiError = thaiNameError({ titleTh, firstNameTh, lastNameTh }, { mode: "create" });
     if (thaiError) return NextResponse.json({ ok:false, message:thaiError, field:thaiErrorField(thaiError) }, { status:400, headers:NO_STORE });
 
@@ -123,9 +133,7 @@ export async function POST(req) {
     // Must be a known key; only a superadmin may grant a superadmin role.
     // The password is never chosen here: a new account gets a temporary one
     // (returned once below) and must change it at first sign-in.
-    const createLogin  = g("createLogin").toLowerCase() === "true";
     const role         = (g("role") || "employee").toLowerCase();
-    const accountEmail = g("accountEmail");
     if (createLogin) {
       try {
         // Non-superadmins may only create "employee" accounts.
