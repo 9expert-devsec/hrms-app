@@ -11,32 +11,16 @@ import { employeeDisplayName, employeeFullNameTh, employeeNameEn } from "@/lib/e
 
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
+import Department from "@/models/Department";
 import CopyBtn from "./CopyBtn";
-import {
-  User,
-  Briefcase,
-  ShieldAlert,
-  Lock,
-  Zap,
-  Pencil,
-  KeyRound,
-  ArrowLeft,
-  PenLine,
-  MapPin,
-} from "lucide-react";
-import OffsiteHistory from "../../../../../components/offsite/OffsiteHistory";
+import { Zap, Pencil, KeyRound, ArrowLeft, PenLine } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const fmtDate = (d) =>
-  d
-    ? new Date(d).toLocaleDateString("th-TH", {
-        year: "numeric",
-        month: "long",
-        day: "2-digit",
-      })
-    : "-";
-
+// The view shows these fields only; everything else (email, birthday,
+// address, employment, bank, emergency contact) lives on the edit page.
+const PROFILE_FIELDS =
+  "_id userId photoUrl titleTh firstNameTh lastNameTh firstName lastName nickName phone department departmentId position";
 
 export default async function EmployeeProfilePage({ searchParams }) {
   const session = await requirePage("self_profile");
@@ -48,10 +32,10 @@ export default async function EmployeeProfilePage({ searchParams }) {
   let e = null;
 
   if (targetId) {
-    e = await Employee.findById(targetId).lean();
+    e = await Employee.findById(targetId).select(PROFILE_FIELDS).lean().catch(() => null);
   } else {
     // Own profile = the linked employee only (lib/accountLinks.js).
-    e = await employeeOfUser(session.user.id);
+    e = await employeeOfUser(session.user.id, PROFILE_FIELDS);
     if (!e) return <UnlinkedNotice />;
   }
 
@@ -60,9 +44,9 @@ export default async function EmployeeProfilePage({ searchParams }) {
   // Self = linked to this account, never an email match.
   const isSelf = !!e.userId && String(e.userId) === String(session.user.id || "");
 
-  // Someone else's profile: employees holders, superadmin, a head of their
-  // department, or a colleague in the same department (ทีมของฉัน links).
-  // Anyone else gets 404, so the page does not confirm the person exists.
+  // Someone else's profile: employees / users_manage holders, superadmin, a
+  // head of their department, or a colleague in the same department (ทีมของฉัน
+  // links). Anyone else gets 404, so the page does not confirm the person exists.
   const access = profileAccess(session.user, {
     targetEmployeeId: e._id,
     targetDepartmentId: await departmentIdOf(e),
@@ -71,21 +55,10 @@ export default async function EmployeeProfilePage({ searchParams }) {
   if (!isSelf && !access.canView) notFound();
 
   const canManage = canAccess(session.user, "employees");
-  const canSeeOffsite = canAccess(session.user, "offsite_hr");
-  // Bank details and emergency contact: owner, employees holders, superadmin.
-  const canSeeSensitive = isSelf || access.canSeePrivate;
   const canEdit = isSelf || canManage;
 
-  const book = e.privateInfo?.bookbank || e.privateInfo || {};
-  const bankAccountName =
-    book.accountHolderName || book.accountHolder || book.bankAccountName || "-";
-  const bankAccountNo = book.accountNumber || book.bankAccountNo || "-";
-  const bankName = book.bankName || "-";
-  const bankBranch = book.branchName || book.bankBranch || "-";
-
-  const emgPrimary = canSeeSensitive
-    ? e.emergency?.primary || e.emergency || null
-    : null;
+  const dept = e.departmentId ? await Department.findById(e.departmentId).select("name code").lean() : null;
+  const departmentLabel = dept?.name || e.department || "-";
 
   function normalizeAvatar(u) {
     if (!u) return "/avatar-default.png";
@@ -93,12 +66,12 @@ export default async function EmployeeProfilePage({ searchParams }) {
     return u.startsWith("/") ? u : `/${u}`;
   }
   const avatar = normalizeAvatar(e.photoUrl);
+  const nameTh = employeeFullNameTh(e) || employeeDisplayName(e) || "-";
 
   return (
-    <div className="px-6 py-6 container mx-auto space-y-6">
-      {/* Breadcrumb + Back */}
+    <div className="px-6 py-6 container mx-auto space-y-6" style={{ maxWidth: 960 }}>
       <div className="flex items-center justify-between">
-        <h1 style={{ color: "#0D1B2A", fontSize: "1.5rem", fontWeight: 600 }}>Profile</h1>
+        <h1 style={{ color: "#0D1B2A", fontSize: "1.5rem", fontWeight: 600 }}>โปรไฟล์</h1>
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard/hrm/employee"
@@ -110,7 +83,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
               boxShadow: "0 1px 4px rgba(13,27,42,0.06)",
             }}
           >
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={14} /> กลับ
           </Link>
           {canEdit && (
             <Link
@@ -122,213 +95,72 @@ export default async function EmployeeProfilePage({ searchParams }) {
                 boxShadow: "0 2px 12px rgba(0,92,255,0.3)",
               }}
             >
-              <Pencil size={14} /> Edit
+              <Pencil size={14} /> แก้ไข
             </Link>
           )}
         </div>
       </div>
 
-      {/* ── Hero Profile Banner ──────────────────────────────────── */}
-      <section
-        className="relative overflow-hidden rounded-3xl p-8"
-        style={{
-          background: "linear-gradient(135deg, #0D1B2A 0%, #005CFF 60%, #2486FF 100%)",
-          border: "none",
-          boxShadow: "0 4px 24px rgba(0,92,255,0.15)",
-        }}
-      >
-        {/* Decorative elements */}
-        <div
-          className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full opacity-10"
-          style={{ background: "#D4F73F" }}
-        />
-        <div
-          className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full opacity-[0.06]"
-          style={{ background: "#D4F73F" }}
-        />
-
-        <div className="relative z-10 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-          {/* Avatar with ring */}
-          <div className="relative shrink-0">
-            <div
-              className="h-28 w-28 rounded-2xl p-[3px]"
-              style={{
-                background: "linear-gradient(135deg, #D4F73F, #005CFF, #D4F73F)",
-              }}
-            >
-              <div className="relative h-full w-full overflow-hidden rounded-[13px]">
-                {/* Full photo, top-anchored (no face crop on the profile page). */}
-                <Image src={avatar} alt={employeeDisplayName(e)} fill sizes="112px" className="object-cover object-top" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* ── Profile card ───────────────────────────── */}
+        <section
+          className="lg:col-span-2 overflow-hidden rounded-3xl"
+          style={{ background: "#FFFFFF", border: "1px solid rgba(0,92,255,0.10)", boxShadow: "0 2px 8px rgba(13,27,42,0.06)" }}
+          data-testid="profile-card"
+        >
+          <div className="h-20" style={{ background: "linear-gradient(135deg, #0D1B2A 0%, #005CFF 60%, #2486FF 100%)" }} />
+          <div className="flex flex-col items-center gap-6 px-6 pb-6 sm:flex-row sm:items-end">
+            <div className="-mt-12 shrink-0">
+              <div className="h-28 w-28 rounded-2xl p-[3px]" style={{ background: "linear-gradient(135deg, #D4F73F, #005CFF, #D4F73F)" }}>
+                <div className="relative h-full w-full overflow-hidden rounded-[13px] bg-white">
+                  {/* Full photo, top-anchored (no face crop on the profile page). */}
+                  <Image src={avatar} alt={nameTh} fill sizes="112px" className="object-cover object-top" />
+                </div>
               </div>
             </div>
-            {/* Online dot */}
-            <div
-              className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px]"
-              style={{
-                background: "#D4F73F",
-                borderColor: "#0D1B2A",
-              }}
-            />
-          </div>
-
-          <div className="min-w-0 flex-1 text-center sm:text-left">
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
-              <h1 style={{ color: "#FFFFFF", fontSize: "20px", fontWeight: 600 }}>
-                {employeeDisplayName(e)}
-              </h1>
-              {e.nickName && (
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-medium"
-                  style={{
-                    background: "rgba(212,247,63,0.15)",
-                    color: "#D4F73F",
-                  }}
-                >
-                  {e.nickName}
-                </span>
-              )}
-            </div>
-            <p style={{ color: "rgba(255,255,255,0.85)", fontSize: "14px", marginTop: "4px" }}>
-              {e.position || "-"}
-            </p>
-
-            <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs sm:justify-start">
-              {[
-                { label: "Dept", val: e.department || "-" },
-                { label: "Emp ID", val: e.empAutoId || "-" },
-                { label: "Joined", val: fmtDate(e.dateOfJoin) },
-                { label: "Gender", val: e.gender || "-" },
-              ].map((tag) => (
-                <span
-                  key={tag.label}
-                  className="rounded-lg px-3 py-1.5 font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#FFFFFF",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    backdropFilter: "blur(8px)",
-                  }}
-                >
-                  {tag.label}: <span style={{ fontWeight: 600 }}>{tag.val}</span>
-                </span>
-              ))}
+            <div className="min-w-0 flex-1 text-center sm:text-left">
+              <h2 style={{ color: "#0D1B2A", fontSize: "20px", fontWeight: 700 }}>{nameTh}</h2>
+              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>{e.position || "-"}</p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ── Content Grid ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* LEFT column */}
-        <div className="xl:col-span-2 space-y-6">
-          <Card title="Personal Information" Icon={User}>
-            <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-              <Info label="ชื่อ-นามสกุล (ไทย)" value={employeeFullNameTh(e) || "-"} />
-              <Info label="ชื่อ-นามสกุล (อังกฤษ)" value={employeeNameEn(e) || "-"} />
-              <Info label="Phone" value={e.phone} copyable />
-              <Info label="Email" value={e.email} copyable />
-              <Info label="Birthday" value={fmtDate(e.birthday)} />
-              <Info label="Address" value={e.address || "-"} span />
-            </dl>
-          </Card>
+          <dl className="grid gap-x-6 gap-y-4 border-t px-6 py-5 text-sm sm:grid-cols-2" style={{ borderColor: "rgba(0,92,255,0.08)" }}>
+            <Info label="ชื่อ-นามสกุล" value={nameTh} />
+            <Info label="ชื่อ-นามสกุล (อังกฤษ)" value={employeeNameEn(e) || "-"} />
+            <Info label="ชื่อเล่น" value={e.nickName || "-"} />
+            <Info label="เบอร์โทร" value={e.phone || "-"} copyable={!!e.phone} />
+            <Info label="แผนก" value={departmentLabel} />
+            <Info label="ตำแหน่ง" value={e.position || "-"} />
+          </dl>
+        </section>
 
-          <Card title="Employment" Icon={Briefcase}>
-            <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-              <Info label="Department" value={e.department || "-"} />
-              <Info label="Position" value={e.position || "-"} />
-              <Info label="Employee ID" value={e.empAutoId || "-"} />
-              <Info label="Date of Join" value={fmtDate(e.dateOfJoin)} />
-            </dl>
-          </Card>
-
-          {/* HR view (offsite_hr / superadmin): approved off-site work. */}
-          {canSeeOffsite && (
-            <Card title="ประวัติทำงานนอกสถานที่" Icon={MapPin}>
-              <OffsiteHistory employeeId={String(e._id)} />
-            </Card>
-          )}
-
-          <Card title="Emergency Contact" Icon={ShieldAlert}>
-            {emgPrimary ? (
-              <EmergencyBlock
-                title="Emergency Contact"
-                data={emgPrimary}
-                canView={canSeeSensitive}
-              />
-            ) : (
-              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>
-                No emergency contact information available
-              </p>
-            )}
-          </Card>
-        </div>
-
-        {/* RIGHT column */}
-        <div className="space-y-6">
-          <Card
-            title="Private Information"
-            Icon={Lock}
-            right={
-              !canSeeSensitive && (
-                <span style={{ color: "#5E6A7E", fontSize: "12px" }}>
-                  Visible to the owner, HR, and Super Admin only
-                </span>
-              )
-            }
-          >
-            {canSeeSensitive ? (
+        {/* ── Quick actions ──────────────────────────── */}
+        <section
+          className="rounded-2xl p-5 self-start"
+          style={{ background: "#FFFFFF", border: "1px solid rgba(0,92,255,0.10)", boxShadow: "0 2px 8px rgba(13,27,42,0.06)" }}
+        >
+          <h3 className="mb-4 flex items-center gap-2" style={{ color: "#0D1B2A", fontWeight: 600, fontSize: "15px" }}>
+            <span className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: "rgba(0,92,255,0.08)", color: "#005CFF" }}>
+              <Zap size={14} strokeWidth={2} />
+            </span>
+            การดำเนินการ
+          </h3>
+          <div className="flex flex-col gap-2">
+            {canEdit ? (
               <>
-                <dl className="grid gap-3 text-sm">
-                  <Info label="Account holder name" value={bankAccountName} />
-                  <Info label="Account name / No." value={bankAccountNo} />
-                  <Info label="Bank name" value={bankName} />
-                  <Info label="Branch name" value={bankBranch} />
-                </dl>
-                <p style={{ color: "#5E6A7E", fontSize: "12px", marginTop: "12px" }}>
-                  Visible to the owner, HR, and Super Admin only
-                </p>
+                <QuickActionLink href={`/dashboard/hrm/employee/edit?id=${e._id}`} label="แก้ไขข้อมูลพนักงาน" ActionIcon={Pencil} />
+                {/* Own password only (requires the current one); someone
+                    else's is reset with a temporary password on the users
+                    page. Suspending is a users_manage action, not here. */}
+                {isSelf && <QuickActionLink href="/account/password" label="เปลี่ยนรหัสผ่าน" ActionIcon={KeyRound} />}
+                {/* Own signature only (off-site requests are signed with it). */}
+                {isSelf && <QuickActionLink href="/dashboard/hrm/employee-profile/signature" label="แก้ไขลายเซ็น" ActionIcon={PenLine} />}
               </>
             ) : (
-              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>
-                You do not have access to this information
-              </p>
+              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>ไม่มีรายการ</p>
             )}
-          </Card>
-
-          <Card title="Quick actions" Icon={Zap}>
-            <div className="flex flex-col gap-2">
-              {canEdit ? (
-                <>
-                  <QuickActionLink
-                    href={`/dashboard/hrm/employee/edit?id=${e._id}`}
-                    label="Edit employee info"
-                    ActionIcon={Pencil}
-                  />
-                  {/* Own password only (requires the current one); someone
-                      else's is reset with a temporary password on the users
-                      page. Suspending is a users_manage action, not here. */}
-                  {isSelf && (
-                    <QuickActionLink
-                      href="/account/password"
-                      label="เปลี่ยนรหัสผ่าน"
-                      ActionIcon={KeyRound}
-                    />
-                  )}
-                  {/* Own signature only (off-site requests are signed with it). */}
-                  {isSelf && (
-                    <QuickActionLink
-                      href="/dashboard/hrm/employee-profile/signature"
-                      label="แก้ไขลายเซ็น"
-                      ActionIcon={PenLine}
-                    />
-                  )}
-                </>
-              ) : (
-                <p style={{ color: "#5E6A7E", fontSize: "14px" }}>No actions available</p>
-              )}
-            </div>
-          </Card>
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -336,51 +168,12 @@ export default async function EmployeeProfilePage({ searchParams }) {
 
 /* ---------- small view helpers (server-safe) ---------- */
 
-function Card({ title, children, right, Icon }) {
-  return (
-    <section
-      className="group/card relative overflow-hidden rounded-2xl p-5 transition-all duration-300 hover:-translate-y-0.5"
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid rgba(0,92,255,0.10)",
-        boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
-      }}
-    >
-      <div
-        className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover/card:opacity-100"
-        style={{
-          boxShadow: "0 6px 20px rgba(13,27,42,0.10)",
-        }}
-      />
-      <div className="relative z-10">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="flex items-center gap-2" style={{ color: "#0D1B2A", fontWeight: 600, fontSize: "15px" }}>
-            {Icon && (
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-md"
-                style={{ background: "rgba(0,92,255,0.08)", color: "#005CFF" }}
-              >
-                <Icon size={14} strokeWidth={2} />
-              </span>
-            )}
-            {title}
-          </h3>
-          {right}
-        </div>
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function Info({ label, value, span = false, copyable = false }) {
+function Info({ label, value, copyable = false }) {
   const v = value ?? "-";
   return (
-    <div className={span ? "sm:col-span-2" : ""}>
-      <dt style={{ color: "#5E6A7E", fontSize: "11px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        {label}
-      </dt>
-      <dd className="mt-1 flex items-center gap-2" style={{ color: "#334155" }}>
+    <div>
+      <dt style={{ color: "#5E6A7E", fontSize: "12px", fontWeight: 500 }}>{label}</dt>
+      <dd className="mt-1 flex items-center gap-2" style={{ color: "#0D1B2A", fontSize: "15px" }}>
         <span className="truncate">{v}</span>
         {copyable && typeof value === "string" && <CopyBtn text={value} />}
       </dd>
@@ -388,73 +181,19 @@ function Info({ label, value, span = false, copyable = false }) {
   );
 }
 
-function QuickActionLink({ href, label, danger = false, ActionIcon }) {
+function QuickActionLink({ href, label, ActionIcon }) {
   return (
     <Link
       href={href}
       className="group/action flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium no-underline transition-all duration-200 hover:-translate-y-0.5"
-      style={{
-        background: "#F8FAFD",
-        border: "1px solid rgba(0,92,255,0.08)",
-        color: danger ? "#DC2626" : "#334155",
-      }}
+      style={{ background: "#F8FAFD", border: "1px solid rgba(0,92,255,0.08)", color: "#334155" }}
     >
       {ActionIcon && (
-        <span style={{ color: danger ? "#DC2626" : "#5E6A7E" }}>
+        <span style={{ color: "#5E6A7E" }}>
           <ActionIcon size={15} strokeWidth={1.8} />
         </span>
       )}
       {label}
     </Link>
-  );
-}
-
-function EmergencyBlock({ title, data, canView }) {
-  if (!canView) {
-    return (
-      <div
-        className="rounded-xl p-4 text-sm"
-        style={{
-          background: "#F8FAFD",
-          border: "1px solid rgba(0,92,255,0.08)",
-          color: "#5E6A7E",
-        }}
-      >
-        Visible to the owner, HR, and Super Admin only
-      </div>
-    );
-  }
-  if (!data) {
-    return (
-      <div
-        className="rounded-xl p-4 text-sm"
-        style={{
-          background: "#F8FAFD",
-          border: "1px solid rgba(0,92,255,0.08)",
-          color: "#5E6A7E",
-        }}
-      >
-        No data
-      </div>
-    );
-  }
-  return (
-    <div
-      className="rounded-xl p-4"
-      style={{
-        background: "#F8FAFD",
-        border: "1px solid rgba(0,92,255,0.08)",
-      }}
-    >
-      <h4 style={{ color: "#0D1B2A", fontWeight: 500, marginBottom: "12px" }}>{title}</h4>
-      <dl className="grid gap-2 text-sm">
-        <Info label="First Name" value={data.firstName || "-"} />
-        <Info label="Last Name" value={data.lastName || "-"} />
-        <Info label="Relationship" value={data.relationship || "-"} />
-        <Info label="Phone" value={data.phone || "-"} />
-        <Info label="Email" value={data.email || "-"} />
-        <Info label="Address" value={data.address || "-"} />
-      </dl>
-    </div>
   );
 }
