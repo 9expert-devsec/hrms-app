@@ -1,16 +1,40 @@
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import User from "@/models/User";
-import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
-import { canAccess } from "@/lib/rbac/access";
+import { requirePageApi } from "@/lib/rbac/guard";
 import cloudinary from "@/lib/cloudinary";
 import { thaiNameError } from "@/lib/employeeName";
 
+// Fields HR may edit. An employee's own changes (photo, nickname, phone only)
+// go through PATCH /api/employees/me.
+const EDITABLE_FIELDS = [
+  "firstName",
+  "lastName",
+  "titleTh",
+  "firstNameTh",
+  "lastNameTh",
+  "nickName",
+  "phone",
+  "address",
+  "photoUrl",
+  "photoPublicId",
+  "emergency",
+  "department",
+  "departmentId",
+  "position",
+  "level",
+  "dateOfJoin",
+  "email",
+  "privateInfo",
+  "gender",
+  "birthday",
+];
+
 export async function PUT(req, { params }) {
-  // Own profile (self_profile, self fields) or any employee (employees).
-  const gate = await requireAnyPageApi(["self_profile", "employees"]);
+  // HR only (`employees` holders and the superadmin) — own record included:
+  // names and private data are not self-service (round 16).
+  const gate = await requirePageApi("employees");
   if (gate.res) return gate.res;
-  const { session } = gate;
 
   await dbConnect();
 
@@ -18,46 +42,8 @@ export async function PUT(req, { params }) {
   const emp = await Employee.findById(id).lean();
   if (!emp) return new Response("Not found", { status: 404 });
 
-  const canManage = canAccess(session.user, "employees");
-  // Self = the employee linked to this account (Employee.userId), never an
-  // email match — an unlinked account must not edit whoever shares its email.
-  const isSelf = !!emp.userId && String(emp.userId) === String(session.user.id || "");
-
-  if (!(isSelf || canManage)) {
-    return new Response("Forbidden", { status: 403 });
-  }
-
   const payload = await req.json();
-
-  // สิทธิ์การแก้ไข
-  const selfFields = [
-    "firstName",
-    "lastName",
-    "titleTh",
-    "firstNameTh",
-    "lastNameTh",
-    "nickName",
-    "phone",
-    "address",
-    "photoUrl",
-    "photoPublicId",
-    "emergency",
-  ];
-  const adminExtra = [
-    "department",
-    "departmentId",
-    "position",
-    "level",
-    "dateOfJoin",
-    "email",
-    "privateInfo",
-    "gender",
-    "birthday",
-  ];
-
-  const allowed = canManage
-    ? [...selfFields, ...adminExtra]
-    : selfFields;
+  const allowed = EDITABLE_FIELDS;
 
   const update = {};
   for (const k of allowed) {

@@ -13,7 +13,8 @@ import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import CopyBtn from "./CopyBtn";
-import { Zap, Pencil, KeyRound, ArrowLeft, PenLine } from "lucide-react";
+import BackButton from "./BackButton";
+import { Zap, Pencil, KeyRound, PenLine } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +55,15 @@ export default async function EmployeeProfilePage({ searchParams }) {
   });
   if (!isSelf && !access.canView) notFound();
 
+  // HR (`employees` / superadmin) → the full edit page; the owner without it →
+  // "แก้ไขโปรไฟล์ของฉัน" (photo, nickname, phone only).
   const canManage = canAccess(session.user, "employees");
-  const canEdit = isSelf || canManage;
+  const editHref = canManage
+    ? `/dashboard/hrm/employee/edit?id=${e._id}`
+    : isSelf
+      ? "/dashboard/hrm/employee-profile/edit"
+      : null;
+  const editLabel = canManage ? "แก้ไข" : "แก้ไขโปรไฟล์";
 
   const dept = e.departmentId ? await Department.findById(e.departmentId).select("name code").lean() : null;
   const departmentLabel = dept?.name || e.department || "-";
@@ -73,8 +81,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
       <div className="flex items-center justify-between">
         <h1 style={{ color: "#0D1B2A", fontSize: "1.5rem", fontWeight: 600 }}>โปรไฟล์</h1>
         <div className="flex items-center gap-2">
-          <Link
-            href="/dashboard/hrm/employee"
+          <BackButton
             className="group inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium no-underline transition-all duration-200 hover:-translate-y-0.5"
             style={{
               background: "#FFFFFF",
@@ -82,12 +89,11 @@ export default async function EmployeeProfilePage({ searchParams }) {
               color: "#334155",
               boxShadow: "0 1px 4px rgba(13,27,42,0.06)",
             }}
-          >
-            <ArrowLeft size={14} /> กลับ
-          </Link>
-          {canEdit && (
+          />
+          {editHref && (
             <Link
-              href={`/dashboard/hrm/employee/edit?id=${e._id}`}
+              href={editHref}
+              data-testid="profile-edit"
               className="group inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium no-underline transition-all duration-200 hover:-translate-y-0.5"
               style={{
                 background: "linear-gradient(135deg, #005CFF, #2486FF)",
@@ -95,7 +101,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
                 boxShadow: "0 2px 12px rgba(0,92,255,0.3)",
               }}
             >
-              <Pencil size={14} /> แก้ไข
+              <Pencil size={14} /> {editLabel}
             </Link>
           )}
         </div>
@@ -146,9 +152,9 @@ export default async function EmployeeProfilePage({ searchParams }) {
             การดำเนินการ
           </h3>
           <div className="flex flex-col gap-2">
-            {canEdit ? (
+            {editHref ? (
               <>
-                <QuickActionLink href={`/dashboard/hrm/employee/edit?id=${e._id}`} label="แก้ไขข้อมูลพนักงาน" ActionIcon={Pencil} />
+                <QuickActionLink href={editHref} label={canManage ? "แก้ไขข้อมูลพนักงาน" : "แก้ไขโปรไฟล์ของฉัน"} ActionIcon={Pencil} />
                 {/* Own password only (requires the current one); someone
                     else's is reset with a temporary password on the users
                     page. Suspending is a users_manage action, not here. */}

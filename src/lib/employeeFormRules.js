@@ -35,6 +35,31 @@ export const FIELD_LABELS = {
   accountEmail: "อีเมล (ใช้ล็อกอิน)",
 };
 
+/* ── Self-edit ("แก้ไขโปรไฟล์ของฉัน", PATCH /api/employees/me) ─────────── */
+
+/** The only fields an employee may change on their own record. */
+export const SELF_EDIT_FIELDS = ["photoUrl", "photoPublicId", "nickName", "phone"];
+export const SELF_EDIT_LABELS = { photo: "รูปโปรไฟล์", nickName: "ชื่อเล่น", phone: "เบอร์โทร" };
+export const NICKNAME_MAX = 50;
+
+/**
+ * Validate a self-edit. `stored` = the saved employee: the phone format
+ * applies to a changed value only (same rule as the edit form), but it may
+ * not be cleared. Returns { field: message } (empty = valid).
+ */
+export function validateSelfProfile(values = {}, { stored = {} } = {}) {
+  const errors = {};
+  if ("phone" in values) {
+    const phone = clean(values.phone);
+    if (!phone) errors.phone = "กรุณากรอกเบอร์โทร";
+    else if (phone !== clean(stored.phone) && !PHONE_RE.test(phone)) errors.phone = "เบอร์โทรต้องเป็นตัวเลข 10 หลัก";
+  }
+  if ("nickName" in values && clean(values.nickName).length > NICKNAME_MAX) {
+    errors.nickName = `ชื่อเล่นยาวเกิน ${NICKNAME_MAX} ตัวอักษร`;
+  }
+  return errors;
+}
+
 const SELECTS = new Set(["titleTh", "departmentId", "positionId", "dateOfJoin", "birthday"]);
 const THAI = ["titleTh", "firstNameTh", "lastNameTh"];
 // The schema requires these; POST /api/employees also requires the address.

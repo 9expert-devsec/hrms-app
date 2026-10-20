@@ -7,6 +7,7 @@ import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import Sidebar from "./../../components/Sidebar";
 import Topbar from "./../../components/Topbar";
 import SelfServiceGate from "./../../components/SelfServiceGate";
+import NavTracker from "./../../components/NavTracker";
 
 export default async function ProtectedLayout({ children }) {
   // Is this account linked to an employee? (Employee.userId — read from the
@@ -29,6 +30,7 @@ export default async function ProtectedLayout({ children }) {
         color: "#0D1B2A",
       }}
     >
+      <NavTracker />
       <Sidebar />
       <div
         style={{
