@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { placeSignatures, prepareSignatures } from "./printSignatures";
+
+/** Fired on window (and data-print-ready="true" set on .pf-doc) once the form may be printed. */
+export const PRINT_READY_EVENT = "pf-print-ready";
 
 const MIN_PT = 11;
 const STEP_PT = 0.25;
@@ -72,7 +76,10 @@ function hasAngsana() {
  * data-fit-pt / data-fit-wrapped so tests can report them. If wrapping would
  * push page 1 past its footer, page 1's line pitch is tightened just enough
  * (data-compact-lh on .pf-body). Then the dot leaders are trimmed to whole
- * periods. Also shows the on-screen-only note when Angsana New is not installed.
+ * periods and the signatures (prepared for print first) are set on their
+ * dotted lines. Only then is the form print-ready: data-print-ready="true" on
+ * .pf-doc and PRINT_READY_EVENT, which enables the print button. Also shows
+ * the on-screen-only note when Angsana New is not installed.
  */
 export default function PrintFit() {
   const [missingFont, setMissingFont] = useState(false);
@@ -108,8 +115,17 @@ export default function PrintFit() {
       compactPage1();
       trimLeaders();
     };
+    const run = async () => {
+      await Promise.all([document.fonts?.ready, prepareSignatures()]);
+      if (cancelled) return;
+      fit();
+      placeSignatures();
+      const doc = document.querySelector(".pf-doc");
+      if (doc) doc.dataset.printReady = "true";
+      window.dispatchEvent(new Event(PRINT_READY_EVENT));
+    };
     setMissingFont(!hasAngsana());
-    (document.fonts?.ready || Promise.resolve()).then(fit);
+    run();
     return () => {
       cancelled = true;
     };

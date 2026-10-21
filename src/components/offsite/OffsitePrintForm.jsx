@@ -106,19 +106,22 @@ const Icon = ({ children, style }) => (
 
 /**
  * A dotted fill-in from `at` to `to`. Empty: dots end to end. With a value:
- * 3-pt gap, the value, 3-pt gap, dots to the end. PrintFit shrinks a value
- * that does not fit (`fit`), then lets it wrap.
+ * 3-pt gap, the value, 3-pt gap, dots to the end — or, `center`ed, dots on
+ * both sides of it. PrintFit shrinks a value that does not fit (`fit`), then
+ * lets it wrap. `overlay` sits over the unbroken dots (a signature).
  */
-function S({ children, style, base = 14, fit = true, className = "" }) {
+function S({ children, style, base = 14, fit = true, center = false, className = "", overlay = null }) {
   const has = children != null && children !== "" && children !== false;
   return (
     <span className={`pf-seg ${className}`} style={style} data-fit={fit ? "line" : undefined} data-base-pt={base}>
+      {has && center && <span className="pf-dots pf-dots-l">{DOT_FILL}</span>}
       {has && (
         <span className="pf-val">
           <span className="pf-vt">{children}</span>
         </span>
       )}
       <span className="pf-dots">{DOT_FILL}</span>
+      {overlay}
     </span>
   );
 }
@@ -238,25 +241,25 @@ export default function OffsitePrintForm({ r, printedAt }) {
             <L at={57.6} to={87.4}>
               ในวันที่
             </L>
-            <S at={87.4} to={126.2}>
+            <S at={87.4} to={126.2} center>
               {date.day}
             </S>
             <L at={128.9} to={148.9}>
               เดือน
             </L>
-            <S at={148.9} to={194.6}>
+            <S at={148.9} to={194.6} center>
               {date.month}
             </S>
             <L at={197.3} to={216}>
               พ.ศ.
             </L>
-            <S at={216} to={268.8}>
+            <S at={216} to={268.8} center>
               {date.yearBE}
             </S>
             <L at={271.7} to={311.8}>
               ตั้งแต่เวลา
             </L>
-            <S at={311.8} to={373.5}>
+            <S at={311.8} to={373.5} center>
               {dotTime(r.startTime)}
             </S>
             <L at={373.5} to={385.1}>
@@ -265,7 +268,7 @@ export default function OffsitePrintForm({ r, printedAt }) {
             <L at={385.1} to={411.9}>
               ถึงเวลา
             </L>
-            <S at={411.9} to={464.5}>
+            <S at={411.9} to={464.5} center>
               {dotTime(r.endTime)}
             </S>
             <L at={464.5} to={476.1}>
@@ -327,9 +330,14 @@ export default function OffsitePrintForm({ r, printedAt }) {
               <L at={416.5} to={442.7}>
                 เซ็นชื่อ
               </L>
-              <S at={442.7} to={530.4} fit={false} className="pf-sigseg">
-                {m?.signature ? <img src={m.signature} alt="" className="pf-msig" /> : null}
-              </S>
+              {/* Signed on the line: the dots run unbroken under the signature (placed by PrintFit). */}
+              <S
+                at={442.7}
+                to={530.4}
+                fit={false}
+                className="pf-sigseg"
+                overlay={m?.signature ? <img src={m.signature} alt="" className="pf-msig" data-sig="member" /> : null}
+              />
             </Stops>
           ))}
           <div className="pf-note">
@@ -343,7 +351,7 @@ export default function OffsitePrintForm({ r, printedAt }) {
               return (
                 <div key={n} className="pf-sign">
                   <div className="pf-sign-head">{title}</div>
-                  {signed && a.signature ? <img src={a.signature} alt="" className="pf-sign-img" /> : null}
+                  {signed && a.signature ? <img src={a.signature} alt="" className="pf-sign-img" data-sig="approval" /> : null}
                   <div className="pf-sign-dots" style={{ width: pt(dots), left: `calc(50% - ${pt(dots / 2)})` }}>
                     {DOT_FILL}
                   </div>
@@ -386,7 +394,7 @@ export default function OffsitePrintForm({ r, printedAt }) {
               <L at={78} to={104.2}>
                 เบี้ยเลี้ยง
               </L>
-              <S at={104.2} to={141.8} base={12}>
+              <S at={104.2} to={141.8} base={12} center>
                 {amountFor("per_person")}
               </S>
               <L at={141.9}>บาท/ ท่าน</L>
@@ -398,7 +406,7 @@ export default function OffsitePrintForm({ r, printedAt }) {
               <L at={78} to={104.2}>
                 เบี้ยเลี้ยง
               </L>
-              <S at={104.2} to={141.8} base={12}>
+              <S at={104.2} to={141.8} base={12} center>
                 {amountFor("per_person_plus_travel")}
               </S>
               <L at={141.9} to={178.4}>
@@ -480,13 +488,20 @@ export const PRINT_CSS = `
 .pf-val { flex: none; padding: 0 3pt; }
 .pf-dots, .pf-ruled-dots, .pf-sign-dots { overflow: hidden; white-space: nowrap; }
 .pf-dots { flex: 1 1 0; min-width: 0; align-self: flex-end; height: var(--lh); }
+/* Centred value: the left run hugs the value's 3-pt gap, the right run starts after it. */
+.pf-dots-l { text-align: right; }
 .pf-seg.pf-wrapped { height: auto; overflow: visible; white-space: normal; }
 .pf-seg.pf-wrapped .pf-val { flex: 0 1 auto; min-width: 0; }
-.pf-sigseg { overflow: visible; }
-.pf-sigseg .pf-val { display: flex; align-items: flex-end; height: calc(var(--lh) - 5.4pt); }
-.pf-sigseg .pf-vt { display: block; }
-/* No mix-blend-mode on signatures: Chrome prints a blend's backdrop (the dots) as a bitmap. */
-.pf-msig { display: block; max-height: 17pt; max-width: 75pt; object-fit: contain; }
+/*
+ * Signatures sit ON the dotted line, over unbroken dots. PrintFit makes the
+ * ink transparent-backed black, crops it, sizes it (member ≤ 80 × 18 pt,
+ * approval ≤ 140 × 34 pt) and sets its top so the ink rests on the dot
+ * baseline; the CSS here is the fallback placement. Absolutely positioned
+ * (never changes the line pitch), centred by auto margins (no transform), and
+ * no mix-blend-mode / filter: Chrome prints those as flattened bitmaps.
+ */
+.pf-sigseg { position: relative; overflow: visible; }
+.pf-msig { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 5.2pt; max-width: 80pt; max-height: 18pt; }
 .pf-ruled { position: relative; overflow: hidden; }
 .pf-ruled.pf-wrapped { height: auto !important; overflow: visible; }
 .pf-ruled-dots { position: absolute; left: 0; right: 0; height: var(--lh); }
@@ -500,7 +515,7 @@ export const PRINT_CSS = `
 .pf-sign { position: relative; border-left: 0.5pt solid #000; text-align: center; }
 .pf-sign:first-child { border-left: 0; }
 .pf-sign-head { position: absolute; left: 0; right: 0; top: 0.75pt; font-weight: 700; }
-.pf-sign-img { position: absolute; left: 50%; bottom: 31.4pt; transform: translateX(-50%); max-height: 27pt; max-width: 130pt; object-fit: contain; }
+.pf-sign-img { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 30.4pt; max-height: 34pt; max-width: 140pt; }
 /* Centred by its inline left (a transform would print the dots as a bitmap); drawn over the signature image. */
 .pf-sign-dots { position: absolute; z-index: 1; top: 36.45pt; height: var(--lh); text-align: center; }
 .pf-sign-name { position: absolute; left: 2pt; right: 2pt; top: 55.25pt; white-space: nowrap; overflow: hidden; }
