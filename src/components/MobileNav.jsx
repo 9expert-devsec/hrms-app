@@ -92,13 +92,14 @@ export default function MobileNav() {
       <button
         ref={buttonRef}
         type="button"
-        className="md:hidden"
+        // display comes from the classes (an inline `display` would beat md:hidden and show ☰ on desktop)
+        className="grid place-items-center md:hidden"
         aria-label="เมนู"
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
         onClick={() => setOpen(true)}
         data-testid="mobile-nav-button"
-        style={{ width: 44, height: 44, flexShrink: 0, display: "grid", placeItems: "center", borderRadius: 10, border: "1px solid rgba(0,92,255,0.12)", background: "#FFFFFF", color: "#0D1B2A" }}
+        style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 10, border: "1px solid rgba(0,92,255,0.12)", background: "#FFFFFF", color: "#0D1B2A" }}
       >
         <Menu size={22} aria-hidden />
       </button>
