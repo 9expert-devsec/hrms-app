@@ -495,7 +495,7 @@ export const PRINT_CSS = `
 /*
  * Signatures sit ON the dotted line, over unbroken dots. PrintFit makes the
  * ink transparent-backed black, crops it, sizes it (member ≤ 80 × 18 pt,
- * approval ≤ 140 × 34 pt) and sets its top so the ink rests on the dot
+ * approval ≤ 140 × 28 pt) and sets its top so the ink rests on the dot
  * baseline; the CSS here is the fallback placement. Absolutely positioned
  * (never changes the line pitch), centred by auto margins (no transform), and
  * no mix-blend-mode / filter: Chrome prints those as flattened bitmaps.
@@ -515,7 +515,7 @@ export const PRINT_CSS = `
 .pf-sign { position: relative; border-left: 0.5pt solid #000; text-align: center; }
 .pf-sign:first-child { border-left: 0; }
 .pf-sign-head { position: absolute; left: 0; right: 0; top: 0.75pt; font-weight: 700; }
-.pf-sign-img { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 30.4pt; max-height: 34pt; max-width: 140pt; }
+.pf-sign-img { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 30.4pt; max-height: 28pt; max-width: 140pt; }
 /* Centred by its inline left (a transform would print the dots as a bitmap); drawn over the signature image. */
 .pf-sign-dots { position: absolute; z-index: 1; top: 36.45pt; height: var(--lh); text-align: center; }
 .pf-sign-name { position: absolute; left: 2pt; right: 2pt; top: 55.25pt; white-space: nowrap; overflow: hidden; }

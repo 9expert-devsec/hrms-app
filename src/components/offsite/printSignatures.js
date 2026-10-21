@@ -14,10 +14,10 @@ const INK_FULL = 150; // darkness at or above this is fully opaque ink
 const INK_BOX_ALPHA = 32; // pixels at least this opaque define the ink's bounding box
 const DIP_PT = 1; // the ink's bottom dips this far below the dot baseline, like a pen
 
-// Largest box each kind may fill (aspect ratio kept).
+// Largest box each kind may fill (aspect ratio kept). Approval ink ≤ 28 pt keeps tall strokes clear of the cell headers.
 const SIG_BOX = {
   member: { w: 80, h: 18 },
-  approval: { w: 140, h: 34 },
+  approval: { w: 140, h: 28 },
 };
 
 /** A same-origin (untainted) URL for the image: data:/same-origin as is, anything else fetched as a blob. */
