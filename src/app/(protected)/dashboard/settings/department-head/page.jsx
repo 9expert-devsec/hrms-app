@@ -206,7 +206,7 @@ export default function HodSettingsPage() {
           <Loader2 size={24} className="animate-spin" style={{ color: BLUE }} />
         </div>
       ) : (
-        <div style={{ ...CARD, overflow: "hidden" }}>
+        <div style={{ ...CARD, overflowX: "auto" /* own horizontal scroll: a narrow screen scrolls the table, not the page */ }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: ICE }}>

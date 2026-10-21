@@ -81,7 +81,7 @@ export default function DepartmentsClient({ initialItems, canEdit = false }) {
               {canEdit && (
                 <Link
                   href={`/dashboard/hrm/departments/${d._id}/edit`}
-                  className="no-underline text-sm transition-colors duration-150"
+                  className="touch-40 inline-flex items-center justify-center no-underline text-sm transition-colors duration-150"
                   style={{ color: "#005CFF", fontWeight: 500 }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = "#0D1B2A"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = "#005CFF"; }}

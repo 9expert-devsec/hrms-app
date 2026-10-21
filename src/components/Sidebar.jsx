@@ -26,8 +26,10 @@ const BORDER = "rgba(255,255,255,0.06)";
 
 /* ── Keys ──────────────────────────────────────────────────────── */
 const OPEN_KEY = "sb:open";
-const COLLAPSE_KEY = "sb:collapsed";
+const COLLAPSE_KEY = "sb:collapsed"; // desktop (≥ 1024 px) choice
+const TABLET_KEY = "sb:tablet"; // "expanded" once the user widened the rail on a 768–1023 px screen
 const EMPLOYEE_KEY = "emp";
+const TABLET = "(min-width: 768px) and (max-width: 1023px)";
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 function isActivePath(pathname, href) {
@@ -522,6 +524,7 @@ export function SidebarPanel({ variant = "rail", collapsed: railCollapsed = fals
             <button
               onClick={() => setCollapsed(true)}
               title="Collapse sidebar"
+              className="sb-toggle"
               style={{
                 padding: "6px",
                 borderRadius: "8px",
@@ -622,6 +625,7 @@ export function SidebarPanel({ variant = "rail", collapsed: railCollapsed = fals
             <button
               onClick={() => setCollapsed(false)}
               title="Expand sidebar"
+              className="sb-toggle"
               style={{
                 display: "grid",
                 placeItems: "center",
@@ -655,22 +659,38 @@ export function SidebarPanel({ variant = "rail", collapsed: railCollapsed = fals
   );
 }
 
-/* \u2500\u2500 Sidebar (desktop rail, \u2265 768 px; phones use MobileNav's drawer) \u2500\u2500 */
+/*
+ * \u2500\u2500 Sidebar (\u2265 768 px; phones use MobileNav's drawer) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * 768\u20131023 px (tablets): starts as the icon rail unless the user expanded
+ * it there before (TABLET_KEY). \u2265 1024 px: the remembered desktop choice
+ * (COLLAPSE_KEY), as before. Each width remembers only what the user chose
+ * there, so the tablet default never overwrites the desktop preference.
+ */
 export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(false);
 
   useEffect(() => {
-    try {
-      const c = localStorage.getItem(COLLAPSE_KEY);
-      if (c) setCollapsed(c === "1");
-    } catch {}
+    const mq = window.matchMedia(TABLET);
+    const apply = () => {
+      try {
+        if (mq.matches) setCollapsedState(localStorage.getItem(TABLET_KEY) !== "expanded");
+        else setCollapsedState(localStorage.getItem(COLLAPSE_KEY) === "1");
+      } catch {
+        setCollapsedState(mq.matches);
+      }
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
   }, []);
 
-  useEffect(() => {
+  const setCollapsed = (value) => {
+    setCollapsedState(value);
     try {
-      localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+      if (window.matchMedia(TABLET).matches) localStorage.setItem(TABLET_KEY, value ? "collapsed" : "expanded");
+      else localStorage.setItem(COLLAPSE_KEY, value ? "1" : "0");
     } catch {}
-  }, [collapsed]);
+  };
 
   return (
     <aside

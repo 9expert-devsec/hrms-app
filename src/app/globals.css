@@ -271,6 +271,11 @@ select option {
   /* Sidebar / phone menu drawer items. */
   .sb-item { min-height: 44px; }
   .sb-pill { width: 44px !important; height: 44px !important; }
+  .sb-toggle { min-width: 44px !important; min-height: 44px !important; display: grid !important; place-items: center; }
+  /* Back-office tables: row actions (buttons, selects) and edit links at least 40 × 40. */
+  td button,
+  td select,
+  .touch-40 { min-height: 40px; min-width: 40px; }
 }
 
 /* ── Form labels ─────────────────────────────────────────────── */
