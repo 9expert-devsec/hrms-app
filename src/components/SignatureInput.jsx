@@ -142,7 +142,8 @@ function SignatureUpload({ confirmLabel, onSave, onClear }) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        // image/* so phones offer the camera as well as the gallery (no `capture`); the real type is still checked by decoding.
+        accept="image/*"
         style={{ display: "none" }}
         onChange={(e) => takeFile(e.target.files?.[0])}
         data-testid="sig-upload-input"
@@ -234,7 +235,7 @@ function SignatureUpload({ confirmLabel, onSave, onClear }) {
             <button
               type="button"
               onClick={pickAgain}
-              style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, borderRadius: 10, border: "1px solid rgba(0,92,255,0.25)", background: "#FFFFFF", color: NAVY, cursor: "pointer" }}
+              style={{ minHeight: 44, padding: "8px 14px", fontSize: 14, fontWeight: 600, borderRadius: 10, border: "1px solid rgba(0,92,255,0.25)", background: "#FFFFFF", color: NAVY, cursor: "pointer" }}
             >
               เลือกไฟล์ใหม่
             </button>
@@ -246,8 +247,9 @@ function SignatureUpload({ confirmLabel, onSave, onClear }) {
                 onSave?.(result);
               }}
               style={{
+                minHeight: 44,
                 padding: "8px 14px",
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 600,
                 borderRadius: 10,
                 border: "none",
@@ -293,8 +295,9 @@ export default function SignatureInput({ label, hint, clearLabel, confirmLabel =
     display: "inline-flex",
     alignItems: "center",
     gap: 6,
+    minHeight: 44,
     padding: "7px 12px",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 600,
     borderRadius: 10,
     border: `1px solid ${active ? BLUE : "rgba(0,92,255,0.25)"}`,
@@ -304,7 +307,7 @@ export default function SignatureInput({ label, hint, clearLabel, confirmLabel =
   });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }} data-testid="signature-input">
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }} data-testid="signature-input">
       <div role="tablist" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" role="tab" aria-selected={tab === "draw"} onClick={() => switchTo("draw")} style={tabBtn(tab === "draw")} data-testid="sig-tab-draw">
           <PenLine size={14} /> วาดลายเซ็น
