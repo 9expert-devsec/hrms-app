@@ -29,7 +29,7 @@ export async function GET() {
   }
 }
 
-/** Body: { png: "data:image/png;base64,…" } (≤ 60 KB). */
+/** Body: { png: "data:image/png;base64,…" } — a 400×160 PNG, ≤ 300 KB (lib/signaturePng.js). */
 export async function PUT(req) {
   const gate = await requireAnyPageApi(SIGNATURE_PAGES);
   if (gate.res) return gate.res;

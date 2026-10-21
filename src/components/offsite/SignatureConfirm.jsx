@@ -2,41 +2,16 @@
 
 import { useState } from "react";
 import { Loader2, PenLine } from "lucide-react";
-import SignaturePad from "../SignaturePad";
+import SignatureInput, { shrinkSignature } from "../SignatureInput";
 import { Button, ErrorBox, SLATE, NAVY, api } from "./ui";
 
-const OUT_W = 400;
-const OUT_H = 160;
-const MAX_CHARS = Math.floor((60 * 1024 * 4) / 3); // ~60 KB decoded
-
-/** The pad's (devicePixelRatio-sized) PNG → a 400×160 PNG data URL. */
-export function shrinkSignature(dataUrl) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = OUT_W;
-      canvas.height = OUT_H;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(0, 0, OUT_W, OUT_H);
-      ctx.drawImage(img, 0, 0, OUT_W, OUT_H);
-      const out = canvas.toDataURL("image/png");
-      if (out.length > MAX_CHARS + 30) reject(new Error("ลายเซ็นมีขนาดใหญ่เกิน 60 KB กรุณาวาดใหม่"));
-      else resolve(out);
-    };
-    img.onerror = () => reject(new Error("อ่านลายเซ็นไม่ได้"));
-    img.src = dataUrl;
-  });
-}
-
-/** Save a freshly drawn signature as the caller's profile signature. */
-export async function saveMySignature(rawDataUrl) {
-  const png = await shrinkSignature(rawDataUrl);
+/** Save a freshly drawn or uploaded signature as the caller's profile signature (400×160 PNG). */
+export async function saveMySignature(dataUrl) {
+  const png = await shrinkSignature(dataUrl);
   return api("/api/signature", { method: "PUT", body: { png } });
 }
 
-/** The drawing pad with Thai labels; calls onSaved({ png }) once stored. */
+/** Draw or upload, with Thai labels; calls onSaved({ png }) once stored. */
 export function SignatureDrawer({ onSaved, onCancel }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,7 +28,7 @@ export function SignatureDrawer({ onSaved, onCancel }) {
   };
   return (
     <div className="space-y-2">
-      <SignaturePad
+      <SignatureInput
         label="วาดลายเซ็นของคุณ"
         hint="เซ็นชื่อในกรอบ แล้วกด “บันทึกลายเซ็น” — ลายเซ็นนี้จะถูกบันทึกในโปรไฟล์ของคุณ"
         clearLabel="ล้าง"
@@ -63,7 +38,7 @@ export function SignatureDrawer({ onSaved, onCancel }) {
       />
       {onCancel && (
         <button type="button" onClick={onCancel} className="text-xs underline" style={{ color: SLATE }}>
-          ยกเลิกการวาด
+          ยกเลิก
         </button>
       )}
       <ErrorBox>{error}</ErrorBox>
@@ -127,7 +102,7 @@ export default function SignatureConfirm({ title = "ลงนาม", note, conf
       {state === "drawing" && (
         <div className="space-y-2">
           <p className="text-sm" style={{ color: "#92400E" }}>
-            {png ? "วาดลายเซ็นใหม่ — จะแทนที่ลายเซ็นในโปรไฟล์ของคุณ" : "คุณยังไม่มีลายเซ็นที่บันทึกไว้ กรุณาวาดและบันทึกก่อน"}
+            {png ? "วาดหรืออัปโหลดลายเซ็นใหม่ — จะแทนที่ลายเซ็นในโปรไฟล์ของคุณ" : "คุณยังไม่มีลายเซ็นที่บันทึกไว้ กรุณาวาดหรืออัปโหลดแล้วบันทึกก่อน"}
           </p>
           <SignatureDrawer
             onSaved={(sig) => {

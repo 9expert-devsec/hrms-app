@@ -6,6 +6,7 @@ import { canActOnHodStep, canActOnHrStep } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
 import LeaveBalance from "@/models/LeaveBalance";
+import { signaturePngError } from "@/lib/signaturePng";
 
 export async function POST(req, { params }) {
   try {
@@ -31,6 +32,9 @@ export async function POST(req, { params }) {
     if (!["approve", "reject"].includes(action)) {
       return NextResponse.json({ ok: false, message: "action ต้องเป็น approve หรือ reject" }, { status: 400 });
     }
+    // The approver's signature copy: the one accepted format (400×160 PNG, ≤ 300 KB).
+    const sigError = action === "approve" && signature ? signaturePngError(signature) : null;
+    if (sigError) return NextResponse.json({ ok: false, message: sigError }, { status: 400 });
 
     // CASE A — HOD step: pending → hod_approved or rejected. The head of the
     // employee's department, scope_leave_all_depts, or superadmin.

@@ -7,6 +7,7 @@ import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
 import LeaveBalance from "@/models/LeaveBalance";
 import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
+import { signaturePngError } from "@/lib/signaturePng";
 
 /* ---------- helpers ---------- */
 
@@ -115,6 +116,9 @@ export async function POST(req) {
     if (!leaveType || !startDate || !endDate || !reason) {
       return NextResponse.json({ ok: false, message: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
     }
+    // The record's own signature copy: the one accepted format (400×160 PNG, ≤ 300 KB).
+    const sigError = employeeSignature ? signaturePngError(employeeSignature) : null;
+    if (sigError) return NextResponse.json({ ok: false, message: sigError }, { status: 400 });
 
     const start = new Date(startDate);
     const end = new Date(endDate);

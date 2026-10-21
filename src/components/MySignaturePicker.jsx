@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, PenLine, CheckCircle2 } from "lucide-react";
-import SignaturePad from "./SignaturePad";
+import SignatureInput from "./SignatureInput";
 
 const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
@@ -11,8 +11,9 @@ const SLATE = "#5E6A7E";
 /**
  * Signature step of the leave flow (request + approve), same pattern as the
  * off-site sign view: "ใช้ลายเซ็นของฉัน" (the saved signature — GET
- * /api/signature, the one store) or "วาดใหม่" with "บันทึกเป็นลายเซ็นหลักของฉัน"
- * (ticked by default when nothing is saved yet).
+ * /api/signature, the one store) or "วาด / อัปโหลดใหม่" (SignatureInput: draw
+ * or upload a file, both giving the stored 400×160 PNG) with
+ * "บันทึกเป็นลายเซ็นหลักของฉัน" (ticked by default when nothing is saved yet).
  *
  * onChange(null) until a signature is chosen or drawn, then
  * onChange({ png, saveAsMine }). The page sends `png` as the record's own
@@ -100,7 +101,7 @@ export default function MySignaturePicker({ label = "ลายเซ็น", onC
             <CheckCircle2 size={14} /> ใช้ลายเซ็นของฉัน
           </button>
           <button type="button" onClick={drawNew} style={choiceBtn(mode === "draw")} data-testid="sig-draw">
-            <PenLine size={14} /> วาดใหม่
+            <PenLine size={14} /> วาด / อัปโหลดใหม่
           </button>
         </div>
       )}
@@ -115,9 +116,9 @@ export default function MySignaturePicker({ label = "ลายเซ็น", onC
       {mode === "draw" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {noneNotice && (
-            <span style={{ color: "#92400E", fontSize: 13 }}>คุณยังไม่มีลายเซ็นที่บันทึกไว้ — วาดลายเซ็นด้านล่าง</span>
+            <span style={{ color: "#92400E", fontSize: 13 }}>คุณยังไม่มีลายเซ็นที่บันทึกไว้ — วาดหรืออัปโหลดลายเซ็นด้านล่าง</span>
           )}
-          <SignaturePad
+          <SignatureInput
             label="วาดลายเซ็น"
             hint="เซ็นชื่อในกรอบ แล้วกด “ใช้ลายเซ็นนี้”"
             clearLabel="ล้าง"

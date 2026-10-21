@@ -10,6 +10,7 @@ import { canAccess } from "@/lib/rbac/access";
 import { notifyTransitions } from "@/lib/offsiteNotify";
 import { HEAD_FIELDS } from "@/lib/hod";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
+import { signaturePngError } from "@/lib/signaturePng";
 import {
   ACCOUNTING_DEPT_CODE,
   ACTIVE_APPROVAL_STATUSES,
@@ -80,8 +81,6 @@ const ALLOWED_FROM = {
 const STEP_DEPT = { 2: ACCOUNTING_DEPT_CODE, 3: HR_DEPT_CODE };
 const STEP_DEPT_LABEL = { 2: "ฝ่ายบัญชี", 3: "ฝ่ายบุคคล" };
 
-const SIGNATURE_MAX_BYTES = 60 * 1024;
-const PNG_DATA_URL_RE = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/;
 const VIEWER_FIELDS = `_id ${EMPLOYEE_NAME_FIELDS} position department departmentId userId`;
 const LIST_PROJECTION = "-members.signature -approvals.signature -events -returnSnapshot";
 const SNAPSHOT_FIELDS = ["jobName", "workDate", "startTime", "endTime", "description", "placeName", "address", "travelMode", "note", "leader"];
@@ -137,13 +136,10 @@ export async function viewerEmployee(session) {
 
 /* ── signatures ─────────────────────────────────────────────── */
 
-/** Normalized PNG data URL, or an OffsiteError (400). */
+/** The PNG data URL if it is an acceptable signature (lib/signaturePng.js), else an OffsiteError (400). */
 export function validateSignaturePng(png) {
-  const m = typeof png === "string" ? png.match(PNG_DATA_URL_RE) : null;
-  if (!m) throw new OffsiteError("ลายเซ็นต้องเป็นรูป PNG", 400);
-  const bytes = Buffer.from(m[1], "base64");
-  if (bytes.length > SIGNATURE_MAX_BYTES) throw new OffsiteError("ไฟล์ลายเซ็นใหญ่เกิน 60 KB", 400);
-  if (bytes.length < 8 || bytes.readUInt32BE(0) !== 0x89504e47) throw new OffsiteError("ลายเซ็นต้องเป็นรูป PNG", 400);
+  const error = signaturePngError(png);
+  if (error) throw new OffsiteError(error, 400);
   return png;
 }
 
