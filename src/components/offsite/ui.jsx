@@ -65,7 +65,7 @@ export function MemberStatusChip({ status }) {
   return <Chip tone={MEMBER_TONE[status]}>{MEMBER_STATUS_LABELS[status] || status}</Chip>;
 }
 
-export function Button({ variant = "primary", disabled, children, style, ...rest }) {
+export function Button({ variant = "primary", disabled, children, style, className = "", ...rest }) {
   const look = {
     primary: { background: disabled ? "#A0AEC0" : `linear-gradient(135deg, ${BLUE}, #2486FF)`, color: "#FFFFFF", border: "none" },
     secondary: { background: "#FFFFFF", color: NAVY, border: "1px solid rgba(0,92,255,0.20)" },
@@ -76,7 +76,7 @@ export function Button({ variant = "primary", disabled, children, style, ...rest
     <button
       type="button"
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold"
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold ${className}`}
       style={{ ...look, cursor: disabled ? "not-allowed" : "pointer", ...style }}
       {...rest}
     >

@@ -119,6 +119,7 @@ export default function LeaveHistoryPage() {
         <Filter size={16} style={{ color: SLATE }} />
 
         <select
+          className="touch-44"
           value={year}
           onChange={(e) => setYear(e.target.value)}
           style={{
@@ -136,6 +137,7 @@ export default function LeaveHistoryPage() {
         </select>
 
         <select
+          className="touch-44"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
           style={{
@@ -154,6 +156,7 @@ export default function LeaveHistoryPage() {
         </select>
 
         <select
+          className="touch-44"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           style={{
@@ -295,7 +298,7 @@ export default function LeaveHistoryPage() {
                       <button
                         onClick={() => handleCancel(item._id)}
                         disabled={cancelling === item._id}
-                        className="flex items-center gap-1 rounded-lg px-3 py-1.5 transition-colors"
+                        className="touch-44 flex items-center gap-1 rounded-lg px-3 py-1.5 transition-colors"
                         style={{
                           border: "1px solid #FEE2E2",
                           color: "#991B1B",

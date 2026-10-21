@@ -22,7 +22,7 @@ export default async function EditMyProfilePage() {
 
   return (
     <div className="container mx-auto max-w-3xl space-y-6 px-6 py-6">
-      <Link href="/dashboard/hrm/employee-profile" className="inline-flex items-center gap-1 text-sm" style={{ color: "#5E6A7E" }}>
+      <Link href="/dashboard/hrm/employee-profile" className="touch-44 inline-flex items-center gap-1 text-sm" style={{ color: "#5E6A7E" }}>
         <ArrowLeft size={14} /> กลับไปโปรไฟล์
       </Link>
       <div>

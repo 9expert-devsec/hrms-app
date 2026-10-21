@@ -368,6 +368,11 @@ function DocumentDetail({ id }) {
           .no-print { display: none !important; }
           nav, header, aside, [data-sidebar], [data-topbar] { display: none !important; }
         }
+        /* Phones (screen only — print keeps the three columns): stack the signatures, slimmer card. */
+        @media screen and (max-width: 639px) {
+          .leave-document { padding: 20px !important; }
+          .leave-sig-grid { grid-template-columns: minmax(0, 1fr) !important; }
+        }
       `}</style>
 
       <div style={{ maxWidth: 800, margin: "0 auto" }} className="space-y-4">
@@ -375,7 +380,7 @@ function DocumentDetail({ id }) {
         <div className="flex justify-between no-print">
           <Link
             href="/dashboard/leave/document"
-            className="flex items-center gap-1 rounded-xl px-4 py-2.5"
+            className="touch-44 flex items-center gap-1 rounded-xl px-4 py-2.5"
             style={{
               border: "1px solid rgba(0,92,255,0.10)",
               color: NAVY,
@@ -484,8 +489,9 @@ function DocumentDetail({ id }) {
             </div>
           )}
 
-          {/* Signatures — 3 columns */}
+          {/* Signatures — 3 columns (stacked on phones) */}
           <div
+            className="leave-sig-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr 1fr",

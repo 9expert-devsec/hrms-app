@@ -11,6 +11,7 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelRightOpen,
+  X,
 } from "lucide-react";
 import { menuConfig, filterMenu } from "@/app/config/menuConfig";
 import { canOpenPage } from "@/lib/rbac/access";
@@ -36,6 +37,8 @@ function isActivePath(pathname, href) {
 
 /* ── Badge (menuConfig badgeKey → useMenuBadges count) ─────────── */
 const BadgesContext = createContext({});
+/* The phone drawer hears about link taps (to close once the page changes). */
+const NavigateContext = createContext(null);
 
 function Badge({ count, dot }) {
   if (!count) return null;
@@ -61,6 +64,7 @@ function Badge({ count, dot }) {
 function NavLink({ node, active, collapsed }) {
   const Icon = node.icon;
   const badges = useContext(BadgesContext);
+  const onNavigate = useContext(NavigateContext);
   const count = node.badgeKey ? badges[node.badgeKey] || 0 : 0;
   /* Collapsed mode: icon-only pill */
   if (collapsed) {
@@ -68,6 +72,8 @@ function NavLink({ node, active, collapsed }) {
       <Link
         href={node.href}
         title={node.label}
+        className="sb-pill"
+        onClick={() => onNavigate?.(node.href)}
         style={{
           display: "grid",
           placeItems: "center",
@@ -105,6 +111,8 @@ function NavLink({ node, active, collapsed }) {
     <Link
       href={node.href}
       title={undefined}
+      className="sb-item"
+      onClick={() => onNavigate?.(node.href)}
       style={{
         display: "flex",
         alignItems: "center",
@@ -204,6 +212,7 @@ function RecursiveNode({
       <button
         onClick={toggle}
         title={node.label}
+        className="sb-pill"
         style={{
           display: "grid",
           placeItems: "center",
@@ -238,6 +247,7 @@ function RecursiveNode({
       <button
         onClick={toggle}
         title={undefined}
+        className="sb-item"
         style={{
           display: "flex",
           alignItems: "center",
@@ -377,15 +387,9 @@ function RecursiveNode({
   return null;
 }
 
-/* ── Sidebar ───────────────────────────────────────────────────── */
-export default function Sidebar() {
-  const { data: session } = useSession();
-  const user = session?.user;
-  const pathname = usePathname();
-
+/* ── Open groups (remembered across pages) ─────────────────────── */
+function useOpenGroups() {
   const [open, setOpen] = useState({});
-  const [collapsed, setCollapsed] = useState(false);
-
   useEffect(() => {
     try {
       const o = localStorage.getItem(OPEN_KEY);
@@ -396,17 +400,29 @@ export default function Sidebar() {
       } else {
         setOpen({ [EMPLOYEE_KEY]: true });
       }
-      const c = localStorage.getItem(COLLAPSE_KEY);
-      if (c) setCollapsed(c === "1");
     } catch {}
   }, []);
-
   useEffect(() => {
     try {
       localStorage.setItem(OPEN_KEY, JSON.stringify(open));
-      localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
     } catch {}
-  }, [open, collapsed]);
+  }, [open]);
+  return [open, setOpen];
+}
+
+/**
+ * The sidebar's contents — brand, the RBAC-filtered menu, footer — shared by
+ * the desktop rail (`variant="rail"`) and the phone menu drawer
+ * (`variant="drawer"`: always expanded, a ✕ instead of the collapse button,
+ * `onNavigate(href)` on every link tap).
+ */
+export function SidebarPanel({ variant = "rail", collapsed: railCollapsed = false, setCollapsed = () => {}, onClose, onNavigate }) {
+  const { data: session } = useSession();
+  const user = session?.user;
+  const pathname = usePathname();
+  const [open, setOpen] = useOpenGroups();
+  const drawer = variant === "drawer";
+  const collapsed = drawer ? false : railCollapsed;
 
   // Registry-driven: a link shows when canOpenPage(user, pageKey) is true;
   // empty groups disappear.
@@ -415,15 +431,7 @@ export default function Sidebar() {
 
   return (
     <BadgesContext.Provider value={badges}>
-    <aside
-      className="hidden md:block shrink-0"
-      style={{
-        width: collapsed ? "64px" : "256px",
-        background: "linear-gradient(180deg, #0D1B2A 0%, #0a1628 100%)",
-        borderRight: `1px solid ${BORDER}`,
-        transition: "width 200ms cubic-bezier(0.4,0,0.2,1)",
-      }}
-    >
+    <NavigateContext.Provider value={onNavigate || null}>
       <div
         style={{
           height: "100dvh",
@@ -431,6 +439,7 @@ export default function Sidebar() {
           top: 0,
           display: "flex",
           flexDirection: "column",
+          ...(drawer ? { background: "linear-gradient(180deg, #0D1B2A 0%, #0a1628 100%)" } : {}),
         }}
       >
         {/* ── Brand area with subtle blue glow ────────────────── */}
@@ -497,8 +506,19 @@ export default function Sidebar() {
             )}
           </div>
 
-          {/* Toggle button — always visible */}
-          {!collapsed && (
+          {/* Drawer: close (✕). Rail: collapse toggle. */}
+          {drawer && (
+            <button
+              type="button"
+              onClick={onClose}
+              data-drawer-close
+              aria-label="ปิดเมนู"
+              style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, border: "none", background: "transparent", color: "#FFFFFF", cursor: "pointer", position: "relative", zIndex: 1 }}
+            >
+              <X size={20} aria-hidden />
+            </button>
+          )}
+          {!drawer && !collapsed && (
             <button
               onClick={() => setCollapsed(true)}
               title="Collapse sidebar"
@@ -630,7 +650,39 @@ export default function Sidebar() {
           )}
         </div>
       </div>
-    </aside>
+    </NavigateContext.Provider>
     </BadgesContext.Provider>
+  );
+}
+
+/* \u2500\u2500 Sidebar (desktop rail, \u2265 768 px; phones use MobileNav's drawer) \u2500\u2500 */
+export default function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const c = localStorage.getItem(COLLAPSE_KEY);
+      if (c) setCollapsed(c === "1");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+    } catch {}
+  }, [collapsed]);
+
+  return (
+    <aside
+      className="hidden md:block shrink-0"
+      style={{
+        width: collapsed ? "64px" : "256px",
+        background: "linear-gradient(180deg, #0D1B2A 0%, #0a1628 100%)",
+        borderRight: `1px solid ${BORDER}`,
+        transition: "width 200ms cubic-bezier(0.4,0,0.2,1)",
+      }}
+    >
+      <SidebarPanel variant="rail" collapsed={collapsed} setCollapsed={setCollapsed} />
+    </aside>
   );
 }

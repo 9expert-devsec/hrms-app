@@ -250,6 +250,29 @@ select option {
   color: #0D1B2A;
 }
 
+/* ── Phones, tablets, touch screens ──────────────────────────────
+   iOS zooms the page when a field under 16 px gets focus. Below 1024 px or
+   on any coarse pointer every field is 16 px (beats the inline 13–15 px
+   styles); desktop with a mouse keeps its sizes. */
+@media (max-width: 1023px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Finger-sized tap targets on touch only (desktop layout unchanged). */
+@media (pointer: coarse) {
+  .touch-44 { min-height: 44px !important; }
+  /* A whole HR allowance option row is the tap target. */
+  .hr-option { min-height: 44px; }
+  .hr-option input[type="radio"] { width: 20px; height: 20px; flex-shrink: 0; }
+  /* Sidebar / phone menu drawer items. */
+  .sb-item { min-height: 44px; }
+  .sb-pill { width: 44px !important; height: 44px !important; }
+}
+
 /* ── Form labels ─────────────────────────────────────────────── */
 form label,
 section label {

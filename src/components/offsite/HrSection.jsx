@@ -64,7 +64,8 @@ export default function HrSection({ value, onChange, editable = false, errors = 
             const [before, after] = ALLOWANCE_OPTION_LABELS[option].split("…");
             const checked = v.allowanceOption === option;
             return (
-              <label key={option} className="flex flex-wrap items-center gap-2 text-sm" style={{ color: NAVY }}>
+              // The whole row is the tap target (≥ 44 px on touch, radio ≥ 20 px — globals.css .hr-option).
+              <label key={option} className="hr-option flex flex-wrap items-center gap-2 text-sm" style={{ color: NAVY }}>
                 <input
                   type="radio"
                   name="allowanceOption"

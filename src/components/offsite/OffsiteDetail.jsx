@@ -303,7 +303,7 @@ export default function OffsiteDetail({ id }) {
       {staleBanner && <StaleBanner onReload={refreshInPlace} />}
       <LiveToast show={toast} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/dashboard/offsite" className="inline-flex items-center gap-1 text-sm" style={{ color: SLATE }}>
+        <Link href="/dashboard/offsite" className="touch-44 inline-flex items-center gap-1 text-sm" style={{ color: SLATE }}>
           <ArrowLeft size={14} /> กลับ
         </Link>
         <div className="flex flex-wrap gap-2">

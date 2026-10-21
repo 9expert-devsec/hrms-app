@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UserMenu from "./UserMenu";
 import InboxBell from "./inbox/InboxBell";
+import MobileNav from "./MobileNav";
 import dbConnect from "@/lib/mongoose";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 
@@ -38,8 +39,11 @@ export default async function Topbar() {
           boxShadow: "0 1px 4px rgba(13,27,42,0.06)",
         }}
       >
-        {/* Search */}
-        <div className="flex-1 max-w-xl">
+        {/* Phones: ☰ opens the sidebar as a drawer (the rail is hidden below 768 px). */}
+        <MobileNav />
+
+        {/* Search — desktop only (on phones it took half the bar). */}
+        <div className="hidden md:block flex-1 max-w-xl">
           <input
             placeholder="Search here…"
             className="topbar-search"

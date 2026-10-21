@@ -86,7 +86,7 @@ export default function OffsiteList() {
       <LiveToast show={toast} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 style={{ color: NAVY, fontSize: "1.5rem", fontWeight: 600 }}>ทำงานนอกสถานที่</h1>
-        <Button onClick={() => router.push("/dashboard/offsite/new")}>
+        <Button className="touch-44" onClick={() => router.push("/dashboard/offsite/new")}>
           <Plus size={14} /> สร้างคำขอ
         </Button>
       </div>
@@ -100,7 +100,7 @@ export default function OffsiteList() {
               href={`/dashboard/offsite?tab=${t.key}`}
               role="tab"
               aria-selected={active}
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+              className="touch-44 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
               style={{ background: active ? BLUE : "#FFFFFF", color: active ? "#FFFFFF" : NAVY, border: "1px solid rgba(0,92,255,0.15)" }}
             >
               {t.label}

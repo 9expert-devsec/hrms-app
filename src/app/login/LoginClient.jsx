@@ -215,7 +215,7 @@ export default function LoginClient() {
               <div className="mt-2 flex justify-end">
                 <Link
                   href="/forgot-password"
-                  className="text-sm font-semibold text-9e-action hover:underline"
+                  className="touch-44 inline-flex items-center text-sm font-semibold text-9e-action hover:underline"
                 >
                   ลืมรหัสผ่าน?
                 </Link>

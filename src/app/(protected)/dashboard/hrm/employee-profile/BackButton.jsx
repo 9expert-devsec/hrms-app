@@ -14,7 +14,7 @@ export default function BackButton({ className, style }) {
     <button
       type="button"
       onClick={() => (hasInAppHistory() ? router.back() : router.push("/dashboard"))}
-      className={className}
+      className={`touch-44 ${className || ""}`}
       style={style}
     >
       <ArrowLeft size={14} /> กลับ

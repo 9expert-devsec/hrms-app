@@ -17,7 +17,7 @@ export default function AuthCard({ eyebrow, title, subtitle, children }) {
           <div className="mt-6">{children}</div>
         </div>
         <div className="mt-6 text-center">
-          <Link href="/login" className="inline-flex items-center gap-1 text-sm font-semibold text-9e-action hover:underline">
+          <Link href="/login" className="touch-44 inline-flex items-center gap-1 text-sm font-semibold text-9e-action hover:underline">
             <ArrowLeft size={14} /> กลับไปหน้าเข้าสู่ระบบ
           </Link>
         </div>

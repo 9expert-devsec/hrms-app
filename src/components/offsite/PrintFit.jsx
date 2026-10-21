@@ -14,6 +14,21 @@ const BODY_LIMIT_PT = 832;
 const LH_PT = 18.92; // Word's single spacing for Angsana New 14 pt (the original)
 const MIN_LH_PT = 16;
 const PROBE_DOTS = 40;
+const SHEET_PX = 595.28 * PX_PER_PT; // one A4 sheet at 100 %
+const FIT_GUTTER_PX = 16;
+
+/**
+ * Phones: scale the ON-SCREEN preview so a sheet fits the screen width
+ * (--pf-fit → `zoom` under @media screen in PRINT_CSS; print stays at 100 %).
+ * Runs only after the form is measured and print-ready. A mobile browser
+ * widens the layout viewport to fit an overflowing page, so the device width
+ * (screen.width) bounds it too.
+ */
+function fitPreview() {
+  const avail = Math.min(window.innerWidth, window.screen?.width || window.innerWidth) - FIT_GUTTER_PX;
+  const scale = Math.min(1, avail / SHEET_PX);
+  document.documentElement.style.setProperty("--pf-fit", String(+scale.toFixed(4)));
+}
 
 /**
  * Leaders are typed periods rendered long and clipped; trim each to the whole
@@ -123,11 +138,15 @@ export default function PrintFit() {
       const doc = document.querySelector(".pf-doc");
       if (doc) doc.dataset.printReady = "true";
       window.dispatchEvent(new Event(PRINT_READY_EVENT));
+      // Measured at 100 % above; only now scale the screen preview.
+      fitPreview();
+      window.addEventListener("resize", fitPreview);
     };
     setMissingFont(!hasAngsana());
     run();
     return () => {
       cancelled = true;
+      window.removeEventListener("resize", fitPreview);
     };
   }, []);
 

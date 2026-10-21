@@ -137,7 +137,7 @@ export default function ChangePasswordForm({ forced, email }) {
 
         <div className="mt-6 flex justify-between text-sm">
           {!forced ? (
-            <a href="/dashboard" className="text-9e-action hover:underline">
+            <a href="/dashboard" className="touch-44 inline-flex items-center text-9e-action hover:underline">
               กลับไปแดชบอร์ด
             </a>
           ) : (

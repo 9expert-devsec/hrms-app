@@ -328,7 +328,7 @@ export default function OffsiteForm({ request = null }) {
               <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-white" style={{ border: "1px solid rgba(0,92,255,0.15)", boxShadow: "0 8px 24px rgba(13,27,42,0.12)" }}>
                 {results.map((e) => (
                   <li key={e._id}>
-                    <button type="button" onClick={() => addMember(e._id)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
+                    <button type="button" onClick={() => addMember(e._id)} className="touch-44 flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
                       <UserPlus size={14} style={{ color: BLUE }} />
                       <span style={{ color: NAVY }}>{employeeDisplayName(e)}</span>
                       <span className="text-xs" style={{ color: SLATE }}>

@@ -38,7 +38,7 @@ export default async function OffsitePrintPage({ params }) {
     <div className="pf-screen">
       <style>{PRINT_CSS}</style>
       <div className="pf-toolbar no-print">
-        <Link href={`/dashboard/offsite/${r._id}`} style={{ color: "#5E6A7E" }}>
+        <Link href={`/dashboard/offsite/${r._id}`} className="touch-44 inline-flex items-center" style={{ color: "#5E6A7E" }}>
           ← กลับไปหน้าคำขอ
         </Link>
         <PrintButton />

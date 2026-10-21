@@ -468,6 +468,8 @@ export const PRINT_CSS = `
   color: #000; font-size: 14pt; line-height: var(--lh); font-weight: 400;
 }
 .pf-sheet { position: relative; width: 595.28pt; height: 841.89pt; margin: 0 auto 12px; background: #fff; overflow: hidden; box-shadow: 0 4px 24px rgba(13,27,42,.18); }
+/* Phones: the preview is scaled to the screen width (PrintFit sets --pf-fit after measuring); print is always 100 %. */
+@media screen { .pf-doc { zoom: var(--pf-fit, 1); } }
 .pf-logo { position: absolute; left: 39.8pt; top: 33.4pt; width: 146.2pt; height: 51.8pt; object-fit: contain; }
 .pf-docno, .pf-printed { position: absolute; right: 57.28pt; font-size: 9pt; line-height: 11pt; color: #777; white-space: nowrap; }
 .pf-docno { top: 53.8pt; }
