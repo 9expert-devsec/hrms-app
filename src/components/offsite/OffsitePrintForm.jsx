@@ -210,13 +210,13 @@ export default function OffsitePrintForm({ r, printedAt }) {
             <L at={93} to={122.7}>
               ข้าพเจ้า
             </L>
-            <S at={122.7} to={253.9}>
+            <S at={122.7} to={253.9} center>
               {r.creatorNameTh}
             </S>
             <L at={256.7} to={291.3}>
               ตำแหน่ง
             </L>
-            <S at={291.3} to={524}>
+            <S at={291.3} to={524} center>
               {r.creatorPosition}
             </S>
           </Stops>
@@ -224,7 +224,7 @@ export default function OffsitePrintForm({ r, printedAt }) {
             <L at={57.6} to={81.4}>
               แผนก
             </L>
-            <S at={81.4} to={307.2}>
+            <S at={81.4} to={307.2} center>
               {r.creatorDepartment}
             </S>
           </Stops>
