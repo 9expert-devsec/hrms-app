@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongoose";
 import { requirePageApi } from "@/lib/rbac/guard";
-import { listAllRequests, offsiteErrorResponse } from "@/lib/offsite";
+import { listAllRequests, listVersion, offsiteErrorResponse } from "@/lib/offsite";
 
 export const dynamic = "force-dynamic";
 
@@ -13,14 +13,17 @@ export async function GET(req) {
   try {
     await dbConnect();
     const sp = new URL(req.url).searchParams;
-    const out = await listAllRequests({
-      status: sp.get("status") || "",
-      month: sp.get("month") || "",
-      department: sp.get("department") || "",
-      q: sp.get("q") || "",
-      page: sp.get("page") || 1,
-    });
-    return NextResponse.json(out, { headers: { "Cache-Control": "no-store" } });
+    const [out, { version }] = await Promise.all([
+      listAllRequests({
+        status: sp.get("status") || "",
+        month: sp.get("month") || "",
+        department: sp.get("department") || "",
+        q: sp.get("q") || "",
+        page: sp.get("page") || 1,
+      }),
+      listVersion(gate.session, "all"),
+    ]);
+    return NextResponse.json({ ...out, version }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     const { body, status } = offsiteErrorResponse(e, "all");
     return NextResponse.json(body, { status });

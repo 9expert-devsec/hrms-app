@@ -95,6 +95,38 @@ export function ErrorBox({ children }) {
   );
 }
 
+/** "อัปเดตสถานะล่าสุดแล้ว": a small toast for an in-place refresh (shown while `show`). */
+export function LiveToast({ show }) {
+  if (!show) return null;
+  return (
+    <div
+      role="status"
+      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl px-4 py-2 text-sm font-medium shadow-lg"
+      style={{ background: NAVY, color: "#FFFFFF" }}
+      data-testid="live-toast"
+    >
+      อัปเดตสถานะล่าสุดแล้ว
+    </div>
+  );
+}
+
+/** Sticky "เอกสารนี้มีการเปลี่ยนแปลง" with "โหลดข้อมูลล่าสุด" — when the person is mid-input and the page must not change under them. */
+export function StaleBanner({ onReload }) {
+  return (
+    <div
+      role="alert"
+      className="sticky top-2 z-40 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+      style={{ background: "#FEF3C7", border: "1px solid #FCD34D", color: "#92400E" }}
+      data-testid="stale-banner"
+    >
+      <span className="font-semibold">เอกสารนี้มีการเปลี่ยนแปลง</span>
+      <Button variant="secondary" onClick={onReload}>
+        โหลดข้อมูลล่าสุด
+      </Button>
+    </div>
+  );
+}
+
 /** fetch → JSON; throws an Error carrying the API's `error` message and body. */
 export async function api(url, { method = "GET", body } = {}) {
   const res = await fetch(url, {

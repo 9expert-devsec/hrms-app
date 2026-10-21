@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, PenLine } from "lucide-react";
 import SignatureInput, { shrinkSignature } from "../SignatureInput";
 import { Button, ErrorBox, SLATE, NAVY, api } from "./ui";
@@ -59,12 +59,20 @@ function SignatureImage({ png }) {
  * Sign-anywhere block: "ใช้ลายเซ็นของฉัน" shows the saved signature (or the
  * pad to draw and save one first); only then does the confirm button enable.
  * The server copies the SAVED signature into the request — nothing drawn
- * here is sent with the action itself.
+ * here is sent with the action itself. `onEditingChange(open)` reports the
+ * pad / upload being open, so a live refresh never pulls it away mid-signature.
  */
-export default function SignatureConfirm({ title = "ลงนาม", note, confirmLabel = "ยืนยัน", onConfirm, busy = false, children }) {
+export default function SignatureConfirm({ title = "ลงนาม", note, confirmLabel = "ยืนยัน", onConfirm, busy = false, onEditingChange, children }) {
   const [state, setState] = useState("idle"); // idle | loading | shown | drawing
   const [png, setPng] = useState(null);
   const [error, setError] = useState("");
+
+  const editingRef = useRef(onEditingChange);
+  editingRef.current = onEditingChange;
+  useEffect(() => {
+    editingRef.current?.(state === "drawing");
+  }, [state]);
+  useEffect(() => () => editingRef.current?.(false), []);
 
   const useMine = async () => {
     setState("loading");

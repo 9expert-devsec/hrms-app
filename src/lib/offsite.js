@@ -16,11 +16,13 @@ import {
   ACTIVE_APPROVAL_STATUSES,
   HR_DEPT_CODE,
   MEMBER_STATUS_LABELS,
+  OFFSITE_STALE_MESSAGE,
   SELF_APPROVAL_LABEL,
   STATUS_LABELS,
   activeStepOf,
   allowanceNeedsAmount,
   detailsKey,
+  offsiteVersion,
   parseWorkDate,
   progressOf,
   validateHrSummary,
@@ -90,10 +92,25 @@ const clean = (v) => (typeof v === "string" ? v.trim() : "");
 const nameOf = (emp) => employeeFullNameTh(emp) || employeeDisplayName(emp);
 const stepOf = (doc, n) => doc.approvals.find((a) => a.step === n);
 
+/**
+ * 409 for an action that no longer fits the request as it is now (someone
+ * else acted first). `stale: true` tells the page to reload its data.
+ */
+const stale = (message) => new OffsiteError(message, 409, { stale: true });
+
 function assertFrom(doc, action) {
   if (!ALLOWED_FROM[action].includes(doc.status)) {
-    throw new OffsiteError(`ทำรายการนี้ไม่ได้ในสถานะปัจจุบัน (${STATUS_LABELS[doc.status] || doc.status})`, 409);
+    throw stale(`ทำรายการนี้ไม่ได้ในสถานะปัจจุบัน (${STATUS_LABELS[doc.status] || doc.status})`);
   }
+}
+
+/**
+ * The page sends the revision it shows; after a return + resend (a new
+ * revision, possibly with new details) an action taken on the old page is
+ * refused instead of applying to content the person has not seen.
+ */
+function assertRevision(doc, revision) {
+  if (revision != null && revision !== "" && Number(revision) !== Number(doc.revision || 0)) throw stale(OFFSITE_STALE_MESSAGE);
 }
 
 function addEvent(doc, session, type, detail = "") {
@@ -111,7 +128,7 @@ async function save(doc, session) {
     await doc.save();
   } catch (e) {
     if (e instanceof mongoose.Error.VersionError) {
-      throw new OffsiteError("คำขอนี้ถูกเปลี่ยนแปลงพร้อมกัน กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง", 409);
+      throw stale("คำขอนี้ถูกเปลี่ยนแปลงพร้อมกัน กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
     }
     throw e;
   }
@@ -499,6 +516,46 @@ export async function getRequest(session, id) {
 }
 
 /**
+ * { version } of one request for the page's change check — the same access
+ * answers as getRequest (404 / 403 in the same order), from a projection only.
+ */
+export async function getRequestVersion(session, id) {
+  if (!mongoose.isValidObjectId(id)) throw new OffsiteError("ไม่พบคำขอ", 404);
+  const [doc, emp] = await Promise.all([
+    OffsiteRequest.findById(id).select("status updatedAt createdBy members.employee pastApprovers approvals.approver").lean(),
+    getOwnEmployee(session, "_id"),
+  ]);
+  if (!emp && !hasHrView(session.user)) throw new OffsiteError("บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน", 403);
+  if (!doc) throw new OffsiteError("ไม่พบคำขอ", 404);
+  if (!canRead(doc, emp?._id, session.user)) throw new OffsiteError("ไม่มีสิทธิ์เข้าถึงคำขอนี้", 403);
+  return { version: offsiteVersion(doc) };
+}
+
+/** "count:maxUpdatedAt" of a query — changes when an item joins, leaves or changes. */
+async function queryVersion(query) {
+  const [agg] = await OffsiteRequest.aggregate([{ $match: query }, { $group: { _id: null, n: { $sum: 1 }, last: { $max: "$updatedAt" } } }]);
+  return agg ? `${agg.n}:${new Date(agg.last).toISOString()}` : "0:";
+}
+
+/**
+ * One combined version for what a list page shows. `scope`: a box of
+ * listRequests (with the tab badges, so a new invite shows on any tab),
+ * "history" (my approved work), or "all" (the HR-wide list; the route checks
+ * offsite_hr).
+ */
+export async function listVersion(session, scope = "mine") {
+  if (scope === "all") return { version: await queryVersion({ status: { $ne: "draft" } }) };
+  const emp = await viewerEmployee(session);
+  const me = emp._id;
+  const shown =
+    scope === "history"
+      ? { status: "approved", "members.employee": me }
+      : { invites: invitesMatch(me), member: { "members.employee": me, createdBy: { $ne: me } }, approvals: activeApprovalMatch(me), approved_by_me: { pastApprovers: me } }[scope] || { createdBy: me };
+  const parts = await Promise.all([queryVersion(shown), queryVersion(invitesMatch(me)), queryVersion(activeApprovalMatch(me))]);
+  return { version: parts.join("|") };
+}
+
+/**
  * The printable form ("แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่"): the
  * creator, offsite_hr holders (not drafts) and superadmin. Members and
  * approvers use the detail page — 403 here.
@@ -804,15 +861,16 @@ export async function sendInvitations(session, id, opts) {
 }
 
 /** A member answers their invitation: { action: "accept" | "decline", reason }. */
-export async function respondToInvitation(session, id, { action, reason } = {}, opts) {
+export async function respondToInvitation(session, id, { action, reason, revision } = {}, opts) {
   const deps = withDefaults(opts);
   const { doc, emp, isCreator } = await loadOwn(session, id);
   const member = doc.members.find((m) => str(m.employee) === str(emp._id));
   if (!member) throw new OffsiteError("คุณไม่ได้อยู่ในรายชื่อสมาชิกของคำขอนี้", 403);
   if (isCreator && isLeader(doc, emp._id)) throw new OffsiteError("ผู้สร้างคำขอที่เป็นหัวหน้าทีมตอบรับโดยอัตโนมัติเมื่อส่งคำเชิญ", 409);
   assertFrom(doc, "respond");
+  assertRevision(doc, revision);
   if (member.status !== "invited") {
-    throw new OffsiteError(`คุณตอบคำเชิญนี้แล้ว (${MEMBER_STATUS_LABELS[member.status] || member.status})`, 409);
+    throw stale(`คุณตอบคำเชิญนี้แล้ว (${MEMBER_STATUS_LABELS[member.status] || member.status})`);
   }
 
   const now = new Date();
@@ -842,8 +900,9 @@ export async function submitStep1(session, id, opts) {
   const { doc, emp, isCreator } = await loadOwn(session, id);
   if (!isLeader(doc, emp._id)) throw new OffsiteError("เฉพาะหัวหน้าทีมเท่านั้นที่ลงนามขั้นที่ 1 ได้", 403);
   assertFrom(doc, "submit");
-  if (!allAccepted(doc)) throw new OffsiteError("สมาชิกยังตอบรับไม่ครบทุกคน", 409);
-  if (stepOf(doc, 1).status === "needs_reconfirm") throw new OffsiteError("ขั้นที่ 1 ต้อง “ยืนยันอีกครั้ง” ไม่ต้องเซ็นใหม่", 409);
+  assertRevision(doc, opts?.revision);
+  if (!allAccepted(doc)) throw stale("สมาชิกยังตอบรับไม่ครบทุกคน");
+  if (stepOf(doc, 1).status === "needs_reconfirm") throw stale("ขั้นที่ 1 ต้อง “ยืนยันอีกครั้ง” ไม่ต้องเซ็นใหม่");
   const png = await requireSignature(emp._id);
 
   const now = new Date();
@@ -867,9 +926,10 @@ export async function reconfirmStep1(session, id, opts) {
   const { doc, emp, isCreator } = await loadOwn(session, id);
   if (!isLeader(doc, emp._id)) throw new OffsiteError("เฉพาะหัวหน้าทีมเท่านั้นที่ยืนยันขั้นที่ 1 ได้", 403);
   assertFrom(doc, "submit");
-  if (!allAccepted(doc)) throw new OffsiteError("สมาชิกยังตอบรับไม่ครบทุกคน", 409);
+  assertRevision(doc, opts?.revision);
+  if (!allAccepted(doc)) throw stale("สมาชิกยังตอบรับไม่ครบทุกคน");
   const a = stepOf(doc, 1);
-  if (a.status !== "needs_reconfirm") throw new OffsiteError("ขั้นที่ 1 ไม่ได้รอการยืนยันอีกครั้ง", 409);
+  if (a.status !== "needs_reconfirm") throw stale("ขั้นที่ 1 ไม่ได้รอการยืนยันอีกครั้ง");
   a.set({ status: "approved", confirmedAt: new Date() });
   addEvent(doc, session, "step1_reconfirmed", a.approverName);
   await activateNext(doc, session, deps);
@@ -880,7 +940,7 @@ export async function reconfirmStep1(session, id, opts) {
 export async function cancelRequest(session, id, { reason } = {}) {
   const { doc, emp, isCreator } = await loadOwn(session, id);
   requireCreator(isCreator);
-  assertFrom(doc, "cancel");
+  assertFrom(doc, "cancel"); // the creator's own request: no revision check (cancelling is always about this request)
   const why = requireReason(reason, "ยกเลิก");
   doc.status = "cancelled";
   addEvent(doc, session, "cancelled", why);
@@ -895,14 +955,15 @@ export async function cancelRequest(session, id, { reason } = {}) {
  * the request is not in approval or `step` is not the active one; 403 when
  * the caller is not that step's approver.
  */
-async function loadForDecision(session, id, step) {
+async function loadForDecision(session, id, step, revision) {
   const loaded = await loadOwn(session, id);
   const { doc, emp } = loaded;
-  if (doc.status === "approved") throw new OffsiteError("คำขอนี้อนุมัติครบแล้ว แก้ไขหรือลงนามเพิ่มไม่ได้", 409);
+  if (doc.status === "approved") throw stale("คำขอนี้อนุมัติครบแล้ว แก้ไขหรือลงนามเพิ่มไม่ได้");
   assertFrom(doc, "decide");
+  assertRevision(doc, revision);
   const active = activeStepOf(doc);
   const n = step == null || step === "" ? active : Number(step);
-  if (!active || n !== active) throw new OffsiteError(`ขั้นที่ ${n} ไม่ใช่ขั้นที่รอดำเนินการอยู่ตอนนี้`, 409);
+  if (!active || n !== active) throw stale(`ขั้นที่ ${n} ไม่ใช่ขั้นที่รอดำเนินการอยู่ตอนนี้`);
   const a = stepOf(doc, n);
   if (str(a.approver) !== str(emp._id)) throw new OffsiteError("คุณไม่ใช่ผู้อนุมัติของขั้นนี้", 403);
   return { ...loaded, n, a };
@@ -920,9 +981,9 @@ function applyHrSummary(doc, input = {}) {
 }
 
 /** Step 3 approver saves the HR section without approving. */
-export async function saveHrSummary(session, id, hrSummary) {
-  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, 3);
-  if (n !== 3 || a.status !== "pending") throw new OffsiteError("แก้ไขส่วนสำหรับฝ่ายบุคคลไม่ได้ในขั้นนี้", 409);
+export async function saveHrSummary(session, id, hrSummary, { revision } = {}) {
+  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, 3, revision);
+  if (n !== 3 || a.status !== "pending") throw stale("แก้ไขส่วนสำหรับฝ่ายบุคคลไม่ได้ในขั้นนี้");
   applyHrSummary(doc, hrSummary);
   addEvent(doc, session, "hr_summary_saved", a.approverName);
   await save(doc, session);
@@ -934,10 +995,10 @@ export async function saveHrSummary(session, id, hrSummary) {
  * requires the HR section (sent as `hrSummary`, or saved before). The next
  * step activates; after step 3 the request is approved.
  */
-export async function approveStep(session, id, { step, hrSummary } = {}, opts) {
+export async function approveStep(session, id, { step, hrSummary, revision } = {}, opts) {
   const deps = withDefaults(opts);
-  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, step);
-  if (a.status === "needs_reconfirm") throw new OffsiteError("ขั้นนี้ต้อง “ยืนยันอีกครั้ง” ไม่ต้องเซ็นใหม่", 409);
+  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, step, revision);
+  if (a.status === "needs_reconfirm") throw stale("ขั้นนี้ต้อง “ยืนยันอีกครั้ง” ไม่ต้องเซ็นใหม่");
   if (n === 3) {
     if (hrSummary) applyHrSummary(doc, hrSummary);
     const errors = validateHrSummary(doc.toObject().hrSummary || {});
@@ -955,10 +1016,10 @@ export async function approveStep(session, id, { step, hrSummary } = {}, opts) {
 }
 
 /** ยืนยันอีกครั้ง: a needs_reconfirm step's approver confirms; the earlier signature is kept. */
-export async function reconfirmStep(session, id, { step } = {}, opts) {
+export async function reconfirmStep(session, id, { step, revision } = {}, opts) {
   const deps = withDefaults(opts);
-  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, step);
-  if (a.status !== "needs_reconfirm") throw new OffsiteError("ขั้นนี้ต้องลงนามใหม่ ไม่ใช่ยืนยันอีกครั้ง", 409);
+  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, step, revision);
+  if (a.status !== "needs_reconfirm") throw stale("ขั้นนี้ต้องลงนามใหม่ ไม่ใช่ยืนยันอีกครั้ง");
   a.set({ status: "approved", confirmedAt: new Date() });
   addPastApprover(doc, emp._id);
   addEvent(doc, session, `step${n}_reconfirmed`, a.approverName);
@@ -968,8 +1029,8 @@ export async function reconfirmStep(session, id, { step } = {}, opts) {
 }
 
 /** ไม่อนุมัติ: required reason; the request goes back to the creator. */
-export async function rejectStep(session, id, { step, reason } = {}) {
-  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, step);
+export async function rejectStep(session, id, { step, reason, revision } = {}) {
+  const { doc, emp, isCreator, n, a } = await loadForDecision(session, id, step, revision);
   const why = requireReason(reason, "ไม่อนุมัติ");
   a.set({ status: "rejected", signature: "", signedAt: null, confirmedAt: null, reason: why });
   addPastApprover(doc, emp._id);

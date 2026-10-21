@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { OFFSITE_STATUSES, STATUS_LABELS, PROGRESS_STEPS, formatWorkDateTh } from "@/lib/offsiteRules";
-import { CARD, INPUT_STYLE, NAVY, SLATE, Button, ErrorBox, StatusChip, api } from "./ui";
+import { useVersionWatch } from "../useVisibilityPoll";
+import { CARD, INPUT_STYLE, NAVY, SLATE, Button, ErrorBox, LiveToast, StatusChip, api } from "./ui";
+
+const TOAST_MS = 3000;
 
 const FILTER_STATUSES = OFFSITE_STATUSES.filter((s) => s !== "draft");
 
@@ -22,15 +25,35 @@ export default function OffsiteAllList() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(false);
+  const toastTimer = useRef(null);
+
+  // `quiet`: a live refresh — the table stays on screen while it reloads; the filter inputs are never touched.
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!quiet) {
+        setData(null);
+        setError("");
+      }
+      const qs = new URLSearchParams({ ...query, page: String(page) });
+      await api(`/api/offsite/all?${qs}`)
+        .then(setData)
+        .catch((e) => setError(e.message));
+    },
+    [query, page]
+  );
 
   useEffect(() => {
-    setData(null);
-    setError("");
-    const qs = new URLSearchParams({ ...query, page: String(page) });
-    api(`/api/offsite/all?${qs}`)
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, [query, page]);
+    load();
+  }, [load]);
+
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+  useVersionWatch("/api/offsite/version?scope=all", data?.version || "", async () => {
+    await load(true);
+    setToast(true);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(false), TOAST_MS);
+  });
 
   const apply = (patch = {}) => {
     const next = { ...filters, ...patch };
@@ -43,6 +66,7 @@ export default function OffsiteAllList() {
 
   return (
     <div className="space-y-6">
+      <LiveToast show={toast} />
       <h1 style={{ color: NAVY, fontSize: "1.5rem", fontWeight: 600 }}>คำขอทำงานนอกสถานที่ทั้งหมด</h1>
 
       <form

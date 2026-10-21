@@ -50,7 +50,8 @@ export async function PATCH(req, ctx) {
 }
 
 /**
- * Actions. Body { action, reason? }:
+ * Actions. Body { action, reason?, revision? } — `revision` is the one the
+ * page shows; an action taken on an outdated page is refused (409, stale).
  *   send     — creator sends / resends invitations
  *   accept   — an invited member signs and accepts (the creator too, unless they lead)
  *   decline  — an invited member declines (reason required; never the creator)
@@ -64,25 +65,26 @@ export async function PATCH(req, ctx) {
 export async function POST(req, ctx) {
   const { id } = await ctx.params;
   const body = await req.json().catch(() => ({}));
+  const { revision } = body;
   return run(`request ${body.action || "?"}`, (session) => {
     switch (body.action) {
       case "send":
         return sendInvitations(session, id);
       case "accept":
       case "decline":
-        return respondToInvitation(session, id, { action: body.action, reason: body.reason });
+        return respondToInvitation(session, id, { action: body.action, reason: body.reason, revision });
       case "submit":
-        return submitStep1(session, id);
+        return submitStep1(session, id, { revision });
       case "cancel":
         return cancelRequest(session, id, { reason: body.reason });
       case "approve":
-        return approveStep(session, id, { step: body.step, hrSummary: body.hrSummary });
+        return approveStep(session, id, { step: body.step, hrSummary: body.hrSummary, revision });
       case "reject":
-        return rejectStep(session, id, { step: body.step, reason: body.reason });
+        return rejectStep(session, id, { step: body.step, reason: body.reason, revision });
       case "reconfirm":
-        return Number(body.step) === 1 ? reconfirmStep1(session, id) : reconfirmStep(session, id, { step: body.step });
+        return Number(body.step) === 1 ? reconfirmStep1(session, id, { revision }) : reconfirmStep(session, id, { step: body.step, revision });
       case "hr_summary":
-        return saveHrSummary(session, id, body.hrSummary);
+        return saveHrSummary(session, id, body.hrSummary, { revision });
       default:
         throw new OffsiteError("action ไม่ถูกต้อง", 400);
     }

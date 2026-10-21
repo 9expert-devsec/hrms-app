@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -23,18 +23,23 @@ import {
   APPROVAL_ASK_LABELS,
   APPROVAL_ROLE_LABELS,
   DEFAULT_ALLOWANCE_PER_PERSON,
+  OFFSITE_STALE_MESSAGE,
   SELF_APPROVAL_LABEL,
   TRAVEL_MODE_LABELS,
   changeSummaryLines,
   formatDateTimeTh,
   formatWorkDateTh,
+  offsiteVersion,
   validateHrSummary,
 } from "@/lib/offsiteRules";
 import OffsiteProgress from "./OffsiteProgress";
 import { refreshInbox } from "../inbox/InboxProvider";
+import { useVersionWatch } from "../useVisibilityPoll";
 import SignatureConfirm from "./SignatureConfirm";
 import HrSection from "./HrSection";
-import { CARD, INPUT_STYLE, NAVY, SLATE, BLUE, Button, Chip, ErrorBox, StatusChip, MemberStatusChip, api } from "./ui";
+import { CARD, INPUT_STYLE, NAVY, SLATE, BLUE, Button, Chip, ErrorBox, LiveToast, StaleBanner, StatusChip, MemberStatusChip, api } from "./ui";
+
+const TOAST_MS = 3000;
 
 const EVENT_LABELS = {
   created: "สร้างคำขอ",
@@ -91,11 +96,18 @@ function SelfTag() {
   );
 }
 
-/** A required-reason box with a confirm button (decline / reject / cancel). */
-function ReasonForm({ label, confirmLabel, onSubmit, onClose, busy }) {
+/** A required-reason box with a confirm button (decline / reject / cancel). `onEditingChange(true)` while it holds text. */
+function ReasonForm({ label, confirmLabel, onSubmit, onClose, busy, onEditingChange }) {
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const missing = tried && !reason.trim();
+  const editingRef = useRef(onEditingChange);
+  editingRef.current = onEditingChange;
+  const hasText = !!reason.trim();
+  useEffect(() => {
+    editingRef.current?.(hasText);
+  }, [hasText]);
+  useEffect(() => () => editingRef.current?.(false), []);
   return (
     <div className="space-y-2 rounded-xl p-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}>
       <label className="block text-sm font-medium" style={{ color: NAVY }}>
@@ -171,6 +183,18 @@ export default function OffsiteDetail({ id }) {
   const [panel, setPanel] = useState(null); // decline | cancel | reject
   const [hr, setHr] = useState(null);
   const [hrErrors, setHrErrors] = useState({});
+  const [toast, setToast] = useState(false);
+  const [staleBanner, setStaleBanner] = useState(false);
+  const toastTimer = useRef(null);
+  // What the person is in the middle of (signature pad / upload, reason text, HR edits): a live change must not touch it.
+  const editing = useRef(new Set());
+  const editingSetter = useCallback(
+    (key) => (on) => {
+      if (on) editing.current.add(key);
+      else editing.current.delete(key);
+    },
+    []
+  );
 
   const load = useCallback(async () => {
     try {
@@ -184,6 +208,26 @@ export default function OffsiteDetail({ id }) {
     load();
   }, [load]);
 
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+  const showToast = useCallback(() => {
+    setToast(true);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(false), TOAST_MS);
+  }, []);
+
+  // Live status: someone else changed the request. Refresh in place (the
+  // scroll position stays — nothing unmounts), unless the person is mid-input.
+  const refreshInPlace = useCallback(async () => {
+    setStaleBanner(false);
+    await load();
+    refreshInbox();
+    showToast();
+  }, [load, showToast]);
+  useVersionWatch(`/api/offsite/${id}/version`, offsiteVersion(data?.request), () => {
+    if (editing.current.size) setStaleBanner(true);
+    else refreshInPlace();
+  });
+
   // The HR approver edits a local copy, pre-filled with the company default.
   useEffect(() => {
     if (data?.viewer?.canEditHr && hr === null) {
@@ -196,11 +240,23 @@ export default function OffsiteDetail({ id }) {
     setBusy(action);
     setError("");
     try {
-      setData(await api(`/api/offsite/requests/${id}`, { method: "POST", body: { action, ...extra } }));
+      // `revision`: the one on screen — the server refuses an action taken on an outdated page.
+      setData(await api(`/api/offsite/requests/${id}`, { method: "POST", body: { action, revision: data?.request?.revision, ...extra } }));
       setPanel(null);
+      setStaleBanner(false);
+      if (action === "hr_summary" || action === "approve") editingSetter("hr")(false);
       router.refresh();
       refreshInbox(); // bell, sidebar badge, dashboard card
     } catch (e) {
+      if (e.status === 409 && e.body?.stale) {
+        // Someone else acted first: say so and show the request as it is now.
+        setError(e.message === OFFSITE_STALE_MESSAGE ? e.message : `${OFFSITE_STALE_MESSAGE} — ${e.message}`);
+        setPanel(null);
+        setStaleBanner(false);
+        await load();
+        refreshInbox();
+        return;
+      }
       if (e.body?.errors && (action === "approve" || action === "hr_summary")) setHrErrors(e.body.errors);
       setError(e.message);
     } finally {
@@ -244,6 +300,8 @@ export default function OffsiteDetail({ id }) {
 
   return (
     <div className="space-y-6">
+      {staleBanner && <StaleBanner onReload={refreshInPlace} />}
+      <LiveToast show={toast} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/dashboard/offsite" className="inline-flex items-center gap-1 text-sm" style={{ color: SLATE }}>
           <ArrowLeft size={14} /> กลับ
@@ -289,7 +347,7 @@ export default function OffsiteDetail({ id }) {
       <ErrorBox>{error}</ErrorBox>
 
       {panel === "cancel" && (
-        <ReasonForm label="เหตุผลที่ยกเลิก" confirmLabel="ยืนยันการยกเลิก" busy={busy === "cancel"} onClose={() => setPanel(null)} onSubmit={(reason) => act("cancel", { reason })} />
+        <ReasonForm label="เหตุผลที่ยกเลิก" confirmLabel="ยืนยันการยกเลิก" busy={busy === "cancel"} onClose={() => setPanel(null)} onSubmit={(reason) => act("cancel", { reason })} onEditingChange={editingSetter("reason-cancel")} />
       )}
 
       {/* ── Returned: the reason, prominently ─────── */}
@@ -354,7 +412,16 @@ export default function OffsiteDetail({ id }) {
               {v.canEditHr && hr && (
                 <div className="space-y-3 rounded-xl p-4" style={{ background: "#F8FAFD", border: "1px solid #E2E8F0" }} data-testid="hr-section">
                   <div style={{ color: NAVY, fontWeight: 600 }}>สำหรับฝ่ายบุคคล</div>
-                  <HrSection value={hr} onChange={setHr} editable errors={hrErrors} memberCount={r.members.length} />
+                  <HrSection
+                    value={hr}
+                    onChange={(next) => {
+                      setHr(next);
+                      editingSetter("hr")(true);
+                    }}
+                    editable
+                    errors={hrErrors}
+                    memberCount={r.members.length}
+                  />
                   <Button variant="secondary" onClick={() => act("hr_summary", { hrSummary: hr })} disabled={!!busy}>
                     {busy === "hr_summary" && <Loader2 size={14} className="animate-spin" />} บันทึกส่วนฝ่ายบุคคล (ยังไม่อนุมัติ)
                   </Button>
@@ -367,6 +434,7 @@ export default function OffsiteDetail({ id }) {
                   confirmLabel={active.step === 3 ? "ยืนยัน (อนุมัติขั้นสุดท้าย)" : "ยืนยัน (อนุมัติ)"}
                   busy={busy === "approve"}
                   onConfirm={approveWithHr}
+                  onEditingChange={editingSetter("sig-approve")}
                 />
                 <div>
                   <Button variant="ghost" onClick={() => setPanel("reject")} disabled={!!busy}>
@@ -378,7 +446,7 @@ export default function OffsiteDetail({ id }) {
           )}
 
           {panel === "reject" && (
-            <ReasonForm label="เหตุผลที่ไม่อนุมัติ" confirmLabel="ยืนยันไม่อนุมัติ" busy={busy === "reject"} onClose={() => setPanel(null)} onSubmit={(reason) => act("reject", { step: active.step, reason })} />
+            <ReasonForm label="เหตุผลที่ไม่อนุมัติ" confirmLabel="ยืนยันไม่อนุมัติ" busy={busy === "reject"} onClose={() => setPanel(null)} onSubmit={(reason) => act("reject", { step: active.step, reason })} onEditingChange={editingSetter("reason-reject")} />
           )}
         </Section>
       )}
@@ -393,7 +461,7 @@ export default function OffsiteDetail({ id }) {
             <span style={{ color: SLATE }}>อ่านรายละเอียดด้านล่าง แล้วลงนามเพื่อยอมรับ หรือปฏิเสธพร้อมเหตุผล</span>
           </p>
           <div className="grid gap-6 md:grid-cols-[1fr_auto]">
-            <SignatureConfirm title="ลงนามยอมรับ" confirmLabel="ยืนยัน (ยอมรับคำเชิญ)" busy={busy === "accept"} onConfirm={() => act("accept")} />
+            <SignatureConfirm title="ลงนามยอมรับ" confirmLabel="ยืนยัน (ยอมรับคำเชิญ)" busy={busy === "accept"} onConfirm={() => act("accept")} onEditingChange={editingSetter("sig-accept")} />
             <div>
               {v.canDecline && panel !== "decline" && (
                 <Button variant="ghost" onClick={() => setPanel("decline")}>
@@ -403,7 +471,7 @@ export default function OffsiteDetail({ id }) {
             </div>
           </div>
           {v.canDecline && panel === "decline" && (
-            <ReasonForm label="เหตุผลที่ปฏิเสธ" confirmLabel="ยืนยันการปฏิเสธ" busy={busy === "decline"} onClose={() => setPanel(null)} onSubmit={(reason) => act("decline", { reason })} />
+            <ReasonForm label="เหตุผลที่ปฏิเสธ" confirmLabel="ยืนยันการปฏิเสธ" busy={busy === "decline"} onClose={() => setPanel(null)} onSubmit={(reason) => act("decline", { reason })} onEditingChange={editingSetter("reason-decline")} />
           )}
         </Section>
       )}
@@ -443,6 +511,7 @@ export default function OffsiteDetail({ id }) {
               confirmLabel="ยืนยันและส่งแบบฟอร์ม"
               busy={busy === "submit"}
               onConfirm={() => act("submit")}
+              onEditingChange={editingSetter("sig-submit")}
             />
           ) : (
             <p className="text-sm" style={{ color: SLATE }} data-testid="step1-wait">

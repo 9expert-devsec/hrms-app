@@ -192,6 +192,18 @@ export const PROGRESS_STEPS = ["สมาชิกตอบรับ", "หั�
 /** Approval statuses in which a step is the one being acted on. */
 export const ACTIVE_APPROVAL_STATUSES = ["pending", "needs_reconfirm"];
 
+/**
+ * The change-check version of one request (GET /api/offsite/[id]/version):
+ * every write bumps updatedAt, so anything visible on the page changes it.
+ * Client and server build it here so a loaded request and a poll compare equal.
+ */
+export function offsiteVersion(r) {
+  return r?.updatedAt ? `${new Date(r.updatedAt).toISOString()}|${r.status}` : "";
+}
+
+/** Thrown back (409, `stale: true`) when an action no longer fits the request as it is now. */
+export const OFFSITE_STALE_MESSAGE = "สถานะเอกสารเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลล่าสุด";
+
 /** The step (2 or 3) waiting for its approver while in_approval, or null. */
 export function activeStepOf(r) {
   if (r?.status !== "in_approval") return null;
