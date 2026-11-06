@@ -9,8 +9,10 @@ import { employeeDisplayName, employeeNameEn, employeeNameSearchText } from "@/l
 import {
   MAX_MEMBERS,
   OFFSITE_FIELD_LABELS,
+  TOO_MANY_MEMBERS_MESSAGE,
   TRAVEL_MODES,
   TRAVEL_MODE_LABELS,
+  normalizeTravelModes,
   validateOffsiteInput,
   workDateInput,
 } from "@/lib/offsiteRules";
@@ -27,7 +29,7 @@ function emptyForm(creatorId) {
     description: "",
     placeName: "",
     address: "",
-    travelMode: "",
+    travelMode: [],
     note: "",
     members: creatorId ? [{ employee: creatorId, duty: "" }] : [],
     leader: creatorId || "",
@@ -43,7 +45,7 @@ function fromRequest(r) {
     description: r.description || "",
     placeName: r.placeName || "",
     address: r.address || "",
-    travelMode: r.travelMode || "",
+    travelMode: normalizeTravelModes(r.travelMode),
     note: r.note || "",
     members: (r.members || []).map((m) => ({ employee: m.employee, duty: m.duty || "", status: m.status })),
     leader: r.leader || "",
@@ -135,9 +137,15 @@ export default function OffsiteForm({ request = null }) {
     setForm(next);
     revalidate(next);
   };
+  const toggleTravel = (mode) => {
+    const on = new Set(form.travelMode);
+    if (!on.delete(mode)) on.add(mode);
+    set({ travelMode: normalizeTravelModes([...on]) });
+  };
   const setMember = (i, patch) => set({ members: form.members.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
+  const membersFull = form.members.length >= MAX_MEMBERS;
   const addMember = (id) => {
-    if (form.members.length >= MAX_MEMBERS) return;
+    if (membersFull) return;
     set({ members: [...form.members, { employee: id, duty: "" }] });
     setQ("");
   };
@@ -245,7 +253,7 @@ export default function OffsiteForm({ request = null }) {
           <div className="flex flex-wrap gap-4">
             {TRAVEL_MODES.map((mode) => (
               <label key={mode} className="flex items-center gap-2 text-sm" style={{ color: NAVY }}>
-                <input type="radio" name="travelMode" checked={form.travelMode === mode} onChange={() => set({ travelMode: mode })} />
+                <input type="checkbox" name="travelMode" value={mode} checked={form.travelMode.includes(mode)} onChange={() => toggleTravel(mode)} />
                 {TRAVEL_MODE_LABELS[mode]}
               </label>
             ))}
@@ -267,6 +275,38 @@ export default function OffsiteForm({ request = null }) {
             {form.members.length}/{MAX_MEMBERS} คน
           </span>
         </div>
+
+        {/* On top, so it stays put while members are added below it. */}
+        <div className="relative">
+          <div className="flex items-center gap-2" style={{ ...INPUT_STYLE, padding: "8px 12px" }}>
+            <Search size={14} style={{ color: SLATE }} />
+            <input
+              className="flex-1 outline-none"
+              placeholder="ค้นหาพนักงานเพื่อเพิ่มเป็นสมาชิก (ชื่อไทย / อังกฤษ / ชื่อเล่น)"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              disabled={membersFull}
+              aria-label="ค้นหาพนักงาน"
+            />
+          </div>
+          {results.length > 0 && !membersFull && (
+            <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-white" style={{ border: "1px solid rgba(0,92,255,0.15)", boxShadow: "0 8px 24px rgba(13,27,42,0.12)" }}>
+              {results.map((e) => (
+                <li key={e._id}>
+                  <button type="button" onClick={() => addMember(e._id)} className="touch-44 flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
+                    <UserPlus size={14} style={{ color: BLUE }} />
+                    <span style={{ color: NAVY }}>{employeeDisplayName(e)}</span>
+                    <span className="text-xs" style={{ color: SLATE }}>
+                      {[employeeNameEn(e) !== employeeDisplayName(e) ? employeeNameEn(e) : null, e.nickName, e.position].filter(Boolean).join(" · ")}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {membersFull && <p className="mt-1 text-xs text-red-500">{TOO_MANY_MEMBERS_MESSAGE}</p>}
+        </div>
+
         <FieldError k="members" errors={errors} prefix={P} />
         <ErrorBox>{loadError}</ErrorBox>
 
@@ -311,36 +351,6 @@ export default function OffsiteForm({ request = null }) {
             );
           })}
         </ul>
-
-        {form.members.length < MAX_MEMBERS && (
-          <div className="relative">
-            <div className="flex items-center gap-2" style={{ ...INPUT_STYLE, padding: "8px 12px" }}>
-              <Search size={14} style={{ color: SLATE }} />
-              <input
-                className="flex-1 outline-none"
-                placeholder="ค้นหาพนักงานเพื่อเพิ่มเป็นสมาชิก (ชื่อไทย / อังกฤษ / ชื่อเล่น)"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                aria-label="ค้นหาพนักงาน"
-              />
-            </div>
-            {results.length > 0 && (
-              <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl bg-white" style={{ border: "1px solid rgba(0,92,255,0.15)", boxShadow: "0 8px 24px rgba(13,27,42,0.12)" }}>
-                {results.map((e) => (
-                  <li key={e._id}>
-                    <button type="button" onClick={() => addMember(e._id)} className="touch-44 flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
-                      <UserPlus size={14} style={{ color: BLUE }} />
-                      <span style={{ color: NAVY }}>{employeeDisplayName(e)}</span>
-                      <span className="text-xs" style={{ color: SLATE }}>
-                        {[employeeNameEn(e) !== employeeDisplayName(e) ? employeeNameEn(e) : null, e.nickName, e.position].filter(Boolean).join(" · ")}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
 
         <Field k="leader" label={OFFSITE_FIELD_LABELS.leader} required errors={errors}>
           <select style={inputStyle("leader")} value={form.leader} onChange={(e) => set({ leader: e.target.value })} {...aria("leader")}>

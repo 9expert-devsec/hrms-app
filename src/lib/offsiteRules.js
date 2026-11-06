@@ -12,8 +12,9 @@ export const APPROVAL_ROLES = ["leader", "creator", "accounting_head", "hr_head"
 export const TRAVEL_MODES = ["self_from_company", "company_van", "from_lodging"];
 export const ALLOWANCE_OPTIONS = ["per_person", "per_person_plus_travel", "travel_actual", "no_allowance"];
 
-export const MAX_MEMBERS = 10; // the paper form has 10 lines
+export const MAX_MEMBERS = 30; // creator / leader included; page 1 of the form holds 10, the continuation sheet the rest
 export const MIN_MEMBERS = 1;
+export const TOO_MANY_MEMBERS_MESSAGE = `เพิ่มสมาชิกได้สูงสุด ${MAX_MEMBERS} คน`;
 
 /** Department codes whose heads sign steps 2 and 3. */
 export const ACCOUNTING_DEPT_CODE = "AC";
@@ -126,6 +127,26 @@ export function formatDateTimeTh(value) {
 
 const hasDuplicates = (ids) => new Set(ids).size !== ids.length;
 
+const travelList = (value) => (Array.isArray(value) ? value : value ? [value] : []);
+
+/**
+ * `travelMode` as a clean list: an array of TRAVEL_MODES, or a single string
+ * on requests saved before it became multi-select (never migrated). Known
+ * values only, de-duplicated, in TRAVEL_MODES order. Every reader goes through
+ * this.
+ */
+export function normalizeTravelModes(value) {
+  const chosen = new Set(travelList(value));
+  return TRAVEL_MODES.filter((m) => chosen.has(m));
+}
+
+/** The chosen travel options as text ("รถตู้บริษัท, เดินทางจากที่พัก"). */
+export function travelModesText(value) {
+  return normalizeTravelModes(value)
+    .map((m) => TRAVEL_MODE_LABELS[m])
+    .join(", ");
+}
+
 /**
  * Validate the form input. `input.members` = [{ employee, duty }]; it must
  * include the creator (`creatorId`), who is always a member.
@@ -151,7 +172,9 @@ export function validateOffsiteInput(input = {}, { creatorId = null } = {}) {
   else if (!TIME_RE.test(end)) errors.endTime = "เวลาต้องเป็นรูปแบบ HH:mm";
   else if (TIME_RE.test(start) && end <= start) errors.endTime = "เวลาสิ้นสุดต้องหลังเวลาเริ่ม";
 
-  if (!TRAVEL_MODES.includes(input.travelMode)) errors.travelMode = "กรุณาเลือกการเดินทาง";
+  const travel = travelList(input.travelMode);
+  if (!travel.length) errors.travelMode = "กรุณาเลือกการเดินทาง";
+  else if (travel.some((m) => !TRAVEL_MODES.includes(m))) errors.travelMode = "การเดินทางไม่ถูกต้อง";
 
   const members = Array.isArray(input.members) ? input.members : [];
   const ids = members.map((m) => String(m?.employee || "")).filter(Boolean);
@@ -159,7 +182,7 @@ export function validateOffsiteInput(input = {}, { creatorId = null } = {}) {
   if (hasDuplicates(ids)) errors.members = "มีสมาชิกซ้ำกัน";
   else if (creatorId && !unique.has(String(creatorId))) errors.members = "ผู้สร้างคำขอต้องอยู่ในรายชื่อสมาชิก";
   else if (unique.size < MIN_MEMBERS) errors.members = "กรุณาเลือกสมาชิกอย่างน้อย 1 คน";
-  else if (unique.size > MAX_MEMBERS) errors.members = `สมาชิกได้ไม่เกิน ${MAX_MEMBERS} คน`;
+  else if (unique.size > MAX_MEMBERS) errors.members = TOO_MANY_MEMBERS_MESSAGE;
   members.forEach((m, i) => {
     const duty = clean(m?.duty);
     if (!m?.employee) memberErrors[i] = "กรุณาเลือกพนักงาน";
@@ -175,7 +198,12 @@ export function validateOffsiteInput(input = {}, { creatorId = null } = {}) {
   return { errors, memberErrors };
 }
 
-/** The job details members agree to; a change re-invites everyone on resend. */
+/**
+ * The job details members agree to; a change re-invites everyone on resend.
+ * Travel is too, but it is compared through the return snapshot (lib/offsite.js
+ * sendInvitations): `sentDetailsKey` is stored, so adding it here would make
+ * every request sent before now look changed.
+ */
 export function detailsKey(r) {
   return JSON.stringify([
     clean(r?.jobName),

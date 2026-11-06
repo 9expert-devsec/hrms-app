@@ -3,7 +3,8 @@
  * "แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่" — the printable form, built on
  * the measurements of the official Word original (Rev.5, 1 June 2026; A4
  * 595.3 × 841.9 pt): Angsana New (installed on the machine — never bundled),
- * pt metrics, typed-dot leaders. Page 1 the form, page 2 the regulations
+ * pt metrics, typed-dot leaders. Page 1 the form (members 1–10), then a
+ * continuation sheet only with 11+ members, last the regulations
  * (lib/offsiteRegulations.js). Server-renderable (no hooks); PrintFit shrinks
  * values that do not fit their dots. Printing is the browser's (PrintButton).
  *
@@ -19,11 +20,12 @@
  * the segment's end) so no dot ever runs under the text.
  */
 import { Children, cloneElement } from "react";
-import { MAX_MEMBERS, SELF_APPROVAL_LABEL, TRAVEL_MODES, formatBaht, formatDateLongTh, workDateParts } from "@/lib/offsiteRules";
+import { SELF_APPROVAL_LABEL, TRAVEL_MODES, formatBaht, formatDateLongTh, normalizeTravelModes, workDateParts } from "@/lib/offsiteRules";
 import { OFFSITE_REGULATIONS } from "@/lib/offsiteRegulations";
 
 const BODY_X = 57.6; // page x of the text block's left edge (Word's left margin)
 const HR_X = 58.1; // page x inside the HR box's 0.5-pt border
+const PAGE1_ROWS = 10; // the paper form has 10 lines; the rest go on the continuation sheet
 
 // Wording of the paper form (the app's own labels are shorter).
 const TRAVEL_LABELS = {
@@ -148,7 +150,41 @@ function RuledBlock({ label, labelTo, text, rows, to }) {
   );
 }
 
-/** Page 2, line by line as the original breaks it. */
+/** One member line: number, ชื่อ … หน้าที่ … เซ็นชื่อ … (page 1 and the continuation sheet). */
+function MemberRow({ n, m }) {
+  return (
+    <Stops>
+      <L at={93.6} to={111.6}>
+        {n}.
+      </L>
+      <L at={111.6} to={122.8}>
+        ชื่อ
+      </L>
+      <S at={122.8} to={245}>
+        {m?.nameSnapshot}
+      </S>
+      <L at={245} to={268.5}>
+        หน้าที่
+      </L>
+      <S at={268.5} to={411.8}>
+        {m?.duty}
+      </S>
+      <L at={416.5} to={442.7}>
+        เซ็นชื่อ
+      </L>
+      {/* Signed on the line: the dots run unbroken under the signature (placed by PrintFit). */}
+      <S
+        at={442.7}
+        to={530.4}
+        fit={false}
+        className="pf-sigseg"
+        overlay={m?.signature ? <img src={m.signature} alt="" className="pf-msig" data-sig="member" /> : null}
+      />
+    </Stops>
+  );
+}
+
+/** The regulations page, line by line as the original breaks it. */
 function Regulations() {
   const x = (at) => ({ left: pt(at - BODY_X) });
   return (
@@ -187,22 +223,29 @@ function Regulations() {
 export default function OffsitePrintForm({ r, printedAt }) {
   const date = workDateParts(r.workDate);
   const step = (n) => (r.approvals || []).find((a) => a.step === n) || {};
-  const rows = Array.from({ length: MAX_MEMBERS }, (_, i) => r.members[i] || null);
+  const rows = Array.from({ length: PAGE1_ROWS }, (_, i) => r.members[i] || null);
+  const moreRows = r.members.slice(PAGE1_ROWS);
+  const travel = normalizeTravelModes(r.travelMode);
   const hr = r.hrSummary || {};
   const watermark = r.status === "approved" ? null : r.status === "cancelled" ? "ยกเลิกแล้ว" : "ยังไม่อนุมัติ";
   const amountFor = (option) => (hr.allowanceOption === option && hr.amountPerPerson ? formatBaht(hr.amountPerPerson) : "");
+  const sheetHead = (
+    <>
+      {watermark && (
+        <div className="pf-watermark" aria-hidden="true">
+          {watermark}
+        </div>
+      )}
+      <img src="/brand/logo-blue-ink.png" alt="9Expert" className="pf-logo" />
+      <div className="pf-docno">เลขที่ {r.docNo || "ยังไม่ออกเลข"}</div>
+    </>
+  );
 
   return (
     <div className="pf-doc" data-testid="offsite-print">
       {/* ── Page 1: the form ─────────────────────────────── */}
       <article className="pf-sheet">
-        {watermark && (
-          <div className="pf-watermark" aria-hidden="true">
-            {watermark}
-          </div>
-        )}
-        <img src="/brand/logo-blue-ink.png" alt="9Expert" className="pf-logo" />
-        <div className="pf-docno">เลขที่ {r.docNo || "ยังไม่ออกเลข"}</div>
+        {sheetHead}
         <h1 className="pf-title">แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่</h1>
 
         <div className="pf-body">
@@ -299,7 +342,7 @@ export default function OffsitePrintForm({ r, printedAt }) {
             </L>
             {TRAVEL_MODES.flatMap((m, i) => [
               <Icon key={`b${m}`} at={TRAVEL_STOPS[i].box} to={TRAVEL_STOPS[i].label}>
-                <Box checked={r.travelMode === m} />
+                <Box checked={travel.includes(m)} />
               </Icon>,
               <L key={`l${m}`} at={TRAVEL_STOPS[i].label} to={TRAVEL_STOPS[i + 1]?.box}>
                 {TRAVEL_LABELS[m]}
@@ -311,36 +354,10 @@ export default function OffsitePrintForm({ r, printedAt }) {
             <u>(กรณีทำงานที่เดียวกันหลายท่านให้ระบุทุกท่านพร้อมหน้าที่ที่รับผิดชอบในงานและเซ็นชื่อรับทราบด้วยตนเองทุกครั้ง)</u>
           </p>
           {rows.map((m, i) => (
-            <Stops key={i}>
-              <L at={93.6} to={111.6}>
-                {i + 1}.
-              </L>
-              <L at={111.6} to={122.8}>
-                ชื่อ
-              </L>
-              <S at={122.8} to={245}>
-                {m?.nameSnapshot}
-              </S>
-              <L at={245} to={268.5}>
-                หน้าที่
-              </L>
-              <S at={268.5} to={411.8}>
-                {m ? `${m.duty}${r.leader === m.employee ? " (หัวหน้างาน)" : ""}` : ""}
-              </S>
-              <L at={416.5} to={442.7}>
-                เซ็นชื่อ
-              </L>
-              {/* Signed on the line: the dots run unbroken under the signature (placed by PrintFit). */}
-              <S
-                at={442.7}
-                to={530.4}
-                fit={false}
-                className="pf-sigseg"
-                overlay={m?.signature ? <img src={m.signature} alt="" className="pf-msig" data-sig="member" /> : null}
-              />
-            </Stops>
+            <MemberRow key={i} n={i + 1} m={m} />
           ))}
           <div className="pf-note">
+            {moreRows.length > 0 && <div className="pf-more">มีรายชื่อผู้ร่วมงานต่อในแผ่นที่ 2</div>}
             <RuledBlock label="หมายเหตุ" labelTo={93.5} text={r.note} rows={2} to={537} />
           </div>
 
@@ -438,7 +455,20 @@ export default function OffsitePrintForm({ r, printedAt }) {
         </div>
       </article>
 
-      {/* ── Page 2: the regulations ──────────────────────── */}
+      {/* ── Continuation sheet: members 11+ (only when there are any) ── */}
+      {moreRows.length > 0 && (
+        <article className="pf-sheet" data-testid="offsite-print-continuation">
+          {sheetHead}
+          <h2 className="pf-title">รายชื่อผู้ร่วมงาน (ต่อ)</h2>
+          <div className="pf-body pf-cont">
+            {moreRows.map((m, i) => (
+              <MemberRow key={i} n={PAGE1_ROWS + i + 1} m={m} />
+            ))}
+          </div>
+        </article>
+      )}
+
+      {/* ── Last page: the regulations ───────────────────── */}
       <article className="pf-sheet">
         <Regulations />
         <div className="pf-printed">พิมพ์เมื่อ {printedAt}</div>
@@ -448,7 +478,7 @@ export default function OffsitePrintForm({ r, printedAt }) {
 }
 
 /**
- * Two exact A4 sheets in pt, positioned from the page edge (@page margin 0).
+ * Exact A4 sheets in pt, positioned from the page edge (@page margin 0).
  * Font: Angsana New from the machine (local(); never bundled or served),
  * then AngsanaUPC, then the Sarabun / serif fallback.
  * Dots: typed periods in the form's font (2.31 pt apart at 14 pt, 1.98 at 12),
@@ -478,6 +508,8 @@ export const PRINT_CSS = `
 /* The app's base layer gives headings / cells their own fonts — the form uses one. */
 .pf-doc h1, .pf-doc h2, .pf-doc h3, .pf-doc li, .pf-doc td, .pf-doc th { font-family: inherit; }
 .pf-body { position: absolute; left: 57.6pt; top: 114.95pt; width: 480.4pt; }
+/* Wrapped rows take the tightened pitch too (PrintFit sets --lh on .pf-body); page 1 keeps its own behaviour. */
+.pf-cont { line-height: var(--lh); }
 .pf-b { font-weight: 700; }
 .pf-line { margin: 0; line-height: var(--lh); }
 .pf-row { display: flex; height: var(--lh); white-space: nowrap; }
@@ -512,7 +544,9 @@ export const PRINT_CSS = `
 .pf-l-inline { display: inline-block; background: #fff; height: var(--lh); vertical-align: top; white-space: nowrap; }
 .pf-rv { background: #fff; padding: 0 3pt; }
 .pf-members-head { text-indent: 32.4pt; }
-.pf-note { margin-top: 9.48pt; }
+.pf-note { position: relative; margin-top: 9.48pt; }
+/* In the gap above หมายเหตุ, under member 10's name column: absolute, so page 1's lines do not move. */
+.pf-more { position: absolute; left: 54pt; bottom: 100%; height: 9.48pt; font-size: 12pt; line-height: 9.48pt; white-space: nowrap; }
 .pf-signs { display: grid; grid-template-columns: 155.3pt 170.1pt 155.9pt; width: 482.3pt; height: 81.6pt; margin-top: 8.67pt; border: 0.5pt solid #000; box-sizing: border-box; }
 .pf-sign { position: relative; border-left: 0.5pt solid #000; text-align: center; }
 .pf-sign:first-child { border-left: 0; }

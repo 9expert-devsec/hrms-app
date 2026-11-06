@@ -9,7 +9,7 @@ export const PRINT_READY_EVENT = "pf-print-ready";
 const MIN_PT = 11;
 const STEP_PT = 0.25;
 const PX_PER_PT = 96 / 72;
-// Page 1 must hold the whole form: the HR box (bottom ≈ 831.5 pt at the normal pitch) has to stay on the sheet.
+// A sheet must hold its whole body: page 1's HR box (bottom ≈ 831.5 pt at the normal pitch) has to stay on it.
 const BODY_LIMIT_PT = 832;
 const LH_PT = 18.92; // Word's single spacing for Angsana New 14 pt (the original)
 const MIN_LH_PT = 16;
@@ -46,13 +46,12 @@ function trimLeaders() {
 }
 
 /**
- * When wrapped values push page 1 past the footer, tighten page 1's line
- * pitch just enough (never below 16 pt). Returns the pitch used, or null.
+ * When wrapped values push a sheet's body past the footer, tighten that
+ * sheet's line pitch just enough (never below 16 pt).
  */
-function compactPage1() {
-  const sheet = document.querySelector(".pf-sheet");
-  const body = sheet?.querySelector(".pf-body");
-  if (!body) return null;
+function compactSheet(sheet) {
+  const body = sheet.querySelector(".pf-body");
+  if (!body) return;
   body.style.removeProperty("--lh");
   delete body.dataset.compactLh;
   const bottomPt = () => (body.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top) / PX_PER_PT;
@@ -62,7 +61,6 @@ function compactPage1() {
     body.style.setProperty("--lh", `${lh}pt`);
   }
   if (lh < LH_PT) body.dataset.compactLh = String(lh);
-  return lh < LH_PT ? lh : null;
 }
 
 /** Does Angsana New actually render here? (fonts.check alone is true for any system family name.) */
@@ -89,8 +87,8 @@ function hasAngsana() {
  * down to 11 pt; only below that may it wrap (a single-line field gets a
  * second line, a block field more lines). Shrunk / wrapped elements carry
  * data-fit-pt / data-fit-wrapped so tests can report them. If wrapping would
- * push page 1 past its footer, page 1's line pitch is tightened just enough
- * (data-compact-lh on .pf-body). Then the dot leaders are trimmed to whole
+ * push a sheet past its footer, that sheet's line pitch is tightened just
+ * enough (data-compact-lh on .pf-body). Then the dot leaders are trimmed to whole
  * periods and the signatures (prepared for print first) are set on their
  * dotted lines. Only then is the form print-ready: data-print-ready="true" on
  * .pf-doc and PRINT_READY_EVENT, which enables the print button. Also shows
@@ -127,7 +125,7 @@ export default function PrintFit() {
           el.closest(".pf-row")?.classList.add("pf-wrapped");
         }
       }
-      compactPage1();
+      document.querySelectorAll(".pf-sheet").forEach(compactSheet);
       trimLeaders();
     };
     const run = async () => {

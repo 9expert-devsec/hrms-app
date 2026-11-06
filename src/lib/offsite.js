@@ -22,6 +22,7 @@ import {
   activeStepOf,
   allowanceNeedsAmount,
   detailsKey,
+  normalizeTravelModes,
   offsiteVersion,
   parseWorkDate,
   progressOf,
@@ -249,7 +250,7 @@ function readInput(input, creatorId) {
     description: clean(input.description),
     placeName: clean(input.placeName),
     address: clean(input.address),
-    travelMode: input.travelMode,
+    travelMode: normalizeTravelModes(input.travelMode),
     note: clean(input.note),
   };
 }
@@ -342,7 +343,14 @@ function addPastApprover(doc, empId) {
 /** Details + members as they are now, kept while the request is returned. */
 function takeSnapshot(doc) {
   const r = doc.toObject();
-  const details = Object.fromEntries(SNAPSHOT_FIELDS.map((k) => [k, k === "workDate" ? workDateInput(r.workDate) : k === "leader" ? str(r.leader) : r[k] ?? ""]));
+  const value = (k) => {
+    if (k === "workDate") return workDateInput(r.workDate);
+    if (k === "leader") return str(r.leader);
+    // Compared as text (diffSnapshot), so an old single value equals the same one in an array.
+    if (k === "travelMode") return normalizeTravelModes(r.travelMode);
+    return r[k] ?? "";
+  };
+  const details = Object.fromEntries(SNAPSHOT_FIELDS.map((k) => [k, value(k)]));
   return {
     revision: r.revision,
     details,
@@ -783,8 +791,8 @@ export async function updateRequest(session, id, input = {}) {
  * Send (or resend) invitations. A creator who is the team leader is
  * auto-accepted with their saved signature; any other creator is invited
  * like a member. On a resend, members who already accepted stay accepted — unless
- * the job details (name, date, time, place) changed since the last send, in
- * which case everyone is invited again. Declined members still listed and
+ * the job details (name, date, time, place, travel) changed since the last send,
+ * in which case everyone is invited again. Declined members still listed and
  * members not yet sent an invitation are invited; pending ones stay pending.
  * After a return, the approval steps are reset (resetApprovals) and the
  * change summary recorded. The first send assigns the docNo.
@@ -806,11 +814,12 @@ export async function sendInvitations(session, id, opts) {
   const now = new Date();
   const revision = (doc.revision || 0) + 1;
   const key = detailsKey(doc);
-  const detailsChanged = !!doc.sentDetailsKey && doc.sentDetailsKey !== key;
+  let detailsChanged = !!doc.sentDetailsKey && doc.sentDetailsKey !== key;
   let invited = 0;
 
   if (doc.status === "returned" && doc.returnSnapshot) {
     const changes = diffSnapshot(doc.returnSnapshot, doc);
+    if (changes.fields.includes("travelMode")) detailsChanged = true; // outside detailsKey (see there)
     doc.changeSummary = { fromRevision: doc.returnSnapshot.revision, toRevision: revision, ...changes };
     resetApprovals(doc, changes.memberSetChanged, now);
     const newLeaderSigns = pointStep1AtLeader(doc, { resign: true });

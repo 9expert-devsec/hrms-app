@@ -25,7 +25,7 @@ import {
   DEFAULT_ALLOWANCE_PER_PERSON,
   OFFSITE_STALE_MESSAGE,
   SELF_APPROVAL_LABEL,
-  TRAVEL_MODE_LABELS,
+  travelModesText,
   changeSummaryLines,
   formatDateTimeTh,
   formatWorkDateTh,
@@ -533,7 +533,7 @@ export default function OffsiteDetail({ id }) {
           <Info label="แผนก">{r.creatorDepartment}</Info>
           <Info label="สถานที่">{r.placeName}</Info>
           <Info label="ที่อยู่">{r.address}</Info>
-          <Info label="การเดินทาง">{TRAVEL_MODE_LABELS[r.travelMode]}</Info>
+          <Info label="การเดินทาง">{travelModesText(r.travelMode)}</Info>
         </dl>
         <dl className="grid gap-4">
           <Info label="รายละเอียดงาน"><span style={{ whiteSpace: "pre-wrap" }}>{r.description}</span></Info>

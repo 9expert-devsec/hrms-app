@@ -5,8 +5,10 @@ import {
   MEMBER_STATUSES,
   APPROVAL_STATUSES,
   APPROVAL_ROLES,
-  TRAVEL_MODES,
   ALLOWANCE_OPTIONS,
+  MAX_MEMBERS,
+  TOO_MANY_MEMBERS_MESSAGE,
+  normalizeTravelModes,
 } from "@/lib/offsiteRules";
 
 /**
@@ -106,11 +108,21 @@ const OffsiteRequestSchema = new Schema(
     description: { type: String, default: "" },
     placeName: { type: String, default: "" },
     address: { type: String, default: "" },
-    travelMode: { type: String, enum: TRAVEL_MODES, required: true },
+    // Array of TRAVEL_MODES; requests from before multi-select hold one string
+    // (never migrated) — read it through offsiteRules.normalizeTravelModes.
+    travelMode: {
+      type: Schema.Types.Mixed,
+      required: true,
+      validate: { validator: (v) => normalizeTravelModes(v).length > 0, message: "กรุณาเลือกการเดินทาง" },
+    },
     note: { type: String, default: "" },
 
     leader: { type: Schema.Types.ObjectId, ref: "Employee", default: null },
-    members: { type: [MemberSchema], default: [] },
+    members: {
+      type: [MemberSchema],
+      default: [],
+      validate: { validator: (v) => v.length <= MAX_MEMBERS, message: TOO_MANY_MEMBERS_MESSAGE },
+    },
     approvals: { type: [ApprovalSchema], default: [] },
 
     hrSummary: {

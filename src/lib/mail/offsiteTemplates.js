@@ -7,7 +7,7 @@
  *           recipientIsCreator?, recipientIsLeader?,
  *           returnInfo?, changeSummary?, cancelReason? }
  */
-import { changeSummaryLines, formatWorkDateTh } from "../offsiteRules.js";
+import { changeSummaryLines, formatWorkDateTh, travelModesText } from "../offsiteRules.js";
 
 export const OFFSITE_EMAIL_TYPES = [
   "offsite_invite",
@@ -118,6 +118,7 @@ export function buildOffsiteEmail(type, ctx) {
     ["ชื่องาน", r.jobName],
     ["วันที่ทำงาน", `${formatWorkDateTh(r.workDate)} เวลา ${r.startTime}–${r.endTime} น.`],
     ["สถานที่", r.placeName],
+    ["การเดินทาง", travelModesText(r.travelMode) || "-"],
     ["ผู้สร้างคำขอ", r.creatorNameTh],
     ["หัวหน้าทีม", leaderName(r)],
     ...extraLines(type, ctx),
