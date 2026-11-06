@@ -353,6 +353,7 @@ export default function RolesClient({ initialRoles, groups }) {
                               />
                               <span>{p.label}</span>
                               {p.scope && <Badge>ขอบเขตข้อมูล</Badge>}
+                              {p.inDevelopment && <Badge>กำลังพัฒนา</Badge>}
                             </label>
                           ))}
                         </div>

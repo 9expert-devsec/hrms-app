@@ -7,15 +7,15 @@
  * `pages` is NOT treated as allow-all: tokens issued before RBAC have no
  * `pages`, and they must deny, not grant.
  */
-import { resolvePageKey } from "./pages.js";
+import { isInDevelopment, resolvePageKey } from "./pages.js";
 
 export { RBAC_VERSION } from "./version.js";
 
-/** May `user` hold `pageKey`? A null/unknown key is superadmin-only. */
+/** May `user` hold `pageKey`? A null/unknown or in-development key is superadmin-only. */
 export function canAccess(user, pageKey) {
   if (!user) return false;
   if (user.isSuperadmin === true) return true;
-  if (!pageKey || !Array.isArray(user.pages)) return false;
+  if (!pageKey || !Array.isArray(user.pages) || isInDevelopment(pageKey)) return false;
   return user.pages.includes(pageKey);
 }
 

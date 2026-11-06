@@ -17,6 +17,11 @@
  *   - 'none'   → a SCOPE KEY. `href: null`; it widens what data a page or API
  *                returns and never resolves from a URL.
  *
+ * `inDevelopment: true` → the feature is not ready: only the superadmin
+ * passes, whatever Role.pages says (access.js canAccess, so the menu, the page
+ * guards, the middleware and the API guards all follow). Role documents are
+ * not changed; removing the flag restores what they grant.
+ *
  * Paths under /dashboard that resolve to no key are superadmin-only
  * (deny by default — see access.js).
  */
@@ -32,9 +37,9 @@ export const HRMS_PAGES = [
     pages: [
       { key: "self_profile", label: "โปรไฟล์ของฉัน", href: "/dashboard/hrm/employee-profile", match: "prefix" },
       { key: "self_team", label: "ทีมของฉัน", href: "/dashboard/hrm/employee-my-team", match: "prefix" },
-      { key: "self_clock", label: "บันทึกเวลา", href: "/dashboard/attendance/clock", match: "prefix" },
-      { key: "self_attendance", label: "เวลาทำงานของฉัน", href: "/dashboard/attendance/my-attendance", match: "prefix" },
-      { key: "self_ot", label: "แจ้ง OT", href: "/dashboard/attendance/ot", match: "exact" },
+      { key: "self_clock", label: "บันทึกเวลา", href: "/dashboard/attendance/clock", match: "prefix", inDevelopment: true },
+      { key: "self_attendance", label: "เวลาทำงานของฉัน", href: "/dashboard/attendance/my-attendance", match: "prefix", inDevelopment: true },
+      { key: "self_ot", label: "แจ้ง OT", href: "/dashboard/attendance/ot", match: "exact", inDevelopment: true },
       { key: "self_leave_request", label: "ขอลา", href: "/dashboard/leave/request", match: "prefix" },
       { key: "self_leave_history", label: "ประวัติการลา", href: "/dashboard/leave/history", match: "prefix" },
       { key: "self_leave_balance", label: "วันลาคงเหลือ", href: "/dashboard/leave/balance", match: "prefix" },
@@ -54,16 +59,16 @@ export const HRMS_PAGES = [
   {
     group: "เวลาทำงาน",
     pages: [
-      { key: "ot_approve", label: "อนุมัติ OT", href: "/dashboard/attendance/ot-approve", match: "prefix" },
-      { key: "shifts", label: "รูปแบบเวลาทำงาน", href: "/dashboard/attendance/shifts", match: "prefix" },
-      { key: "shift_assign", label: "กำหนดเวลาพนักงาน", href: "/dashboard/attendance/assign-shift", match: "prefix" },
-      { key: "holidays", label: "วันหยุด", href: "/dashboard/attendance/holidays", match: "prefix" },
-      { key: "attendance_report", label: "รายงานเวลาทำงาน", href: "/dashboard/attendance/report", match: "prefix" },
+      { key: "ot_approve", label: "อนุมัติ OT", href: "/dashboard/attendance/ot-approve", match: "prefix", inDevelopment: true },
+      { key: "shifts", label: "รูปแบบเวลาทำงาน", href: "/dashboard/attendance/shifts", match: "prefix", inDevelopment: true },
+      { key: "shift_assign", label: "กำหนดเวลาพนักงาน", href: "/dashboard/attendance/assign-shift", match: "prefix", inDevelopment: true },
+      { key: "holidays", label: "วันหยุด", href: "/dashboard/attendance/holidays", match: "prefix", inDevelopment: true },
+      { key: "attendance_report", label: "รายงานเวลาทำงาน", href: "/dashboard/attendance/report", match: "prefix", inDevelopment: true },
       // Read every off-site request (not drafts), print forms, see anyone's history.
       { key: "offsite_hr", label: "คำขอทำงานนอกสถานที่ทั้งหมด", href: "/dashboard/offsite/all", match: "prefix" },
       // Scope keys — widen data, never a route.
-      { key: "scope_attendance_all", label: "ดูเวลาทำงานของพนักงานทุกคน", href: null, match: "none" },
-      { key: "scope_ot_all", label: "อนุมัติ OT ได้ทุกแผนก", href: null, match: "none" },
+      { key: "scope_attendance_all", label: "ดูเวลาทำงานของพนักงานทุกคน", href: null, match: "none", inDevelopment: true },
+      { key: "scope_ot_all", label: "อนุมัติ OT ได้ทุกแผนก", href: null, match: "none", inDevelopment: true },
     ],
   },
   {
@@ -101,6 +106,11 @@ export const PAGE_GROUPS = HRMS_PAGES.map((g) => ({
 /** Registry row by key, or null. */
 export function getPage(key) {
   return FLAT_PAGES.find((p) => p.key === key) ?? null;
+}
+
+/** Is this key flagged `inDevelopment` (superadmin only for now)? */
+export function isInDevelopment(key) {
+  return getPage(key)?.inDevelopment === true;
 }
 
 function normalizePath(pathname) {

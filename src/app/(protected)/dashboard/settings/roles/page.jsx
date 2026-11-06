@@ -14,10 +14,10 @@ export default async function RolesPage() {
   await dbConnect();
   const roles = await listRoles();
 
-  // Checklist groups, with scope keys (match "none") flagged.
+  // Checklist groups, with scope keys (match "none") and in-development rows flagged.
   const groups = HRMS_PAGES.map((g) => ({
     group: g.group,
-    pages: g.pages.map((p) => ({ key: p.key, label: p.label, scope: p.match === "none" })),
+    pages: g.pages.map((p) => ({ key: p.key, label: p.label, scope: p.match === "none", inDevelopment: p.inDevelopment === true })),
   }));
 
   return <RolesClient initialRoles={JSON.parse(JSON.stringify(roles))} groups={groups} />;
