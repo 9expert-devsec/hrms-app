@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { PASSWORD_MIN_LENGTH } from "@/lib/passwordRules";
+import PasswordInput from "./PasswordInput";
 import TempPasswordDialog from "./TempPasswordDialog";
 
 /**
@@ -17,7 +18,6 @@ export default function ResetPasswordDialog({ user, onClose, onDone }) {
   const [mode, setMode] = useState("typed");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
-  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [tempResult, setTempResult] = useState(null); // { email, tempPassword }
@@ -144,27 +144,16 @@ export default function ResetPasswordDialog({ user, onClose, onDone }) {
             ].map(([label, value, set, ac]) => (
               <div key={label}>
                 <label style={{ display: "block", color: "#0D1B2A", fontSize: 13, marginBottom: 4 }}>{label}</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={show ? "text" : "password"}
-                    value={value}
-                    onChange={(e) => {
-                      set(e.target.value);
-                      setError("");
-                    }}
-                    autoComplete={ac}
-                    placeholder={`อย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร`}
-                    style={inputStyle}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShow((v) => !v)}
-                    aria-label={show ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                    style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#5E6A7E" }}
-                  >
-                    {show ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
+                <PasswordInput
+                  value={value}
+                  onChange={(e) => {
+                    set(e.target.value);
+                    setError("");
+                  }}
+                  autoComplete={ac}
+                  placeholder={`อย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร`}
+                  style={inputStyle}
+                />
               </div>
             ))}
           </div>

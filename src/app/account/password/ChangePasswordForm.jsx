@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { KeyRound, Loader2, LogOut } from "lucide-react";
 import { PASSWORD_MIN_LENGTH, validateNewPassword } from "@/lib/passwordRules";
+import PasswordInput from "../../../components/PasswordInput";
 
 const inputClass =
   "h-12 w-full rounded-[var(--9e-radius-md)] border border-[var(--surface-border)] bg-white px-4 text-[15px] text-9e-navy";
@@ -75,9 +76,8 @@ export default function ChangePasswordForm({ forced, email }) {
             <label htmlFor="current" className="mb-1.5 block text-sm font-semibold text-9e-navy">
               {forced ? "รหัสผ่านชั่วคราว" : "รหัสผ่านปัจจุบัน"}
             </label>
-            <input
+            <PasswordInput
               id="current"
-              type="password"
               autoComplete="current-password"
               required
               value={currentPassword}
@@ -89,9 +89,8 @@ export default function ChangePasswordForm({ forced, email }) {
             <label htmlFor="new" className="mb-1.5 block text-sm font-semibold text-9e-navy">
               รหัสผ่านใหม่
             </label>
-            <input
+            <PasswordInput
               id="new"
-              type="password"
               autoComplete="new-password"
               required
               minLength={PASSWORD_MIN_LENGTH}
@@ -107,9 +106,8 @@ export default function ChangePasswordForm({ forced, email }) {
             <label htmlFor="confirm" className="mb-1.5 block text-sm font-semibold text-9e-navy">
               ยืนยันรหัสผ่านใหม่
             </label>
-            <input
+            <PasswordInput
               id="confirm"
-              type="password"
               autoComplete="new-password"
               required
               value={confirmPassword}

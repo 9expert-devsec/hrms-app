@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
-import { Eye, EyeOff, LogIn, Mail, Lock } from "lucide-react";
+import { LogIn, Mail, Lock } from "lucide-react";
+import PasswordInput from "../../components/PasswordInput";
 import { ACCOUNT_LOCKED_ERROR, ACCOUNT_LOCKED_MESSAGE } from "@/lib/loginLockout";
 
 // Only same-origin paths. "//host" and "/\host" are protocol-relative in
@@ -59,7 +60,6 @@ export default function LoginClient() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(errorFromQuery);
 
@@ -187,31 +187,22 @@ export default function LoginClient() {
               >
                 รหัสผ่าน
               </label>
-              <div className="relative">
-                <Lock
-                  size={18}
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-                />
-                <input
-                  id="password"
-                  type={showPw ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`${inputClass} pr-12`}
-                  placeholder="กรอกรหัสผ่าน"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((s) => !s)}
-                  className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-[var(--9e-radius-md)] text-[var(--text-muted)] transition-colors hover:text-9e-action"
-                  aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                >
-                  {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+              <PasswordInput
+                leading={
+                  <Lock
+                    size={18}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                  />
+                }
+                id="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+                placeholder="กรอกรหัสผ่าน"
+              />
               <div className="mt-2 flex justify-end">
                 <Link
                   href="/forgot-password"
