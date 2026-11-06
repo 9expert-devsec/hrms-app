@@ -1,22 +1,23 @@
 /**
  * Print-time signature handling for the off-site form (client only; the
  * stored signature is never changed). Stored signatures are opaque 400×160
- * canvas PNGs — white background, thin #0D1B2A strokes — so printed whole and
- * shrunk they float above the line and print pale grey. Here each <img
- * data-sig> is redrawn as: alpha from darkness (smooth anti-aliased edges),
- * ink solid black, cropped to the ink's bounding box + 1 px; then sized and
- * set ON its dotted line.
+ * canvas PNGs on white, so printed whole and shrunk they float above the line
+ * and hide the dots under them. Here each <img data-sig> is redrawn with white
+ * turned to transparency and cropped to the ink's bounding box + 1 px, then
+ * sized and set ON its dotted line. Colours are the stored ones: the white is
+ * only un-blended out, so on white paper every pixel composites back to its
+ * stored colour.
  */
 
 const PX_PER_PT = 96 / 72;
-const INK_FLOOR = 12; // darkness (0–255) below this is background → fully transparent
-const INK_FULL = 150; // darkness at or above this is fully opaque ink
+const INK_FLOOR = 12; // alpha (0–255) below this is background → fully transparent
 const INK_BOX_ALPHA = 32; // pixels at least this opaque define the ink's bounding box
 const DIP_PT = 1; // the ink's bottom dips this far below the dot baseline, like a pen
+const CELL_TOP_GAP_PT = 1; // clear space between the ink and the top of its cell
 
-// Largest box each kind may fill (aspect ratio kept). Approval ink ≤ 28 pt keeps tall strokes clear of the cell headers.
+// Largest box each kind may fill (aspect ratio kept); never taller than the cell above its dotted line.
 const SIG_BOX = {
-  member: { w: 80, h: 18 },
+  member: { w: 100, h: 18 },
   approval: { w: 140, h: 28 },
 };
 
@@ -29,7 +30,7 @@ async function sameOriginSrc(src) {
   return URL.createObjectURL(await res.blob());
 }
 
-/** Redraw one signature as transparent-backed black ink cropped to its bounding box. Throws on failure. */
+/** Redraw one signature with a transparent background, cropped to its bounding box. Throws on failure. */
 export async function prepareSignature(img) {
   const source = new Image();
   source.src = await sameOriginSrc(img.getAttribute("src"));
@@ -40,7 +41,7 @@ export async function prepareSignature(img) {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  // Judge darkness against white, whatever the stored background (opaque or not).
+  // Judge every pixel against white, whatever the stored background (opaque or not).
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, w, h);
   ctx.drawImage(source, 0, 0);
@@ -51,11 +52,14 @@ export async function prepareSignature(img) {
   let x1 = -1;
   let y1 = -1;
   for (let i = 0, n = 0; i < p.length; i += 4, n += 1) {
-    const dark = 255 - (0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]);
-    const a = dark < INK_FLOOR ? 0 : Math.min(255, Math.round(((dark - INK_FLOOR) * 255) / (INK_FULL - INK_FLOOR)));
-    p[i] = 0;
-    p[i + 1] = 0;
-    p[i + 2] = 0;
+    // Un-blend from white: the most transparent this pixel can be and still
+    // composite back to its colour. Bright channels rise; hue is untouched.
+    const white = Math.min(p[i], p[i + 1], p[i + 2]);
+    const a = 255 - white < INK_FLOOR ? 0 : 255 - white;
+    const channel = (c) => (a ? Math.round(((c - white) * 255) / a) : 0);
+    p[i] = channel(p[i]);
+    p[i + 1] = channel(p[i + 1]);
+    p[i + 2] = channel(p[i + 2]);
     p[i + 3] = a;
     if (a >= INK_BOX_ALPHA) {
       const x = n % w;
@@ -115,16 +119,18 @@ export function placeSignatures() {
   for (const img of document.querySelectorAll("img[data-sig]")) {
     const box = SIG_BOX[img.dataset.sig];
     const holder = img.parentElement;
-    const dots = holder?.querySelector(img.dataset.sig === "member" ? ".pf-dots" : ".pf-sign-dots");
+    const dots = holder?.querySelector(img.dataset.sig === "member" ? ".pf-sig-dots" : ".pf-sign-dots");
     if (!box || !dots || !img.naturalWidth || !img.naturalHeight) continue;
-    const scale = Math.min(box.w / img.naturalWidth, box.h / img.naturalHeight);
+    const basePt = (baselineY(dots) - holder.getBoundingClientRect().top) / PX_PER_PT;
+    // The top of the holder is the row above's border: the ink stops short of it.
+    const maxH = Math.min(box.h, basePt + DIP_PT - CELL_TOP_GAP_PT);
+    const scale = Math.min(box.w / img.naturalWidth, maxH / img.naturalHeight);
     const wPt = img.naturalWidth * scale;
     const hPt = img.naturalHeight * scale;
     img.style.width = `${wPt.toFixed(2)}pt`;
     img.style.height = `${hPt.toFixed(2)}pt`;
     img.style.maxWidth = "none";
     img.style.maxHeight = "none";
-    const basePt = (baselineY(dots) - holder.getBoundingClientRect().top) / PX_PER_PT;
     img.style.top = `${(basePt + DIP_PT - hPt).toFixed(2)}pt`;
     img.style.bottom = "auto";
   }

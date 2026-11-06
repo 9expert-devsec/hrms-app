@@ -3,13 +3,17 @@
  * "แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่" — the printable form, built on
  * the measurements of the official Word original (Rev.5, 1 June 2026; A4
  * 595.3 × 841.9 pt): Angsana New (installed on the machine — never bundled),
- * pt metrics, typed-dot leaders. Page 1 the form (members 1–10), then a
- * continuation sheet only with 11+ members, last the regulations
- * (lib/offsiteRegulations.js). Server-renderable (no hooks); PrintFit shrinks
- * values that do not fit their dots. Printing is the browser's (PrintButton).
+ * pt metrics, typed-dot leaders. Page 1 the form, then as many continuation
+ * sheets as the members need, last the regulations (lib/offsiteRegulations.js).
+ * Server-renderable (no hooks): every member is rendered on page 1 with a
+ * hidden continuation sheet beside it; once fonts and signatures are ready
+ * PrintFit moves the rows that do not fit onto copies of that sheet, and
+ * shrinks fill-in values that do not fit their dots. Printing is the
+ * browser's (PrintButton).
  *
  * Baselines in the original (pt from the top): title 93.0; "ข้าพเจ้า" 127.7,
- * then one line every 18.92 pt (member 10 at 543.8); หมายเหตุ 572.2 (+9.5);
+ * then one line every 18.92 pt (the original's 10 member lines end at 543.8;
+ * the member table keeps that block, so what follows stays put); หมายเหตุ 572.2 (+9.5);
  * signature table 606.1–687.7; HR box from 698.9 (pitch 16.4).
  * In Chromium with Angsana New, a 14-pt baseline sits 12.75 pt below the top
  * of an 18.92-pt line box, 16 pt bold 16.5 pt in 24 pt, 12 pt 10.5 pt in 16.4 pt.
@@ -25,7 +29,13 @@ import { OFFSITE_REGULATIONS } from "@/lib/offsiteRegulations";
 
 const BODY_X = 57.6; // page x of the text block's left edge (Word's left margin)
 const HR_X = 58.1; // page x inside the HR box's 0.5-pt border
-const PAGE1_ROWS = 10; // the paper form has 10 lines; the rest go on the continuation sheet
+// Member table columns, in % of its width (the approval table's).
+const MEMBER_COLUMNS = [
+  { title: "ลำดับ", width: "8%" },
+  { title: "ชื่อ-นามสกุล", width: "27%" },
+  { title: "หน้าที่ / ตำแหน่ง", width: "41%" },
+  { title: "ลายเซ็น", width: "24%" },
+];
 
 // Wording of the paper form (the app's own labels are shorter).
 const TRAVEL_LABELS = {
@@ -109,13 +119,13 @@ const Icon = ({ children, style }) => (
 /**
  * A dotted fill-in from `at` to `to`. Empty: dots end to end. With a value:
  * 3-pt gap, the value, 3-pt gap, dots to the end — or, `center`ed, dots on
- * both sides of it. PrintFit shrinks a value that does not fit (`fit`), then
- * lets it wrap. `overlay` sits over the unbroken dots (a signature).
+ * both sides of it. PrintFit shrinks a value that does not fit, then lets it
+ * wrap.
  */
-function S({ children, style, base = 14, fit = true, center = false, className = "", overlay = null }) {
+function S({ children, style, base = 14, center = false }) {
   const has = children != null && children !== "" && children !== false;
   return (
-    <span className={`pf-seg ${className}`} style={style} data-fit={fit ? "line" : undefined} data-base-pt={base}>
+    <span className="pf-seg" style={style} data-fit="line" data-base-pt={base}>
       {has && center && <span className="pf-dots pf-dots-l">{DOT_FILL}</span>}
       {has && (
         <span className="pf-val">
@@ -123,7 +133,6 @@ function S({ children, style, base = 14, fit = true, center = false, className =
         </span>
       )}
       <span className="pf-dots">{DOT_FILL}</span>
-      {overlay}
     </span>
   );
 }
@@ -150,37 +159,45 @@ function RuledBlock({ label, labelTo, text, rows, to }) {
   );
 }
 
-/** One member line: number, ชื่อ … หน้าที่ … เซ็นชื่อ … (page 1 and the continuation sheet). */
+/** One member row. Long text wraps inside its cell; rows are never split (PrintFit moves them whole). */
 function MemberRow({ n, m }) {
   return (
-    <Stops>
-      <L at={93.6} to={111.6}>
-        {n}.
-      </L>
-      <L at={111.6} to={122.8}>
-        ชื่อ
-      </L>
-      <S at={122.8} to={245}>
-        {m?.nameSnapshot}
-      </S>
-      <L at={245} to={268.5}>
-        หน้าที่
-      </L>
-      <S at={268.5} to={411.8}>
-        {m?.duty}
-      </S>
-      <L at={416.5} to={442.7}>
-        เซ็นชื่อ
-      </L>
+    <tr>
+      <td className="pf-mno">{n}.</td>
+      <td>{m.nameSnapshot}</td>
+      <td>
+        <div className="pf-duty">
+          <span className="pf-duty-l">หน้าที่</span>
+          <span className="pf-duty-v">{m.duty}</span>
+        </div>
+      </td>
       {/* Signed on the line: the dots run unbroken under the signature (placed by PrintFit). */}
-      <S
-        at={442.7}
-        to={530.4}
-        fit={false}
-        className="pf-sigseg"
-        overlay={m?.signature ? <img src={m.signature} alt="" className="pf-msig" data-sig="member" /> : null}
-      />
-    </Stops>
+      <td className="pf-msign">
+        <span className="pf-sig-dots">{DOT_FILL}</span>
+        {m.signature ? <img src={m.signature} alt="" className="pf-msig" data-sig="member" /> : null}
+      </td>
+    </tr>
+  );
+}
+
+/** The bordered member table with its header row; the rows are `children`. */
+function MemberTable({ children }) {
+  return (
+    <table className="pf-mtable">
+      <colgroup>
+        {MEMBER_COLUMNS.map(({ title, width }) => (
+          <col key={title} style={{ width }} />
+        ))}
+      </colgroup>
+      <thead>
+        <tr>
+          {MEMBER_COLUMNS.map(({ title }) => (
+            <th key={title}>{title}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>{children}</tbody>
+    </table>
   );
 }
 
@@ -223,8 +240,6 @@ function Regulations() {
 export default function OffsitePrintForm({ r, printedAt }) {
   const date = workDateParts(r.workDate);
   const step = (n) => (r.approvals || []).find((a) => a.step === n) || {};
-  const rows = Array.from({ length: PAGE1_ROWS }, (_, i) => r.members[i] || null);
-  const moreRows = r.members.slice(PAGE1_ROWS);
   const travel = normalizeTravelModes(r.travelMode);
   const hr = r.hrSummary || {};
   const watermark = r.status === "approved" ? null : r.status === "cancelled" ? "ยกเลิกแล้ว" : "ยังไม่อนุมัติ";
@@ -353,11 +368,17 @@ export default function OffsitePrintForm({ r, printedAt }) {
             รายชื่อผู้ร่วมทำงาน{" "}
             <u>(กรณีทำงานที่เดียวกันหลายท่านให้ระบุทุกท่านพร้อมหน้าที่ที่รับผิดชอบในงานและเซ็นชื่อรับทราบด้วยตนเองทุกครั้ง)</u>
           </p>
-          {rows.map((m, i) => (
-            <MemberRow key={i} n={i + 1} m={m} />
-          ))}
+          <div className="pf-members">
+            <MemberTable>
+              {r.members.map((m, i) => (
+                <MemberRow key={i} n={i + 1} m={m} />
+              ))}
+            </MemberTable>
+            <div className="pf-more" hidden>
+              มีรายชื่อผู้ร่วมงานต่อในแผ่นถัดไป
+            </div>
+          </div>
           <div className="pf-note">
-            {moreRows.length > 0 && <div className="pf-more">มีรายชื่อผู้ร่วมงานต่อในแผ่นที่ 2</div>}
             <RuledBlock label="หมายเหตุ" labelTo={93.5} text={r.note} rows={2} to={537} />
           </div>
 
@@ -455,18 +476,14 @@ export default function OffsitePrintForm({ r, printedAt }) {
         </div>
       </article>
 
-      {/* ── Continuation sheet: members 11+ (only when there are any) ── */}
-      {moreRows.length > 0 && (
-        <article className="pf-sheet" data-testid="offsite-print-continuation">
-          {sheetHead}
-          <h2 className="pf-title">รายชื่อผู้ร่วมงาน (ต่อ)</h2>
-          <div className="pf-body pf-cont">
-            {moreRows.map((m, i) => (
-              <MemberRow key={i} n={PAGE1_ROWS + i + 1} m={m} />
-            ))}
-          </div>
-        </article>
-      )}
+      {/* ── Continuation sheet: stays hidden; PrintFit copies it for the rows page 1 cannot hold ── */}
+      <article className="pf-sheet" data-pf-cont-template hidden>
+        {sheetHead}
+        <h2 className="pf-title">รายชื่อผู้ร่วมงาน (ต่อ)</h2>
+        <div className="pf-body">
+          <MemberTable />
+        </div>
+      </article>
 
       {/* ── Last page: the regulations ───────────────────── */}
       <article className="pf-sheet">
@@ -508,8 +525,6 @@ export const PRINT_CSS = `
 /* The app's base layer gives headings / cells their own fonts — the form uses one. */
 .pf-doc h1, .pf-doc h2, .pf-doc h3, .pf-doc li, .pf-doc td, .pf-doc th { font-family: inherit; }
 .pf-body { position: absolute; left: 57.6pt; top: 114.95pt; width: 480.4pt; }
-/* Wrapped rows take the tightened pitch too (PrintFit sets --lh on .pf-body); page 1 keeps its own behaviour. */
-.pf-cont { line-height: var(--lh); }
 .pf-b { font-weight: 700; }
 .pf-line { margin: 0; line-height: var(--lh); }
 .pf-row { display: flex; height: var(--lh); white-space: nowrap; }
@@ -520,22 +535,21 @@ export const PRINT_CSS = `
 .pf-radio { display: block; margin: 1.6pt 0 0 -0.1pt; }
 .pf-seg { display: flex; min-width: 0; height: var(--lh); overflow: hidden; white-space: nowrap; }
 .pf-val { flex: none; padding: 0 3pt; }
-.pf-dots, .pf-ruled-dots, .pf-sign-dots { overflow: hidden; white-space: nowrap; }
+.pf-dots, .pf-ruled-dots, .pf-sign-dots, .pf-sig-dots { overflow: hidden; white-space: nowrap; }
 .pf-dots { flex: 1 1 0; min-width: 0; align-self: flex-end; height: var(--lh); }
 /* Centred value: the left run hugs the value's 3-pt gap, the right run starts after it. */
 .pf-dots-l { text-align: right; }
 .pf-seg.pf-wrapped { height: auto; overflow: visible; white-space: normal; }
 .pf-seg.pf-wrapped .pf-val { flex: 0 1 auto; min-width: 0; }
 /*
- * Signatures sit ON the dotted line, over unbroken dots. PrintFit makes the
- * ink transparent-backed black, crops it, sizes it (member ≤ 80 × 18 pt,
- * approval ≤ 140 × 28 pt) and sets its top so the ink rests on the dot
+ * Signatures sit ON the dotted line, over unbroken dots, in their stored
+ * colours. PrintFit makes the background transparent, crops to the ink, sizes
+ * it (printSignatures SIG_BOX) and sets its top so the ink rests on the dot
  * baseline; the CSS here is the fallback placement. Absolutely positioned
  * (never changes the line pitch), centred by auto margins (no transform), and
  * no mix-blend-mode / filter: Chrome prints those as flattened bitmaps.
  */
-.pf-sigseg { position: relative; overflow: visible; }
-.pf-msig { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 5.2pt; max-width: 80pt; max-height: 18pt; }
+.pf-msig { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 3pt; max-width: 100pt; max-height: 13pt; }
 .pf-ruled { position: relative; overflow: hidden; }
 .pf-ruled.pf-wrapped { height: auto !important; overflow: visible; }
 .pf-ruled-dots { position: absolute; left: 0; right: 0; height: var(--lh); }
@@ -544,9 +558,20 @@ export const PRINT_CSS = `
 .pf-l-inline { display: inline-block; background: #fff; height: var(--lh); vertical-align: top; white-space: nowrap; }
 .pf-rv { background: #fff; padding: 0 3pt; }
 .pf-members-head { text-indent: 32.4pt; }
-.pf-note { position: relative; margin-top: 9.48pt; }
-/* In the gap above หมายเหตุ, under member 10's name column: absolute, so page 1's lines do not move. */
-.pf-more { position: absolute; left: 54pt; bottom: 100%; height: 9.48pt; font-size: 12pt; line-height: 9.48pt; white-space: nowrap; }
+/* The original's 10 lines + the gap above หมายเหตุ: a short table leaves everything below where it was. */
+.pf-members { min-height: calc(10 * var(--lh) + 9.48pt); }
+/* Same weight as the approval table; no fills, no radius. The width is .pf-signs'. */
+.pf-mtable { width: 482.3pt; table-layout: fixed; border-collapse: collapse; line-height: 16pt; }
+.pf-mtable th, .pf-mtable td { height: 16pt; padding: 0 4pt; border: 0.5pt solid #000; border-radius: 0; background: none; color: #000; font-size: 14pt; font-weight: 400; line-height: 16pt; text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
+.pf-mtable th { font-weight: 700; text-align: center; }
+.pf-mtable td.pf-mno { text-align: center; }
+.pf-mtable td.pf-msign { position: relative; padding: 0; }
+/* Hanging indent: wrapped duty lines stay under the duty text. */
+.pf-duty { display: flex; gap: 3pt; }
+.pf-duty-l { flex: none; }
+.pf-duty-v { flex: 1 1 0; min-width: 0; }
+.pf-sig-dots { position: absolute; left: 6pt; right: 6pt; bottom: 0; height: 14pt; line-height: 14pt; text-align: center; }
+.pf-more { font-size: 12pt; line-height: 10pt; white-space: nowrap; }
 .pf-signs { display: grid; grid-template-columns: 155.3pt 170.1pt 155.9pt; width: 482.3pt; height: 81.6pt; margin-top: 8.67pt; border: 0.5pt solid #000; box-sizing: border-box; }
 .pf-sign { position: relative; border-left: 0.5pt solid #000; text-align: center; }
 .pf-sign:first-child { border-left: 0; }
