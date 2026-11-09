@@ -20,7 +20,11 @@ const BLUE = "#005CFF";
 const SLATE = "#5E6A7E";
 const MAX_PNG_CHARS = Math.floor((300 * 1024 * 4) / 3) + 30; // 300 KB decoded (lib/signaturePng.js)
 
-/** Any signature image (the pad's devicePixelRatio-sized PNG, or a cleaned upload) → the stored 400×160 PNG data URL. */
+/**
+ * Any signature image (the pad's devicePixelRatio-sized PNG, or a cleaned
+ * upload) → the stored 400×160 PNG data URL. Its background is kept as it is:
+ * the pad paints white itself, an upload stays transparent.
+ */
 export function shrinkSignature(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -29,8 +33,6 @@ export function shrinkSignature(dataUrl) {
       canvas.width = SIGNATURE_OUT_W;
       canvas.height = SIGNATURE_OUT_H;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(0, 0, SIGNATURE_OUT_W, SIGNATURE_OUT_H);
       ctx.drawImage(img, 0, 0, SIGNATURE_OUT_W, SIGNATURE_OUT_H);
       const out = canvas.toDataURL("image/png");
       if (out.length > MAX_PNG_CHARS) reject(new Error("ลายเซ็นมีขนาดใหญ่เกิน 300 KB กรุณาลองใหม่"));
@@ -80,9 +82,9 @@ function toPngDataUrl({ data, width, height }) {
 
 /**
  * "อัปโหลดไฟล์": pick or drop a PNG / JPEG / WebP (≤ 5 MB); it is cleaned in
- * the browser (background removed, ink cropped, recoloured, fitted to
- * 400×160) and previewed with a "ความเข้ม" slider. Only the cleaned PNG ever
- * leaves the browser — the file itself is never uploaded or stored.
+ * the browser (background made transparent, ink cropped in its own colour,
+ * fitted to 400×160) and previewed on white exactly as it will be saved, with
+ * a "ความเข้ม" slider. Only the cleaned PNG ever leaves the browser — the file itself is never uploaded or stored.
  */
 function SignatureUpload({ confirmLabel, onSave, onClear }) {
   const inputRef = useRef(null);

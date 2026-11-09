@@ -4,17 +4,17 @@
  * components/SignatureInput.jsx decodes the file (createImageBitmap, phone
  * rotation applied, longest side ≤ 1600 px) and encodes the result as PNG.
  *
- * The output is exactly what the drawing pad produces: 400×160, opaque white
- * background, ink #0D1B2A, the ink centred and scaled to fit with ~8 px
- * padding (aspect kept). The paper is estimated from the border pixels, and
- * a coarse local background map absorbs uneven light (photos, grey scans);
- * transparent PNGs are composited on white first.
+ * The output is a 400×160 PNG like the drawing pad's, but with a transparent
+ * background and the ink in the file's own colour (a blue pen stays blue):
+ * the ink centred and scaled to fit with ~8 px padding (aspect kept). The
+ * paper is estimated from the border pixels, and a coarse local background
+ * map absorbs uneven light (photos, grey scans); transparent PNGs are
+ * composited on white first.
  */
 
 export const SIGNATURE_OUT_W = 400;
 export const SIGNATURE_OUT_H = 160;
 export const SIGNATURE_PADDING = 8;
-export const SIGNATURE_INK = [13, 27, 42]; // #0D1B2A, the pad's ink
 export const SIGNATURE_SOURCE_MAX = 1600; // longest side the browser decodes to
 export const SIGNATURE_FILE_MAX_BYTES = 5 * 1024 * 1024;
 export const SIGNATURE_STRENGTH_DEFAULT = 50; // "ความเข้ม" 1–100: higher keeps fainter strokes
@@ -49,6 +49,16 @@ function luminance({ data, width, height }) {
     L[n] = y * a + 255 * (1 - a);
   }
   return L;
+}
+
+/** RGB of each pixel composited on white (the ink colour is read from these). */
+function colours({ data, width, height }) {
+  const C = new Float32Array(width * height * 3);
+  for (let i = 0, n = 0; n < width * height; i += 4, n += 1) {
+    const a = data[i + 3] / 255;
+    for (let k = 0; k < 3; k += 1) C[n * 3 + k] = data[i + k] * a + 255 * (1 - a);
+  }
+  return C;
 }
 
 /** Indexes of the border band (sampled on big images) and the paper luminance there. */
@@ -261,27 +271,36 @@ export function cleanSignatureImage(src, { strength = SIGNATURE_STRENGTH_DEFAULT
   const dh = ch * scale;
   const ox = (W - dw) / 2;
   const oy = (H - dh) / 2;
-  const at = (x, y) => alpha[(y0 + Math.min(ch - 1, Math.max(0, y))) * width + x0 + Math.min(cw - 1, Math.max(0, x))];
+  const C = colours(src);
+  const index = (x, y) => (y0 + Math.min(ch - 1, Math.max(0, y))) * width + x0 + Math.min(cw - 1, Math.max(0, x));
   const out = new Uint8ClampedArray(W * H * 4);
-  const [ir, ig, ib] = SIGNATURE_INK;
   for (let y = 0; y < H; y += 1) {
     for (let x = 0; x < W; x += 1) {
+      // Coverage (alpha) and the ink colour under this output pixel. Colour is
+      // weighted by coverage², so the solid core of a stroke sets it rather
+      // than its paper-tinted anti-aliased edge.
       let a = 0;
+      let wSum = 0;
+      const rgb = [0, 0, 0];
+      const take = (p, weight) => {
+        const cover = alpha[p] * weight;
+        a += cover;
+        const w = alpha[p] * cover;
+        wSum += w;
+        for (let k = 0; k < 3; k += 1) rgb[k] += C[p * 3 + k] * w;
+      };
       const sx0 = (x - ox) / scale;
       const sy0 = (y - oy) / scale;
       const sx1 = (x + 1 - ox) / scale;
       const sy1 = (y + 1 - oy) / scale;
       if (sx1 > 0 && sy1 > 0 && sx0 < cw && sy0 < ch) {
         if (scale < 1) {
-          let sum = 0;
-          let cnt = 0;
-          for (let yy = Math.max(0, Math.floor(sy0)); yy < Math.min(ch, Math.ceil(sy1)); yy += 1) {
-            for (let xx = Math.max(0, Math.floor(sx0)); xx < Math.min(cw, Math.ceil(sx1)); xx += 1) {
-              sum += at(xx, yy);
-              cnt += 1;
-            }
+          const ys = [Math.max(0, Math.floor(sy0)), Math.min(ch, Math.ceil(sy1))];
+          const xs = [Math.max(0, Math.floor(sx0)), Math.min(cw, Math.ceil(sx1))];
+          const cnt = (ys[1] - ys[0]) * (xs[1] - xs[0]);
+          for (let yy = ys[0]; yy < ys[1]; yy += 1) {
+            for (let xx = xs[0]; xx < xs[1]; xx += 1) take(index(xx, yy), cnt ? 1 / cnt : 0);
           }
-          a = cnt ? sum / cnt : 0;
         } else {
           const fx = (x + 0.5 - ox) / scale - 0.5;
           const fy = (y + 0.5 - oy) / scale - 0.5;
@@ -289,14 +308,19 @@ export function cleanSignatureImage(src, { strength = SIGNATURE_STRENGTH_DEFAULT
           const ya = Math.floor(fy);
           const tx = fx - xa;
           const ty = fy - ya;
-          a = (at(xa, ya) * (1 - tx) + at(xa + 1, ya) * tx) * (1 - ty) + (at(xa, ya + 1) * (1 - tx) + at(xa + 1, ya + 1) * tx) * ty;
+          take(index(xa, ya), (1 - tx) * (1 - ty));
+          take(index(xa + 1, ya), tx * (1 - ty));
+          take(index(xa, ya + 1), (1 - tx) * ty);
+          take(index(xa + 1, ya + 1), tx * ty);
         }
       }
       const i = (y * W + x) * 4;
-      out[i] = 255 + (ir - 255) * a;
-      out[i + 1] = 255 + (ig - 255) * a;
-      out[i + 2] = 255 + (ib - 255) * a;
-      out[i + 3] = 255;
+      if (a > 0 && wSum > 0) {
+        out[i] = rgb[0] / wSum;
+        out[i + 1] = rgb[1] / wSum;
+        out[i + 2] = rgb[2] / wSum;
+      }
+      out[i + 3] = Math.min(1, a) * 255; // transparent background
     }
   }
   return { ok: true, image: { data: out, width: W, height: H } };
