@@ -3,11 +3,12 @@
  * "แบบฟอร์มการเบิกเบี้ยเลี้ยงการทำงานนอกสถานที่" — the printable form, built on
  * the measurements of the official Word original (Rev.5, 1 June 2026; A4
  * 595.3 × 841.9 pt): Angsana New (installed on the machine — never bundled),
- * pt metrics, typed-dot leaders. Page 1 the form, then as many continuation
- * sheets as the members need, last the regulations (lib/offsiteRegulations.js).
- * Server-renderable (no hooks): every member is rendered on page 1 with a
- * hidden continuation sheet beside it; once fonts and signatures are ready
- * PrintFit moves the rows that do not fit onto copies of that sheet, and
+ * pt metrics, typed-dot leaders. Flow: page 1's fields, the member rows, the
+ * closing block (หมายเหตุ, approval table, HR box), then the regulations on
+ * their own last sheet (lib/offsiteRegulations.js). Server-renderable (no
+ * hooks): everything is rendered on page 1 with a hidden continuation sheet
+ * beside it; once fonts and signatures are ready PrintFit moves whatever page 1
+ * cannot hold onto copies of that sheet (PrintFit paginateMembers), and
  * shrinks fill-in values that do not fit their dots. Printing is the
  * browser's (PrintButton).
  *
@@ -369,10 +370,9 @@ export default function OffsitePrintForm({ r, printedAt }) {
                 <MemberRow key={i} n={i + 1} m={m} />
               ))}
             </MemberTable>
-            <div className="pf-more" hidden>
-              มีรายชื่อผู้ร่วมงานต่อในแผ่นถัดไป
-            </div>
           </div>
+          {/* The closing block stays together: here when it fits, else PrintFit moves it after the last member. */}
+          <div className="pf-closing">
           <div className="pf-note">
             <RuledBlock label="หมายเหตุ" labelTo={93.5} text={r.note} rows={2} to={537} />
           </div>
@@ -468,10 +468,11 @@ export default function OffsitePrintForm({ r, printedAt }) {
               </S>
             </Stops>
           </section>
+          </div>
         </div>
       </article>
 
-      {/* ── Continuation sheet: stays hidden; PrintFit copies it for the rows page 1 cannot hold ── */}
+      {/* ── Continuation sheet: stays hidden; PrintFit copies it for the rows (and closing block) page 1 cannot hold ── */}
       <article className="pf-sheet" data-pf-cont-template hidden>
         {sheetHead}
         <h2 className="pf-title">รายชื่อผู้ร่วมงาน (ต่อ)</h2>
@@ -563,7 +564,8 @@ export const PRINT_CSS = `
 .pf-mtable td.pf-mno { text-align: center; }
 .pf-mtable td.pf-msign { position: relative; padding: 0; }
 .pf-sig-dots { position: absolute; left: 6pt; right: 6pt; bottom: 0; height: 14pt; line-height: 14pt; text-align: center; }
-.pf-more { font-size: 12pt; line-height: 10pt; white-space: nowrap; }
+/* On a continuation sheet the closing block follows the table with the gap it has on page 1. */
+.pf-mtable + .pf-closing { margin-top: 9.48pt; }
 .pf-signs { display: grid; grid-template-columns: 155.3pt 170.1pt 155.9pt; width: 482.3pt; height: 81.6pt; margin-top: 8.67pt; border: 0.5pt solid #000; box-sizing: border-box; }
 .pf-sign { position: relative; border-left: 0.5pt solid #000; text-align: center; }
 .pf-sign:first-child { border-left: 0; }

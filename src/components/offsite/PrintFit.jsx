@@ -69,48 +69,72 @@ function compactPage1(sheet) {
   if (lh < LH_PT) body.dataset.compactLh = String(lh);
 }
 
-/** A new continuation sheet before the regulations page; returns its table body. */
-function addContinuationSheet(template) {
+/**
+ * A new sheet before the regulations page; returns its .pf-body. With
+ * `members`, it carries the "(ต่อ)" title and the table header; without,
+ * only the logo and the doc number (a sheet for the closing block alone).
+ */
+function addSheet(template, { members }) {
   const sheet = template.cloneNode(true);
   sheet.removeAttribute("hidden");
   sheet.removeAttribute("data-pf-cont-template");
-  sheet.dataset.testid = "offsite-print-continuation";
+  if (members) {
+    sheet.dataset.testid = "offsite-print-continuation";
+  } else {
+    sheet.dataset.testid = "offsite-print-closing";
+    sheet.querySelector(".pf-title").remove();
+    sheet.querySelector(".pf-mtable").remove();
+  }
   template.before(sheet);
-  return sheet.querySelector("tbody");
+  return sheet.querySelector(".pf-body");
 }
 
+const sheetOf = (el) => el.closest(".pf-sheet");
+
 /**
- * Page 1 first: the rest of the form is settled with one member row (the
- * table's block holds its place), then whole rows stay while the body ends
- * inside the sheet, the pointer line under the table counted once any row
- * leaves. The remaining rows fill continuation sheets by the same test. A
- * sheet always takes at least one row, so this always ends.
+ * Flow: page 1's fields → member rows → closing block (หมายเหตุ, approval
+ * table, HR box) → regulations. Page 1 is settled with one member row and
+ * the closing block in place (its line pitch tightened if wrapped fields
+ * need it). If every row and the closing block then fit, page 1 is final.
+ * Otherwise the closing block leaves page 1, whole rows fill page 1 to the
+ * bottom margin, the rest fill continuation sheets by the same test, and the
+ * closing block goes right after the last row — on that sheet if it fits,
+ * else on a sheet of its own. Every sheet takes at least one row, so this
+ * always ends; the closing block is never split.
  */
 function paginateMembers() {
   const sheet = document.querySelector(".pf-sheet");
   const rows = [...sheet.querySelectorAll(".pf-mtable tbody tr")];
   const template = document.querySelector(CONT_TEMPLATE);
+  const closing = sheet.querySelector(".pf-closing");
   const tbody = rows[0]?.parentElement;
   rows.slice(1).forEach((row) => row.remove());
   compactPage1(sheet);
   if (!tbody) return;
   rows.slice(1).forEach((row) => tbody.append(row));
+  if (bodyFits(sheet)) return;
 
+  closing.remove();
   let kept = rows.length;
   while (kept > 1 && !bodyFits(sheet)) {
     kept -= 1;
     rows[kept].remove();
-    sheet.querySelector(".pf-more").hidden = false;
   }
 
-  let current = null;
+  let body = null; // .pf-body of the last sheet that carries rows
   for (const row of rows.slice(kept)) {
-    current?.append(row);
-    if (!current || !bodyFits(current.closest(".pf-sheet"))) {
-      current = addContinuationSheet(template);
-      current.append(row);
+    body?.querySelector("tbody").append(row);
+    if (!body || !bodyFits(sheetOf(body))) {
+      body = addSheet(template, { members: true });
+      body.querySelector("tbody").append(row);
     }
   }
+  if (body) {
+    body.append(closing);
+    if (bodyFits(sheetOf(body))) return;
+    closing.remove();
+  }
+  addSheet(template, { members: false }).append(closing);
 }
 
 /** Does Angsana New actually render here? (fonts.check alone is true for any system family name.) */
