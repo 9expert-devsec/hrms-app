@@ -17,7 +17,7 @@ const CELL_TOP_GAP_PT = 1; // clear space between the ink and the top of its cel
 
 // Largest box each kind may fill (aspect ratio kept); never taller than the cell above its dotted line.
 const SIG_BOX = {
-  member: { w: 100, h: 18 },
+  member: { w: 110, h: 22 },
   approval: { w: 140, h: 28 },
 };
 

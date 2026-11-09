@@ -32,9 +32,9 @@ const HR_X = 58.1; // page x inside the HR box's 0.5-pt border
 // Member table columns, in % of its width (the approval table's).
 const MEMBER_COLUMNS = [
   { title: "ลำดับ", width: "8%" },
-  { title: "ชื่อ-นามสกุล", width: "27%" },
-  { title: "หน้าที่ / ตำแหน่ง", width: "41%" },
-  { title: "ลายเซ็น", width: "24%" },
+  { title: "ชื่อ-นามสกุล", width: "30%" },
+  { title: "หน้าที่", width: "36%" },
+  { title: "ลายเซ็น", width: "26%" },
 ];
 
 // Wording of the paper form (the app's own labels are shorter).
@@ -165,12 +165,7 @@ function MemberRow({ n, m }) {
     <tr>
       <td className="pf-mno">{n}.</td>
       <td>{m.nameSnapshot}</td>
-      <td>
-        <div className="pf-duty">
-          <span className="pf-duty-l">หน้าที่</span>
-          <span className="pf-duty-v">{m.duty}</span>
-        </div>
-      </td>
+      <td>{m.duty}</td>
       {/* Signed on the line: the dots run unbroken under the signature (placed by PrintFit). */}
       <td className="pf-msign">
         <span className="pf-sig-dots">{DOT_FILL}</span>
@@ -549,7 +544,7 @@ export const PRINT_CSS = `
  * (never changes the line pitch), centred by auto margins (no transform), and
  * no mix-blend-mode / filter: Chrome prints those as flattened bitmaps.
  */
-.pf-msig { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 3pt; max-width: 100pt; max-height: 13pt; }
+.pf-msig { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 2.5pt; max-width: 110pt; max-height: 22pt; }
 .pf-ruled { position: relative; overflow: hidden; }
 .pf-ruled.pf-wrapped { height: auto !important; overflow: visible; }
 .pf-ruled-dots { position: absolute; left: 0; right: 0; height: var(--lh); }
@@ -562,14 +557,11 @@ export const PRINT_CSS = `
 .pf-members { min-height: calc(10 * var(--lh) + 9.48pt); }
 /* Same weight as the approval table; no fills, no radius. The width is .pf-signs'. */
 .pf-mtable { width: 482.3pt; table-layout: fixed; border-collapse: collapse; line-height: 16pt; }
-.pf-mtable th, .pf-mtable td { height: 16pt; padding: 0 4pt; border: 0.5pt solid #000; border-radius: 0; background: none; color: #000; font-size: 14pt; font-weight: 400; line-height: 16pt; text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
-.pf-mtable th { font-weight: 700; text-align: center; }
+/* Member rows are tall enough for a legible signature (≤ 22 pt of ink, printSignatures SIG_BOX). */
+.pf-mtable th, .pf-mtable td { height: 28pt; padding: 0 4pt; border: 0.5pt solid #000; border-radius: 0; background: none; color: #000; font-size: 14pt; font-weight: 400; line-height: 16pt; text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
+.pf-mtable th { height: 16pt; font-weight: 700; text-align: center; }
 .pf-mtable td.pf-mno { text-align: center; }
 .pf-mtable td.pf-msign { position: relative; padding: 0; }
-/* Hanging indent: wrapped duty lines stay under the duty text. */
-.pf-duty { display: flex; gap: 3pt; }
-.pf-duty-l { flex: none; }
-.pf-duty-v { flex: 1 1 0; min-width: 0; }
 .pf-sig-dots { position: absolute; left: 6pt; right: 6pt; bottom: 0; height: 14pt; line-height: 14pt; text-align: center; }
 .pf-more { font-size: 12pt; line-height: 10pt; white-space: nowrap; }
 .pf-signs { display: grid; grid-template-columns: 155.3pt 170.1pt 155.9pt; width: 482.3pt; height: 81.6pt; margin-top: 8.67pt; border: 0.5pt solid #000; box-sizing: border-box; }
