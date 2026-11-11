@@ -12,10 +12,9 @@ import { HEAD_FIELDS } from "@/lib/hod";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 import { signaturePngError } from "@/lib/signaturePng";
 import {
-  ACCOUNTING_DEPT_CODE,
   ACTIVE_APPROVAL_STATUSES,
-  HR_DEPT_CODE,
   MEMBER_STATUS_LABELS,
+  OFFSITE_STEP_DEPT_CODES,
   OFFSITE_STALE_MESSAGE,
   SELF_APPROVAL_LABEL,
   STATUS_LABELS,
@@ -81,7 +80,7 @@ const ALLOWED_FROM = {
 };
 
 /** Department whose head signs each step. */
-const STEP_DEPT = { 2: ACCOUNTING_DEPT_CODE, 3: HR_DEPT_CODE };
+const STEP_DEPT = OFFSITE_STEP_DEPT_CODES;
 const STEP_DEPT_LABEL = { 2: "ฝ่ายบัญชี", 3: "ฝ่ายบุคคล" };
 
 const VIEWER_FIELDS = `_id ${EMPLOYEE_NAME_FIELDS} position department departmentId userId`;

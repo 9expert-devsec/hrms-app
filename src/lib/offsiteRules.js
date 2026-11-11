@@ -19,6 +19,8 @@ export const TOO_MANY_MEMBERS_MESSAGE = `เพิ่มสมาชิกได
 /** Department codes whose heads sign steps 2 and 3. */
 export const ACCOUNTING_DEPT_CODE = "AC";
 export const HR_DEPT_CODE = "HR";
+/** Department (code) whose head signs each approval step — the off-site head resolver's map. */
+export const OFFSITE_STEP_DEPT_CODES = { 2: ACCOUNTING_DEPT_CODE, 3: HR_DEPT_CODE };
 
 export const STATUS_LABELS = {
   draft: "ฉบับร่าง",

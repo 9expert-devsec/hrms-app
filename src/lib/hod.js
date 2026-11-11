@@ -13,6 +13,9 @@ import Employee from "@/models/Employee";
  */
 
 export const HEAD_FIELDS = "_id firstName lastName firstNameTh lastNameTh empAutoId userId";
+// The HOD page also shows the head's avatar, title and position (fields the
+// head-candidates list already gives that page).
+const LIST_HEAD_FIELDS = `${HEAD_FIELDS} titleTh photoUrl position`;
 
 /** Thrown for bad input; `status` is the HTTP status to answer with. */
 export class HodError extends Error {
@@ -36,8 +39,11 @@ function toItem(dept) {
           lastName: head.lastName ?? "",
           firstNameTh: head.firstNameTh ?? "",
           lastNameTh: head.lastNameTh ?? "",
+          titleTh: head.titleTh ?? "",
           empAutoId: head.empAutoId ?? null,
           userId: head.userId ? String(head.userId) : null,
+          photoUrl: head.photoUrl ?? null,
+          position: head.position ?? "",
         }
       : null,
     headHasAccount: !!head?.userId,
@@ -80,7 +86,7 @@ export async function setDepartmentHead(departmentId, employeeId, { actor } = {}
     { new: true }
   )
     .select("_id code name color headOfDepartment")
-    .populate("headOfDepartment", HEAD_FIELDS)
+    .populate("headOfDepartment", LIST_HEAD_FIELDS)
     .lean();
   return toItem(updated);
 }
@@ -115,7 +121,7 @@ export async function listHeadCandidates(q = "") {
 export async function listDepartmentHeads() {
   const depts = await Department.find({})
     .select("_id code name color headOfDepartment")
-    .populate("headOfDepartment", HEAD_FIELDS)
+    .populate("headOfDepartment", LIST_HEAD_FIELDS)
     .sort({ code: 1 })
     .lean();
   return depts.map(toItem);

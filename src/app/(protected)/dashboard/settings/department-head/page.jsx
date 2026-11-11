@@ -1,44 +1,55 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { canAccess } from "@/lib/rbac/access";
-import NoAccountBadge from "../../../../../components/NoAccountBadge";
-import Avatar from "../../../../../components/Avatar";
+import { OFFSITE_STEP_DEPT_CODES } from "@/lib/offsiteRules";
+import PersonAvatar from "../../../../../components/PersonAvatar";
 import {
-  ShieldCheck,
-  Users,
-  Search,
-  Pencil,
-  Trash2,
-  Loader2,
-  X,
-  Check,
-  User,
-} from "lucide-react";
-import { employeeDisplayName } from "@/lib/employeeName";
-
-/* ── design tokens ─────────────────────────────────── */
-const NAVY = "#0D1B2A";
-const BLUE = "#005CFF";
-const SLATE = "#5E6A7E";
-const ICE = "#F8FAFD";
-const CARD = {
-  background: "#FFFFFF",
-  border: "1px solid rgba(0,92,255,0.10)",
-  borderRadius: "16px",
-  boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
-};
+  BLUE,
+  BTN_DANGER,
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  CodeChip,
+  FOCUS,
+  INPUT,
+  LINE,
+  MUTED,
+  NAVY,
+  NoAccountPill,
+  PAGE,
+  PAGE_BG,
+  SLATE,
+} from "../../../../../components/hr/hrUi";
+import { Check, Info, Loader2, Pencil, Search, Trash2, Users, X } from "lucide-react";
+import { employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 
 // Thai name when present, else English (lib/employeeName.js)
-const fullName = (e) => employeeDisplayName(e) || "-";
+const fullName = (e) => employeeFullNameTh(e) || employeeDisplayName(e) || "-";
+const plainName = (e) => employeeDisplayName(e) || "-";
+
+/** Off-site steps whose signer is this department's head (the off-site resolver's map). */
+function offsiteStepsOf(code) {
+  return Object.entries(OFFSITE_STEP_DEPT_CODES)
+    .filter(([, c]) => c === code)
+    .map(([step]) => Number(step));
+}
+
+function StagePill({ children, tone }) {
+  const style = tone === "blue" ? { background: "#EEF4FF", color: BLUE } : { background: "#F1F4F8", color: SLATE };
+  return (
+    <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-semibold" style={style} data-testid="hod-stage">
+      {children}
+    </span>
+  );
+}
 
 /**
- * Settings › กำหนด HOD. Heads live in Department.headOfDepartment (an
+ * Settings › กำหนดหัวหน้าแผนก. Heads live in Department.headOfDepartment (an
  * Employee); this page and the department edit form both write it through
- * lib/hod.js. Any employee may be picked; one without a login account gets
- * a warning badge because they cannot approve in the system.
+ * lib/hod.js. Any employee may be picked; one without a login account is
+ * marked because they cannot approve in the system.
  */
 export default function HodSettingsPage() {
   const router = useRouter();
@@ -47,6 +58,7 @@ export default function HodSettingsPage() {
   // [{ _id, code, name, color, head, headHasAccount }] from /api/department-head
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
 
   /* ── modal state ───────────────────────── */
   const [modal, setModal] = useState(null); // { departmentId, deptCode, deptName, hasHead }
@@ -157,7 +169,7 @@ export default function HodSettingsPage() {
   /* ── clear HOD (superadmin) ────────────── */
   async function handleClear() {
     if (!modal) return;
-    if (!confirm(`ต้องการล้าง HOD ของแผนก ${modal.deptCode} หรือไม่?`)) return;
+    if (!confirm(`ต้องการล้างหัวหน้าแผนก ${modal.deptCode} หรือไม่?`)) return;
 
     setClearing(true);
     try {
@@ -176,6 +188,14 @@ export default function HodSettingsPage() {
     }
   }
 
+  const rows = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return departments;
+    return departments.filter((d) =>
+      [d.code, d.name, d.head ? fullName(d.head) : "", d.head ? `${d.head.firstName} ${d.head.lastName}` : ""].some((v) => (v || "").toLowerCase().includes(s))
+    );
+  }, [departments, q]);
+
   if (authStatus === "loading") {
     return (
       <div className="flex items-center justify-center py-24">
@@ -185,116 +205,76 @@ export default function HodSettingsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }} className="space-y-6">
-      {/* ── Header ───────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl"
-          style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
-        >
-          <ShieldCheck size={22} strokeWidth={1.8} />
+    <div className={PAGE} style={PAGE_BG}>
+      <div className="mx-auto max-w-[1360px] space-y-4 md:space-y-5">
+        {/* ── Info ─────────────────────────────── */}
+        <div className="flex gap-3 rounded-[14px] p-5 text-[14px]" style={{ background: "#EEF4FF", color: NAVY }} data-testid="hod-info">
+          <Info size={18} aria-hidden className="mt-0.5 shrink-0" style={{ color: BLUE }} />
+          <p>
+            หัวหน้าแผนกเป็นผู้อนุมัติใบลาขั้นแรกของคนในแผนก หัวหน้าฝ่ายบัญชีและฝ่ายบุคคลยังเป็นผู้ลงนามขั้นที่ 2 และ 3 ของคำขอทำงานนอกสถานที่
+            หัวหน้าแผนกไม่จำเป็นต้องมีบัญชีผู้ใช้ แต่จะลงนามในระบบไม่ได้จนกว่าจะมีบัญชี
+          </p>
         </div>
-        <div>
-          <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>กำหนด Head of Department</h1>
-          <p style={{ color: SLATE, fontSize: 13 }}>ระบุผู้รับผิดชอบอนุมัติการลาของแต่ละแผนก</p>
-        </div>
+
+        {/* ── Search ───────────────────────────── */}
+        <label className="relative block">
+          <span className="sr-only">ค้นหาแผนกหรือชื่อหัวหน้า</span>
+          <Search size={18} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: MUTED }} />
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาแผนกหรือชื่อหัวหน้า" className={`${INPUT} pl-10`} data-testid="hod-search" />
+        </label>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={24} className="animate-spin" style={{ color: BLUE }} />
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rounded-2xl bg-white p-10 text-center text-[14px]" style={{ border: `1px solid ${LINE}`, color: SLATE }}>
+            ไม่พบข้อมูลแผนก
+          </div>
+        ) : (
+          <>
+            {/* tablet / desktop: table */}
+            <div className="hidden overflow-hidden rounded-2xl bg-white md:block" style={{ border: `1px solid ${LINE}` }} data-testid="hod-table">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="text-[13px]" style={{ background: "#F8FAFD", color: SLATE }}>
+                    <th className="p-4 font-semibold">แผนก</th>
+                    <th className="p-4 font-semibold">หัวหน้าแผนก</th>
+                    <th className="p-4 font-semibold">ใช้ในขั้นอนุมัติ</th>
+                    <th className="p-4"><span className="sr-only">จัดการ</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((dept) => (
+                    <tr key={dept._id} style={{ borderTop: "1px solid #EEF2F8" }} data-testid="hod-row" data-code={dept.code}>
+                      <td className="p-4 align-middle"><DeptCell dept={dept} /></td>
+                      <td className="p-4 align-middle"><HeadCell dept={dept} /></td>
+                      <td className="p-4 align-middle"><Stages dept={dept} /></td>
+                      <td className="p-4 text-right align-middle"><ActionButton dept={dept} onClick={() => openModal(dept)} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* phone: cards */}
+            <div className="space-y-3 md:hidden" data-testid="hod-cards">
+              {rows.map((dept) => (
+                <div key={dept._id} className="space-y-3 rounded-2xl bg-white p-4" style={{ border: `1px solid ${LINE}` }} data-testid="hod-card" data-code={dept.code}>
+                  <DeptCell dept={dept} />
+                  <HeadCell dept={dept} />
+                  <Stages dept={dept} />
+                  <div className="flex justify-end">
+                    <ActionButton dept={dept} onClick={() => openModal(dept)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* ── Table ─────────────────────────────── */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={24} className="animate-spin" style={{ color: BLUE }} />
-        </div>
-      ) : (
-        <div style={{ ...CARD, overflowX: "auto" /* own horizontal scroll: a narrow screen scrolls the table, not the page */ }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: ICE }}>
-                <th style={thStyle}>แผนก</th>
-                <th style={thStyle}>HOD ปัจจุบัน</th>
-                <th style={{ ...thStyle, textAlign: "center", width: 100 }}>จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {departments.map((dept) => (
-                <tr key={dept._id} style={{ borderBottom: "1px solid rgba(0,92,255,0.08)" }}>
-                  <td style={tdStyle}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="flex h-8 w-8 items-center justify-center rounded-lg"
-                        style={{
-                          background: dept.color ? `${dept.color}18` : "rgba(0,92,255,0.08)",
-                          color: dept.color || BLUE,
-                          fontSize: 11,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {dept.code}
-                      </div>
-                      <span style={{ color: NAVY, fontSize: 14, fontWeight: 600 }}>{dept.name}</span>
-                    </div>
-                  </td>
-
-                  <td style={tdStyle}>
-                    {dept.head ? (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div
-                          className="flex h-7 w-7 items-center justify-center rounded-full"
-                          style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
-                        >
-                          <User size={13} />
-                        </div>
-                        <span style={{ color: NAVY, fontSize: 13, fontWeight: 500 }}>
-                          {fullName(dept.head)}
-                        </span>
-                        {dept.head.empAutoId != null && (
-                          <span style={{ color: SLATE, fontSize: 11 }}>#{dept.head.empAutoId}</span>
-                        )}
-                        {!dept.headHasAccount && <NoAccountBadge />}
-                      </div>
-                    ) : (
-                      <span
-                        className="inline-flex rounded-full px-2.5 py-0.5"
-                        style={{ background: "#FEF3C7", color: "#92400E", fontSize: 11, fontWeight: 600 }}
-                      >
-                        ยังไม่ได้กำหนด
-                      </span>
-                    )}
-                  </td>
-
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    <button
-                      onClick={() => openModal(dept)}
-                      className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5"
-                      style={{
-                        border: `1px solid ${BLUE}20`,
-                        color: BLUE,
-                        fontSize: 12,
-                        fontWeight: 500,
-                        background: `${BLUE}08`,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Pencil size={13} />
-                      แก้ไข
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {departments.length === 0 && (
-                <tr>
-                  <td colSpan={3} style={{ textAlign: "center", padding: 40, color: SLATE }}>
-                    ไม่พบข้อมูลแผนก
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ── Edit Modal ────────────────────────── */}
+      {/* ── Picker dialog ─────────────────────── */}
       {modal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -302,36 +282,31 @@ export default function HodSettingsPage() {
           onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}
         >
           <div
-            className="w-full max-w-md rounded-2xl p-6"
-            style={{
-              background: "#FFFFFF",
-              boxShadow: "0 16px 48px rgba(13,27,42,0.2)",
-              maxHeight: "80vh",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hod-dialog-title"
+            className="flex w-full max-w-md flex-col rounded-[20px] bg-white p-5 md:p-6"
+            style={{ border: `1px solid ${LINE}`, boxShadow: "0 16px 48px rgba(13,27,42,0.2)", maxHeight: "85vh" }}
+            data-testid="hod-dialog"
           >
-            {/* Modal header */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
-                กำหนดหัวหน้าแผนก — แผนก {modal.deptCode}
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <h3 id="hod-dialog-title" className="text-[17px] font-bold" style={{ color: NAVY }}>
+                กำหนดหัวหน้าแผนก — {modal.deptName}
               </h3>
               <button
+                type="button"
                 onClick={() => setModal(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg"
-                style={{ background: ICE, color: SLATE, cursor: "pointer", border: "none" }}
+                aria-label="ปิด"
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-[10px] md:h-9 md:w-9 ${FOCUS}`}
+                style={{ background: "#F5F8FF", color: SLATE }}
               >
-                <X size={18} />
+                <X size={18} aria-hidden />
               </button>
             </div>
 
-            {/* Search */}
-            <div className="relative mb-3">
-              <Search
-                size={16}
-                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: SLATE }}
-              />
+            <label className="relative mb-2 block">
+              <span className="sr-only">ค้นหาพนักงาน</span>
+              <Search size={16} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: MUTED }} />
               <input
                 type="text"
                 value={searchQ}
@@ -339,136 +314,69 @@ export default function HodSettingsPage() {
                   setSearchQ(e.target.value);
                   loadCandidates(e.target.value);
                 }}
-                placeholder="ค้นหาพนักงาน..."
-                style={{
-                  width: "100%",
-                  padding: "10px 12px 10px 36px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(0,92,255,0.15)",
-                  fontSize: 14,
-                  color: NAVY,
-                  background: ICE,
-                  outline: "none",
-                }}
+                placeholder="ค้นหาพนักงาน"
+                className={`${INPUT} pl-10`}
+                data-testid="hod-dialog-search"
               />
-            </div>
+            </label>
 
-            <p style={{ color: SLATE, fontSize: 12, marginBottom: 8 }}>
-              แสดงพนักงานทุกคน — หัวหน้าไม่จำเป็นต้องอยู่ในแผนกนี้
-            </p>
+            <p className="mb-2 text-[12px]" style={{ color: SLATE }}>แสดงพนักงานทุกคน — หัวหน้าไม่จำเป็นต้องอยู่ในแผนกนี้</p>
 
-            {/* Candidates list */}
-            <div
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                border: "1px solid rgba(0,92,255,0.08)",
-                borderRadius: 10,
-                marginBottom: 16,
-                maxHeight: 280,
-              }}
-            >
+            <div className="mb-4 min-h-0 flex-1 overflow-y-auto rounded-xl" style={{ border: `1px solid ${LINE}`, maxHeight: 300 }}>
               {loadingCandidates ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 size={20} className="animate-spin" style={{ color: BLUE }} />
                 </div>
               ) : candidates.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8" style={{ color: SLATE, fontSize: 13 }}>
-                  <Users size={24} style={{ opacity: 0.4, marginBottom: 8 }} />
+                <div className="flex flex-col items-center justify-center py-8 text-[13px]" style={{ color: SLATE }}>
+                  <Users size={24} aria-hidden style={{ opacity: 0.4, marginBottom: 8 }} />
                   ไม่พบพนักงานที่ตรงเงื่อนไข
                 </div>
               ) : (
                 candidates.map((emp) => {
                   const isSelected = selectedEmp?._id === emp._id;
-                  const empName = fullName(emp);
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={emp._id}
                       onClick={() => setSelectedEmp(emp)}
-                      style={{
-                        padding: "10px 14px",
-                        cursor: "pointer",
-                        background: isSelected ? `${BLUE}0A` : "transparent",
-                        borderBottom: "1px solid rgba(0,92,255,0.06)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
+                      aria-pressed={isSelected}
+                      className={`flex min-h-[52px] w-full items-center gap-2.5 px-3.5 py-2.5 text-left ${FOCUS}`}
+                      style={{ background: isSelected ? "#EEF4FF" : "transparent", borderBottom: "1px solid #EEF2F8" }}
+                      data-testid="hod-candidate"
+                      data-id={emp._id}
                     >
-                      {emp.photoUrl ? (
-                        <Avatar src={emp.photoUrl} alt={empName} size={32} />
-                      ) : (
-                        <div
-                          className="flex h-8 w-8 items-center justify-center rounded-full"
-                          style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
-                        >
-                          <User size={14} />
-                        </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: NAVY, fontSize: 14, fontWeight: 500 }}>{empName}</div>
-                        <div style={{ color: SLATE, fontSize: 12 }}>
-                          {emp.department} • {emp.position} • Level {emp.level}
-                        </div>
-                        {!emp.userId && <NoAccountBadge className="mt-1" />}
-                      </div>
-                      {isSelected && <Check size={18} style={{ color: BLUE, flexShrink: 0 }} />}
-                    </div>
+                      <PersonAvatar src={emp.photoUrl} name={plainName(emp)} size={32} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[14px] font-semibold" style={{ color: NAVY }}>{plainName(emp)}</span>
+                          {!emp.userId && <NoAccountPill />}
+                        </span>
+                        <span className="block text-[12px]" style={{ color: SLATE }}>
+                          {[emp.department, emp.position, emp.level ? `Level ${emp.level}` : ""].filter(Boolean).join(" • ")}
+                        </span>
+                      </span>
+                      {isSelected && <Check size={18} aria-hidden style={{ color: BLUE, flexShrink: 0 }} />}
+                    </button>
                   );
                 })
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 justify-between">
+            <div className="flex flex-wrap justify-between gap-3">
               <div>
                 {canClear && modal.hasHead && (
-                  <button
-                    onClick={handleClear}
-                    disabled={clearing}
-                    className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 disabled:opacity-50"
-                    style={{
-                      background: "#FEE2E2",
-                      color: "#991B1B",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {clearing ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                  <button type="button" onClick={handleClear} disabled={clearing} className={BTN_DANGER} data-testid="hod-clear">
+                    {clearing ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} aria-hidden />}
                     ล้างหัวหน้า
                   </button>
                 )}
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setModal(null)}
-                  className="rounded-xl px-4 py-2.5"
-                  style={{
-                    border: "1px solid rgba(0,92,255,0.10)",
-                    color: NAVY,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    background: "#FFFFFF",
-                    cursor: "pointer",
-                  }}
-                >
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setModal(null)} className={BTN_SECONDARY}>
                   ยกเลิก
                 </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !selectedEmp}
-                  className="flex items-center gap-1.5 rounded-xl px-5 py-2.5 disabled:opacity-50"
-                  style={{
-                    background: BLUE,
-                    color: "#FFFFFF",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    border: "none",
-                    cursor: selectedEmp ? "pointer" : "not-allowed",
-                  }}
-                >
+                <button type="button" onClick={handleSave} disabled={saving || !selectedEmp} className={BTN_PRIMARY} data-testid="hod-save">
                   {saving && <Loader2 size={15} className="animate-spin" />}
                   บันทึก
                 </button>
@@ -481,16 +389,12 @@ export default function HodSettingsPage() {
       {/* ── Toast ─────────────────────────────── */}
       {toast && (
         <div
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl px-5 py-3"
-          style={{
-            background: toast.type === "error" ? "#991B1B" : "#065F46",
-            color: "#FFFFFF",
-            fontSize: 14,
-            fontWeight: 500,
-            boxShadow: "0 8px 32px rgba(13,27,42,0.25)",
-          }}
+          role="status"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-medium text-white"
+          style={{ background: toast.type === "error" ? "#991B1B" : "#065F46", boxShadow: "0 8px 32px rgba(13,27,42,0.25)" }}
+          data-testid="hod-toast"
         >
-          {toast.type === "error" ? <X size={16} /> : <Check size={16} />}
+          {toast.type === "error" ? <X size={16} aria-hidden /> : <Check size={16} aria-hidden />}
           {toast.message}
         </div>
       )}
@@ -498,17 +402,56 @@ export default function HodSettingsPage() {
   );
 }
 
-/* ── table styles ─────────────────────────────── */
-const thStyle = {
-  padding: "12px 16px",
-  textAlign: "left",
-  fontSize: 13,
-  fontWeight: 600,
-  color: "#5E6A7E",
-  borderBottom: "1px solid rgba(0,92,255,0.08)",
-};
+function DeptCell({ dept }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <CodeChip code={dept.code} color={dept.color} />
+      <span className="min-w-0 break-words text-[15px] font-semibold" style={{ color: NAVY }}>{dept.name}</span>
+    </div>
+  );
+}
 
-const tdStyle = {
-  padding: "14px 16px",
-  fontSize: 14,
-};
+function HeadCell({ dept }) {
+  if (!dept.head) {
+    return <span className="text-[14px] font-medium" style={{ color: "#92400E" }} data-testid="hod-no-head">ยังไม่ได้กำหนด</span>;
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <PersonAvatar src={dept.head.photoUrl} name={plainName(dept.head)} size={36} />
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="break-words text-[14px] font-semibold" style={{ color: NAVY }} data-testid="hod-head-name">{fullName(dept.head)}</span>
+          {!dept.headHasAccount && <NoAccountPill />}
+        </div>
+        {dept.head.position && <div className="text-[12px]" style={{ color: SLATE }}>{dept.head.position}</div>}
+      </div>
+    </div>
+  );
+}
+
+function Stages({ dept }) {
+  const steps = offsiteStepsOf(dept.code);
+  if (!dept.head && steps.length === 0) return <span className="text-[13px]" style={{ color: SLATE }}>—</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5" data-testid="hod-stages">
+      {dept.head && <StagePill>ใบลา</StagePill>}
+      {steps.map((n) => (
+        <StagePill key={n} tone="blue">นอกสถานที่ ขั้น {n}</StagePill>
+      ))}
+    </div>
+  );
+}
+
+function ActionButton({ dept, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] bg-white px-3 text-[13px] font-semibold md:min-h-[36px] ${FOCUS}`}
+      style={{ border: "1px solid #D6E0F0", color: BLUE }}
+      data-testid="hod-action"
+    >
+      <Pencil size={14} aria-hidden /> {dept.head ? "เปลี่ยน" : "กำหนด"}
+    </button>
+  );
+}

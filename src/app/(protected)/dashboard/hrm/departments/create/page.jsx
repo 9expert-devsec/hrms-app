@@ -4,6 +4,9 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Trash2, ChevronLeft } from "lucide-react";
+import { BTN_PRIMARY, BTN_SECONDARY, INPUT } from "../../../../../../components/hr/hrUi";
+
+const LABEL = "block text-[13px] font-semibold text-[#0D1B2A]";
 
 const LEVEL_LABEL = {
   1: "Newbie (1)",
@@ -151,42 +154,36 @@ export default function DepartmentCreatePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/dashboard/hrm/departments"
-          className="inline-flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-slate-300 ring-1 ring-white/10 hover:bg-white/10"
-        >
-          <ChevronLeft size={16} />
-          Back
-        </Link>
-        <h1 className="text-2xl font-semibold text-slate-100">
-          Create Department
-        </h1>
-      </div>
+    <div className="-m-6 min-h-full px-4 py-4 md:px-8 md:py-7" style={{ background: "#F5F7FB" }}>
+    <div className="mx-auto max-w-[960px] space-y-5">
+      <Link
+        href="/dashboard/hrm/departments"
+        className={`${BTN_SECONDARY} w-fit`}
+      >
+        <ChevronLeft size={16} aria-hidden />
+        กลับไปแผนกและตำแหน่ง
+      </Link>
 
-      <form onSubmit={submit} className="space-y-8">
+      <form onSubmit={submit} className="space-y-5">
         {/* Basic */}
-        <section className="rounded-2xl border border-white/10 bg-[#0F172B] p-5 space-y-4">
+        <section className="space-y-4 rounded-[18px] bg-white p-5" style={{ border: "1px solid #E3EAF5" }}>
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="space-y-1">
-              <span className="text-sm text-slate-300">Department name</span>
+              <span className={LABEL}>ชื่อแผนก</span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-xl bg-white/5 text-slate-200 border border-white/10 px-3 py-2.5"
+                className={INPUT}
                 placeholder="Information Technology"
               />
             </label>
 
             <label className="space-y-1">
-              <span className="text-sm text-slate-300">
-                Short code (prefix)
-              </span>
+              <span className={LABEL}>รหัสแผนก (code)</span>
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full rounded-xl bg-white/5 text-slate-200 border border-white/10 px-3 py-2.5 uppercase"
+                className={`${INPUT} uppercase`}
                 placeholder="IT"
               />
             </label>
@@ -194,24 +191,24 @@ export default function DepartmentCreatePage() {
 
           <div className="grid sm:grid-cols-2 gap-4 items-center">
             <label className="space-y-1">
-              <span className="text-sm text-slate-300">Color</span>
+              <span className={LABEL}>สี</span>
               <div className="flex items-center gap-3">
                 <input
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-14 rounded-md bg-transparent"
+                  className="h-11 w-14 rounded-xl border border-[#D6E0F0] bg-white p-1"
                 />
-                <span className="text-slate-400 text-sm">{color}</span>
+                <span className="text-sm" style={{ color: "#5E6A7E" }}>{color}</span>
               </div>
             </label>
 
             <label className="space-y-1">
-              <span className="text-sm text-slate-300">Description</span>
+              <span className={LABEL}>คำอธิบาย</span>
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full rounded-xl bg-white/5 text-slate-200 border border-white/10 px-3 py-2.5"
+                className={INPUT}
                 placeholder="คำอธิบายแผนก (ถ้ามี)"
               />
             </label>
@@ -219,8 +216,8 @@ export default function DepartmentCreatePage() {
         </section>
 
         {/* Allow Levels */}
-        <section className="rounded-2xl border border-white/10 bg-[#0F172B] p-5">
-          <h3 className="text-slate-200 font-medium mb-3">Allow levels</h3>
+        <section className="rounded-[18px] bg-white p-5" style={{ border: "1px solid #E3EAF5" }}>
+          <h3 className="mb-3 text-[15px] font-semibold" style={{ color: "#0D1B2A" }}>Level ที่อนุญาต</h3>
           <div className="flex flex-wrap gap-2">
             {[1, 2, 3, 4, 5, 6].map((n) => {
               const active = allowLevels.includes(n);
@@ -229,35 +226,33 @@ export default function DepartmentCreatePage() {
                   key={n}
                   type="button"
                   onClick={() => toggleLevel(n)}
-                  className={`rounded-full px-3 py-1.5 text-sm ring-1 transition ${
-                    active
-                      ? "bg-indigo-600/90 text-white ring-white/10"
-                      : "bg-white/5 text-slate-300 ring-white/10 hover:bg-white/10"
-                  }`}
+                  aria-pressed={active}
+                  className="min-h-[36px] rounded-full px-3 text-sm font-medium transition"
+                  style={active ? { background: "#005CFF", color: "#FFFFFF" } : { background: "#FFFFFF", color: "#0D1B2A", border: "1px solid #D6E0F0" }}
                 >
                   {LEVEL_LABEL[n]}
                 </button>
               );
             })}
           </div>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs" style={{ color: "#5E6A7E" }}>
             * Level ที่อนุญาตตรงนี้จะถูกใช้เป็นตัวเลือกให้กับตำแหน่งด้านล่าง
           </p>
         </section>
 
         {/* Positions */}
-        <section className="rounded-2xl border border-white/10 bg-[#0F172B] p-5">
+        <section className="rounded-[18px] bg-white p-5" style={{ border: "1px solid #E3EAF5" }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-slate-200 font-medium">Positions</h3>
+            <h3 className="text-[15px] font-semibold" style={{ color: "#0D1B2A" }}>ตำแหน่ง</h3>
             <button
               type="button"
               onClick={onAddRow}
               disabled={!canAddMore}
-              className="inline-flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-slate-200 ring-1 ring-white/10 hover:bg-white/10 disabled:opacity-50"
+              className={BTN_SECONDARY}
               title="เพิ่มตำแหน่ง (สูงสุด 10)"
             >
-              <Plus size={16} />
-              Add
+              <Plus size={16} aria-hidden />
+              เพิ่มตำแหน่ง
             </button>
           </div>
 
@@ -271,7 +266,7 @@ export default function DepartmentCreatePage() {
                   value={row.name}
                   onChange={(e) => onChangeRow(idx, { name: e.target.value })}
                   placeholder={`ตำแหน่ง #${idx + 1} เช่น IT Support`}
-                  className="w-full rounded-xl bg-white/5 text-slate-200 border border-white/10 px-3 py-2.5"
+                  className={INPUT}
                 />
 
                 <select
@@ -281,7 +276,7 @@ export default function DepartmentCreatePage() {
                       level: e.target.value ? Number(e.target.value) : null,
                     })
                   }
-                  className="select-dark appearance-none pr-10 w-full"
+                  className={INPUT}
                 >
                   <option value="">เลือก Level</option>
                   {levelOptions
@@ -296,48 +291,44 @@ export default function DepartmentCreatePage() {
                 <button
                   type="button"
                   onClick={() => onRemoveRow(idx)}
-                  className="grid place-items-center rounded-xl bg-white/5 text-slate-300 ring-1 ring-white/10 hover:bg-white/10"
+                  className="grid h-11 w-11 place-items-center rounded-xl border border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C] hover:bg-[#FEE2E2]"
                   title="ลบแถวนี้"
+                  aria-label={`ลบตำแหน่งแถวที่ ${idx + 1}`}
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} aria-hidden />
                 </button>
               </div>
             ))}
 
             {positions.length === 0 && (
-              <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-slate-400">
-                ยังไม่มีตำแหน่ง — กดปุ่ม Add เพื่อเพิ่มรายการ
+              <div className="rounded-xl border border-dashed border-[#D6E0F0] p-8 text-center text-sm" style={{ color: "#5E6A7E" }}>
+                ยังไม่มีตำแหน่ง — กดปุ่ม เพิ่มตำแหน่ง เพื่อเพิ่มรายการ
               </div>
             )}
           </div>
-          <p className="mt-2 text-xs text-slate-400">
-            * จำกัดสูงสุด 10 ตำแหน่ง และ Level ของตำแหน่งต้องอยู่ใน Allow levels
+          <p className="mt-2 text-xs" style={{ color: "#5E6A7E" }}>
+            * จำกัดสูงสุด 10 ตำแหน่ง และ Level ของตำแหน่งต้องอยู่ใน Level ที่อนุญาต
           </p>
         </section>
 
         {/* Error + Submit */}
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">
+          <div role="alert" className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
             {error}
           </div>
         )}
 
         <div className="flex items-center justify-end gap-3">
-          <Link
-            href="/dashboard/hrm/departments"
-            className="rounded-xl bg-white/5 px-4 py-2.5 text-slate-300 ring-1 ring-white/10 hover:bg-white/10"
-          >
-            Cancel
+          <Link href="/dashboard/hrm/departments" className={BTN_SECONDARY}>
+            ยกเลิก
           </Link>
-          <button
-            type="submit"
-            disabled={!isValid || saving}
-            className="rounded-xl bg-indigo-600/90 hover:bg-indigo-600 px-4 py-2.5 text-white font-medium ring-1 ring-white/10 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Create Department"}
+          <button type="submit" disabled={!isValid || saving} className={BTN_PRIMARY}>
+            {!saving && <Plus size={16} aria-hidden />}
+            {saving ? "กำลังบันทึก..." : "เพิ่มแผนก"}
           </button>
         </div>
       </form>
+    </div>
     </div>
   );
 }

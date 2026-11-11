@@ -2,138 +2,99 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Pencil, Search, Users } from "lucide-react";
+import { BLUE, CodeChip, FOCUS, INPUT, LINE, MUTED, NAVY, SLATE } from "../../../../../../components/hr/hrUi";
 
-const LEVEL_LABEL = {
-  1: "Newbie",
-  2: "Junior",
-  3: "Senior",
-  4: "Lead",
-  5: "Manager",
-  6: "CEO/COO",
-};
-
-export default function DepartmentsClient({ initialItems, canEdit = false }) {
+/** แผนกและตำแหน่ง cards + search (name, code, description). */
+export default function DepartmentsClient({ items, canEdit = false }) {
   const [q, setQ] = useState("");
 
-  const items = useMemo(() => {
+  const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return initialItems;
-    return initialItems.filter((d) => {
-      const name = d.name?.toLowerCase() ?? "";
-      const code = d.code?.toLowerCase() ?? "";
-      const desc = d.description?.toLowerCase() ?? "";
-      return name.includes(s) || code.includes(s) || desc.includes(s);
-    });
-  }, [q, initialItems]);
+    if (!s) return items;
+    return items.filter((d) => [d.name, d.code, d.description].some((v) => (v || "").toLowerCase().includes(s)));
+  }, [q, items]);
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="relative">
+      <label className="relative block">
+        <span className="sr-only">ค้นหาแผนก</span>
+        <Search size={18} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: MUTED }} />
         <input
+          type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, code, description..."
-          className="w-full rounded-xl px-4 py-2.5 focus:outline-none"
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid rgba(0,92,255,0.12)",
-            color: "#0D1B2A",
-          }}
+          placeholder="ค้นหาชื่อแผนก รหัส หรือคำอธิบาย"
+          className={`${INPUT} pl-10`}
+          data-testid="dept-search"
         />
-        <Search className="absolute right-3 top-2.5 h-5 w-5" style={{ color: "#5E6A7E" }} />
-      </div>
+      </label>
 
-      {/* Grid */}
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {items.map((d) => (
-          <li
-            key={d._id}
-            className="transition-all duration-200 hover:-translate-y-0.5"
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid rgba(0,92,255,0.10)",
-              borderRadius: "16px",
-              boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
-              padding: "16px",
-            }}
-          >
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="inline-flex h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: d.color || "#005CFF" }}
-                    aria-hidden
-                  />
-                  <span style={{ color: "#5E6A7E", fontSize: "13px" }}>{d.code}</span>
-                </div>
-                <h3 style={{ color: "#0D1B2A", fontWeight: 600, fontSize: "17px" }}>
-                  {d.name}
-                </h3>
-                <div style={{ color: "#5E6A7E", fontSize: "13px" }}>
-                  {Number(d._empCount ?? 0)}{" "}
-                  {Number(d._empCount ?? 0) === 1 ? "person" : "people"}
-                </div>
+      {shown.length === 0 ? (
+        <div className="rounded-2xl bg-white p-10 text-center text-[14px]" style={{ border: `1px solid ${LINE}`, color: SLATE }} data-testid="dept-empty">
+          ไม่พบแผนกที่ตรงกับการค้นหา
+        </div>
+      ) : (
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {shown.map((d) => (
+            <li
+              key={d._id}
+              className="flex flex-col gap-3.5 rounded-[18px] bg-white px-5 py-5"
+              style={{ border: `1px solid ${LINE}` }}
+              data-testid="dept-card"
+              data-code={d.code}
+            >
+              <div className="flex items-center gap-2.5">
+                <CodeChip code={d.code} color={d.color} />
+                <h2 className="min-w-0 flex-1 break-words text-[16px] font-semibold" style={{ color: NAVY }} data-testid="dept-name">{d.name}</h2>
+                {canEdit && (
+                  <Link
+                    href={`/dashboard/hrm/departments/${d._id}/edit`}
+                    aria-label={`แก้ไขแผนก ${d.name}`}
+                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-[10px] md:h-9 md:w-9 ${FOCUS}`}
+                    style={{ background: "#F5F8FF", color: BLUE }}
+                    data-testid="dept-edit"
+                  >
+                    <Pencil size={16} aria-hidden />
+                  </Link>
+                )}
               </div>
 
-              {canEdit && (
-                <Link
-                  href={`/dashboard/hrm/departments/${d._id}/edit`}
-                  className="touch-40 inline-flex items-center justify-center no-underline text-sm transition-colors duration-150"
-                  style={{ color: "#005CFF", fontWeight: 500 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#0D1B2A"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "#005CFF"; }}
-                >
-                  Edit
-                </Link>
-              )}
-            </div>
+              {d.description && <p className="text-[13px]" style={{ color: SLATE }} data-testid="dept-desc">{d.description}</p>}
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(d.allowLevels ?? d.allowedLevels ?? []).map((lv) => (
-                <span
-                  key={lv}
-                  title={`Level ${lv}`}
-                  style={{
-                    background: "#F8FAFD",
-                    border: "1px solid rgba(0,92,255,0.12)",
-                    color: "#334155",
-                    borderRadius: "99px",
-                    fontSize: "11px",
-                    fontWeight: 500,
-                    padding: "2px 8px",
-                  }}
-                >
-                  {LEVEL_LABEL[lv] ?? lv}
-                </span>
-              ))}
-            </div>
+              <div className="rounded-xl px-3 py-2.5" style={{ background: "#FFFBEA" }} data-testid="dept-head">
+                {d.headName ? (
+                  <p className="text-[13px]">
+                    <span style={{ color: SLATE }}>หัวหน้าแผนก</span>{" "}
+                    <span className="font-semibold" style={{ color: NAVY }} data-testid="dept-head-name">{d.headName}</span>
+                  </p>
+                ) : (
+                  <p className="text-[13px] font-medium" style={{ color: "#92400E" }}>ยังไม่ได้กำหนดหัวหน้าแผนก</p>
+                )}
+              </div>
 
-            {d.description ? (
-              <p className="mt-3 line-clamp-2" style={{ color: "#475569", fontSize: "13px", margin: 0, marginTop: "12px" }}>
-                {d.description}
+              <p className="flex items-center gap-1.5 text-[13px]" style={{ color: NAVY }} data-testid="dept-count">
+                <Users size={15} aria-hidden style={{ color: SLATE }} /> พนักงาน {d.empCount} คน
               </p>
-            ) : null}
-          </li>
-        ))}
 
-        {items.length === 0 && (
-          <li className="col-span-full">
-            <div
-              className="p-10 text-center"
-              style={{
-                borderRadius: "12px",
-                border: "1px dashed rgba(0,92,255,0.15)",
-                color: "#5E6A7E",
-              }}
-            >
-              ไม่พบข้อมูลที่ค้นหา
-            </div>
-          </li>
-        )}
-      </ul>
+              <div>
+                <p className="text-[12px] font-semibold" style={{ color: SLATE }}>ตำแหน่ง {d.positions.length}</p>
+                {d.positions.length === 0 ? (
+                  <p className="mt-1.5 text-[13px]" style={{ color: SLATE }} data-testid="dept-no-positions">ยังไม่มีตำแหน่ง</p>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="dept-positions">
+                    {d.positions.map((p, i) => (
+                      <span key={`${p}-${i}`} className="rounded-full bg-white px-2.5 py-0.5 text-[12px]" style={{ border: "1px solid #D6E0F0", color: NAVY }}>
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
