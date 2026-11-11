@@ -1,20 +1,22 @@
 // src/app/(protected)/dashboard/hrm/employee-profile/page.jsx
+// Own profile (no ?id) and someone else's (?id=, the slimmed view). Same data
+// and access as before — only the layout changed.
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Building2, ChevronRight, KeyRound, PenLine, Pencil, User } from "lucide-react";
 import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { profileAccess } from "@/lib/rbac/scopes";
 import { departmentIdOf, employeeOfUser } from "@/lib/rbac/scopeQueries";
-import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
+import { getSignature } from "@/lib/offsite";
 import { employeeDisplayName, employeeFullNameTh, employeeNameEn } from "@/lib/employeeName";
-
 import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
+import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
+import { initialsOf } from "./../../../../../components/PersonAvatar";
 import CopyBtn from "./CopyBtn";
-import BackButton from "./BackButton";
-import { Zap, Pencil, KeyRound, PenLine } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +25,23 @@ export const dynamic = "force-dynamic";
 const PROFILE_FIELDS =
   "_id userId photoUrl titleTh firstNameTh lastNameTh firstName lastName nickName phone department departmentId position";
 
+const NAVY = "#0D1B2A";
+const BLUE = "#005CFF";
+const LIME = "#D4F73F";
+const SLATE = "#5E6A7E";
+// #C9D7F0 in the design is 3.64:1 on #005CFF — this is the nearest shade that passes AA (4.54:1).
+const SUBTLE_ON_BLUE = "#E8EEF9";
+
+function photoSrc(u) {
+  if (!u) return null;
+  if (u.startsWith("http") || u.startsWith("data:")) return u;
+  return u.startsWith("/") ? u : `/${u}`;
+}
+
+const clean = (v) => (typeof v === "string" ? v.trim() : "");
+
 export default async function EmployeeProfilePage({ searchParams }) {
   const session = await requirePage("self_profile");
-
   await dbConnect();
 
   const sp = await searchParams;
@@ -39,7 +55,6 @@ export default async function EmployeeProfilePage({ searchParams }) {
     e = await employeeOfUser(session.user.id, PROFILE_FIELDS);
     if (!e) return <UnlinkedNotice />;
   }
-
   if (!e) notFound();
 
   // Self = linked to this account, never an email match.
@@ -55,151 +70,223 @@ export default async function EmployeeProfilePage({ searchParams }) {
   });
   if (!isSelf && !access.canView) notFound();
 
-  // HR (`employees` / superadmin) → the full edit page; the owner without it →
-  // "แก้ไขโปรไฟล์ของฉัน" (photo, nickname, phone only).
-  const canManage = canAccess(session.user, "employees");
-  const editHref = canManage
-    ? `/dashboard/hrm/employee/edit?id=${e._id}`
-    : isSelf
-      ? "/dashboard/hrm/employee-profile/edit"
+  // Own profile → the self-edit page (photo, nickname, phone). Someone else's →
+  // the HR edit page, only for those who may open it (`employees`).
+  const edit = isSelf
+    ? { href: "/dashboard/hrm/employee-profile/edit", label: "แก้ไขโปรไฟล์" }
+    : canAccess(session.user, "employees")
+      ? { href: `/dashboard/hrm/employee/edit?id=${e._id}`, label: "แก้ไขข้อมูลพนักงาน" }
       : null;
-  const editLabel = canManage ? "แก้ไข" : "แก้ไขโปรไฟล์";
 
-  const dept = e.departmentId ? await Department.findById(e.departmentId).select("name code").lean() : null;
-  const departmentLabel = dept?.name || e.department || "-";
+  const [dept, signature] = await Promise.all([
+    e.departmentId ? Department.findById(e.departmentId).select("name code").lean() : null,
+    isSelf ? getSignature(e._id) : null,
+  ]);
 
-  function normalizeAvatar(u) {
-    if (!u) return "/avatar-default.png";
-    if (u.startsWith("http") || u.startsWith("data:")) return u;
-    return u.startsWith("/") ? u : `/${u}`;
-  }
-  const avatar = normalizeAvatar(e.photoUrl);
-  const nameTh = employeeFullNameTh(e) || employeeDisplayName(e) || "-";
+  const department = dept?.name || clean(e.department);
+  const position = clean(e.position);
+  const nickName = clean(e.nickName);
+  const phone = clean(e.phone);
+  const nameEn = employeeNameEn(e);
+  const thaiFull = employeeFullNameTh(e);
+  const display = employeeDisplayName(e);
+  const thaiName = thaiFull || (display && display !== nameEn ? display : "");
+  const heroName = thaiName || nameEn || "—";
+
+  const personal = (
+    <Card title="ข้อมูลส่วนตัว" Icon={User} testid="profile-personal">
+      <Fields>
+        <Field label="ชื่อ-นามสกุล (ไทย)" value={thaiName} />
+        <Field label="ชื่อ-นามสกุล (อังกฤษ)" value={nameEn} />
+        <Field label="ชื่อเล่น" value={nickName} />
+      </Fields>
+    </Card>
+  );
+  const contact = (
+    <Card title="การติดต่อและการทำงาน" Icon={Building2} testid="profile-contact">
+      <Fields>
+        <Field label="เบอร์โทร" value={phone} extra={phone ? <CopyBtn text={phone} /> : null} />
+        <Field label="แผนก" value={department} />
+        <Field label="ตำแหน่ง" value={position} />
+      </Fields>
+    </Card>
+  );
 
   return (
-    <div className="px-6 py-6 container mx-auto space-y-6" style={{ maxWidth: 960 }}>
-      <div className="flex items-center justify-between">
-        <h1 style={{ color: "#0D1B2A", fontSize: "1.5rem", fontWeight: 600 }}>โปรไฟล์</h1>
-        <div className="flex items-center gap-2">
-          <BackButton
-            className="group inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium no-underline transition-all duration-200 hover:-translate-y-0.5"
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid rgba(0,92,255,0.10)",
-              color: "#334155",
-              boxShadow: "0 1px 4px rgba(13,27,42,0.06)",
-            }}
-          />
-          {editHref && (
-            <Link
-              href={editHref}
-              data-testid="profile-edit"
-              className="group inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium no-underline transition-all duration-200 hover:-translate-y-0.5"
-              style={{
-                background: "linear-gradient(135deg, #005CFF, #2486FF)",
-                color: "#FFFFFF",
-                boxShadow: "0 2px 12px rgba(0,92,255,0.3)",
-              }}
-            >
-              <Pencil size={14} /> {editLabel}
-            </Link>
-          )}
-        </div>
-      </div>
+    <div className="-m-6 min-h-full px-4 py-4 md:px-8 md:py-7" style={{ background: "#F5F7FB" }}>
+      <div className="mx-auto max-w-[1360px] space-y-4 md:space-y-6">
+        <Hero name={heroName} nameEn={thaiName ? nameEn : ""} nickName={nickName} position={position} department={department} photo={photoSrc(e.photoUrl)} edit={edit} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* ── Profile card ───────────────────────────── */}
-        <section
-          className="lg:col-span-2 overflow-hidden rounded-3xl"
-          style={{ background: "#FFFFFF", border: "1px solid rgba(0,92,255,0.10)", boxShadow: "0 2px 8px rgba(13,27,42,0.06)" }}
-          data-testid="profile-card"
-        >
-          <div className="h-20" style={{ background: "linear-gradient(135deg, #0D1B2A 0%, #005CFF 60%, #2486FF 100%)" }} />
-          <div className="flex flex-col items-center gap-6 px-6 pb-6 sm:flex-row sm:items-end">
-            <div className="-mt-12 shrink-0">
-              <div className="h-28 w-28 rounded-2xl p-[3px]" style={{ background: "linear-gradient(135deg, #D4F73F, #005CFF, #D4F73F)" }}>
-                <div className="relative h-full w-full overflow-hidden rounded-[13px] bg-white">
-                  {/* Full photo, top-anchored (no face crop on the profile page). */}
-                  <Image src={avatar} alt={nameTh} fill sizes="112px" className="object-cover object-top" />
-                </div>
+        {isSelf ? (
+          // Phone/tablet: one column, contact → personal → signature → account.
+          // Desktop: personal + contact on the left, account + signature on the right.
+          <div className="flex flex-col gap-4 md:gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+            <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
+              <div className="order-2 min-w-0 lg:order-none">{personal}</div>
+              <div className="order-1 min-w-0 lg:order-none">{contact}</div>
+            </div>
+            <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6" data-testid="profile-right">
+              <div className="order-4 min-w-0 lg:order-none">
+                <Card title="บัญชีและความปลอดภัย" Icon={KeyRound} testid="profile-account">
+                  <Link
+                    href="/account/password"
+                    data-testid="profile-password"
+                    className="flex min-h-[44px] items-center gap-3 rounded-[14px] p-3.5 no-underline transition-colors hover:bg-[#EEF4FF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005CFF]"
+                    style={{ background: "#F5F8FF" }}
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white" style={{ color: BLUE }}>
+                      <KeyRound size={16} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-semibold" style={{ color: NAVY }}>เปลี่ยนรหัสผ่าน</span>
+                      <span className="block text-[12px]" style={{ color: SLATE }}>แนะนำให้เปลี่ยนเป็นระยะ</span>
+                    </span>
+                    <ChevronRight size={16} style={{ color: SLATE }} aria-hidden />
+                  </Link>
+                </Card>
+              </div>
+              <div className="order-3 min-w-0 lg:order-none">
+                <SignatureCard png={signature?.png || null} />
               </div>
             </div>
-            <div className="min-w-0 flex-1 text-center sm:text-left">
-              <h2 style={{ color: "#0D1B2A", fontSize: "20px", fontWeight: 700 }}>{nameTh}</h2>
-              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>{e.position || "-"}</p>
-            </div>
           </div>
-
-          <dl className="grid gap-x-6 gap-y-4 border-t px-6 py-5 text-sm sm:grid-cols-2" style={{ borderColor: "rgba(0,92,255,0.08)" }}>
-            <Info label="ชื่อ-นามสกุล" value={nameTh} />
-            <Info label="ชื่อ-นามสกุล (อังกฤษ)" value={employeeNameEn(e) || "-"} />
-            <Info label="ชื่อเล่น" value={e.nickName || "-"} />
-            <Info label="เบอร์โทร" value={e.phone || "-"} copyable={!!e.phone} />
-            <Info label="แผนก" value={departmentLabel} />
-            <Info label="ตำแหน่ง" value={e.position || "-"} />
-          </dl>
-        </section>
-
-        {/* ── Quick actions ──────────────────────────── */}
-        <section
-          className="rounded-2xl p-5 self-start"
-          style={{ background: "#FFFFFF", border: "1px solid rgba(0,92,255,0.10)", boxShadow: "0 2px 8px rgba(13,27,42,0.06)" }}
-        >
-          <h3 className="mb-4 flex items-center gap-2" style={{ color: "#0D1B2A", fontWeight: 600, fontSize: "15px" }}>
-            <span className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: "rgba(0,92,255,0.08)", color: "#005CFF" }}>
-              <Zap size={14} strokeWidth={2} />
-            </span>
-            การดำเนินการ
-          </h3>
-          <div className="flex flex-col gap-2">
-            {editHref ? (
-              <>
-                <QuickActionLink href={editHref} label={canManage ? "แก้ไขข้อมูลพนักงาน" : "แก้ไขโปรไฟล์ของฉัน"} ActionIcon={Pencil} />
-                {/* Own password only (requires the current one); someone
-                    else's is reset with a temporary password on the users
-                    page. Suspending is a users_manage action, not here. */}
-                {isSelf && <QuickActionLink href="/account/password" label="เปลี่ยนรหัสผ่าน" ActionIcon={KeyRound} />}
-                {/* Own signature only (off-site requests are signed with it). */}
-                {isSelf && <QuickActionLink href="/dashboard/hrm/employee-profile/signature" label="แก้ไขลายเซ็น" ActionIcon={PenLine} />}
-              </>
-            ) : (
-              <p style={{ color: "#5E6A7E", fontSize: "14px" }}>ไม่มีรายการ</p>
-            )}
+        ) : (
+          <div className="flex flex-col gap-4 md:gap-6">
+            {personal}
+            {contact}
           </div>
-        </section>
+        )}
       </div>
     </div>
   );
 }
 
-/* ---------- small view helpers (server-safe) ---------- */
-
-function Info({ label, value, copyable = false }) {
-  const v = value ?? "-";
+/* ── A. hero ──────────────────────────────────────────────────── */
+function Hero({ name, nameEn, nickName, position, department, photo, edit }) {
+  const chip = "rounded-full px-3 py-1 text-[13px] font-medium";
   return (
-    <div>
-      <dt style={{ color: "#5E6A7E", fontSize: "12px", fontWeight: 500 }}>{label}</dt>
-      <dd className="mt-1 flex items-center gap-2" style={{ color: "#0D1B2A", fontSize: "15px" }}>
-        <span className="truncate">{v}</span>
-        {copyable && typeof value === "string" && <CopyBtn text={value} />}
+    <section
+      className="relative overflow-hidden rounded-[24px] p-8"
+      style={{ background: "linear-gradient(135deg, #0D1B2A 0%, #005CFF 65%, #2486FF 100%)" }}
+      data-testid="profile-hero"
+    >
+      <Image
+        src="/brand/symbol-statelight.png"
+        alt=""
+        aria-hidden
+        width={380}
+        height={468}
+        sizes="(min-width: 768px) 380px, 240px"
+        priority
+        className="pointer-events-none absolute -top-12 right-[-24px] h-auto w-[240px] select-none md:-top-20 md:right-[-8px] md:w-[380px]"
+        style={{ opacity: 0.14 }}
+        data-testid="profile-watermark"
+      />
+      <div className="relative flex flex-col items-center gap-5 text-center md:flex-row md:gap-7 md:text-left">
+        <div
+          className="relative h-[112px] w-[112px] shrink-0 overflow-hidden rounded-[24px] md:h-[148px] md:w-[148px] md:rounded-[28px]"
+          style={{ border: `3px solid ${LIME}`, background: "#DCE6F7" }}
+          data-testid="profile-photo"
+        >
+          {photo ? (
+            // Full photo, top-anchored (no face crop on the profile page).
+            <Image src={photo} alt={name} fill sizes="148px" className="object-cover object-top" />
+          ) : (
+            <span aria-hidden className="grid h-full w-full place-items-center text-[36px] font-bold md:text-[44px]" style={{ color: BLUE }}>
+              {initialsOf(name)}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words text-[22px] font-bold leading-tight text-white md:text-[30px]" data-testid="profile-name">{name}</h1>
+          {nameEn && (
+            <p className="mt-1 break-words text-[15px] font-medium md:text-[17px]" style={{ color: SUBTLE_ON_BLUE }} data-testid="profile-name-en">
+              {nameEn}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap justify-center gap-2 md:justify-start" data-testid="profile-chips">
+            {nickName && <span className={chip} style={{ background: LIME, color: NAVY }}>ชื่อเล่น {nickName}</span>}
+            {position && <span className={`${chip} text-white`} style={{ background: "rgba(255,255,255,0.14)" }}>{position}</span>}
+            {department && <span className={`${chip} text-white`} style={{ background: "rgba(255,255,255,0.14)" }}>{department}</span>}
+          </div>
+        </div>
+
+        {edit && (
+          <Link
+            href={edit.href}
+            data-testid="profile-edit"
+            className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 text-[15px] font-semibold no-underline transition-colors hover:bg-[#EEF4FF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:w-auto"
+            style={{ color: BLUE }}
+          >
+            <Pencil size={16} aria-hidden /> {edit.label}
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ── B. cards ─────────────────────────────────────────────────── */
+function Card({ title, Icon, action, testid, children }) {
+  return (
+    <section className="rounded-[20px] bg-white px-5 py-[18px] md:px-6 md:py-[22px]" style={{ border: "1px solid #E3EAF5" }} data-testid={testid}>
+      <div className="mb-4 flex items-center gap-2.5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: "#EEF4FF", color: BLUE }}>
+          <Icon size={16} aria-hidden />
+        </span>
+        <h2 className="min-w-0 flex-1 text-[17px] font-bold" style={{ color: NAVY }}>{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Fields({ children }) {
+  return <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">{children}</dl>;
+}
+
+function Field({ label, value, extra = null }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[13px]" style={{ color: SLATE }}>{label}</dt>
+      <dd className="mt-1 flex flex-wrap items-center gap-2 text-[16px] font-medium" style={{ color: NAVY }}>
+        <span className="min-w-0 break-words">{value || "—"}</span>
+        {extra}
       </dd>
     </div>
   );
 }
 
-function QuickActionLink({ href, label, ActionIcon }) {
-  return (
+function SignatureCard({ png }) {
+  const action = (
     <Link
-      href={href}
-      className="group/action flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium no-underline transition-all duration-200 hover:-translate-y-0.5"
-      style={{ background: "#F8FAFD", border: "1px solid rgba(0,92,255,0.08)", color: "#334155" }}
+      href="/dashboard/hrm/employee-profile/signature"
+      data-testid="profile-signature-link"
+      className="inline-flex min-h-[44px] items-center text-[14px] font-medium no-underline hover:underline"
+      style={{ color: BLUE }}
     >
-      {ActionIcon && (
-        <span style={{ color: "#5E6A7E" }}>
-          <ActionIcon size={15} strokeWidth={1.8} />
-        </span>
-      )}
-      {label}
+      {png ? "แก้ไข" : "เพิ่มลายเซ็น"}
     </Link>
+  );
+  return (
+    <Card title="ลายเซ็นของฉัน" Icon={PenLine} action={action} testid="profile-signature">
+      <div
+        className="flex min-h-[106px] flex-col items-center justify-center gap-1.5 rounded-[14px] px-4 py-3 text-center"
+        style={{ background: "#F5F8FF", border: "1px solid #D6E0F0" }}
+      >
+        {png ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- stored PNG data URL, shown in its own ink colour */}
+            <img src={png} alt="ลายเซ็นของฉัน" className="max-h-14 w-auto max-w-full object-contain" data-testid="profile-signature-img" />
+            <span aria-hidden className="block h-px w-[220px] max-w-full" style={{ background: "#9AA5B4" }} />
+            <span className="text-[12px]" style={{ color: SLATE }}>ใช้ในใบลาและเอกสารทำงานนอกสถานที่</span>
+          </>
+        ) : (
+          <span className="text-[14px]" style={{ color: SLATE }} data-testid="profile-signature-empty">ยังไม่มีลายเซ็น</span>
+        )}
+      </div>
+    </Card>
   );
 }
