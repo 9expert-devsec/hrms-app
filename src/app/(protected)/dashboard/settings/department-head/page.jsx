@@ -315,7 +315,7 @@ export default function HodSettingsPage() {
             {/* Modal header */}
             <div className="flex items-center justify-between mb-4">
               <h3 style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
-                กำหนด HOD — แผนก {modal.deptCode}
+                กำหนดหัวหน้าแผนก — แผนก {modal.deptCode}
               </h3>
               <button
                 onClick={() => setModal(null)}

@@ -29,7 +29,7 @@ function lockScroll() {
  * ✕; focus moves into the drawer and back to the button; the page behind
  * does not scroll.
  */
-export default function MobileNav() {
+export default function MobileNav({ account }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef(null);
   const panelRef = useRef(null);
@@ -114,9 +114,9 @@ export default function MobileNav() {
               aria-modal="true"
               aria-label="เมนู"
               data-testid="mobile-nav-drawer"
-              style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 280, maxWidth: "85vw", boxShadow: "8px 0 32px rgba(0,0,0,0.25)", overscrollBehavior: "contain" }}
+              style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 300, maxWidth: "85vw", boxShadow: "8px 0 32px rgba(0,0,0,0.25)", overscrollBehavior: "contain" }}
             >
-              <SidebarPanel variant="drawer" onClose={close} onNavigate={onNavigate} />
+              <SidebarPanel variant="drawer" onClose={close} onNavigate={onNavigate} account={account} />
             </div>
           </div>,
           document.body

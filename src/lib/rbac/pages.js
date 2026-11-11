@@ -53,7 +53,7 @@ export const HRMS_PAGES = [
     pages: [
       { key: "employees", label: "ข้อมูลพนักงาน (ดู/เพิ่ม/แก้ไข)", href: "/dashboard/hrm/employee", match: "prefix" },
       { key: "orgchart", label: "โครงสร้างองค์กร", href: "/dashboard/hrm/orgchart", match: "prefix" },
-      { key: "departments", label: "แผนก/ตำแหน่ง", href: "/dashboard/hrm/departments", match: "prefix" },
+      { key: "departments", label: "แผนกและตำแหน่ง", href: "/dashboard/hrm/departments", match: "prefix" },
     ],
   },
   {

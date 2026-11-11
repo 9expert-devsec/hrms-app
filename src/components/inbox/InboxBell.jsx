@@ -69,7 +69,7 @@ export default function InboxBell() {
         aria-label={total > 0 ? `รอคุณดำเนินการ ${total} รายการ` : "รอคุณดำเนินการ"}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-150 hover:bg-black/5"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full bg-[#F5F7FB] transition-colors duration-150 hover:bg-[#E9EEF6]"
         data-testid="inbox-bell"
       >
         <Bell size={20} style={{ color: NAVY }} aria-hidden="true" />

@@ -1,78 +1,67 @@
-// src/app/components/Topbar.jsx
-// Server Component — ไม่มี event handlers (onFocus/onBlur ใช้ CSS แทน)
+// src/components/Topbar.jsx
+// Server Component: reads the signed-in person's employee record once (photo
+// for the profile control, name / department for the phone drawer).
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import UserMenu from "./UserMenu";
 import InboxBell from "./inbox/InboxBell";
 import MobileNav from "./MobileNav";
+import TopbarTitle from "./TopbarTitle";
 import dbConnect from "@/lib/mongoose";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
+import Department from "@/models/Department";
 
 export default async function Topbar() {
   const session = await getServerSession(authOptions);
 
-  // The linked employee's photo (Employee.userId), never an email match.
-  let livePhoto = null;
+  // The linked employee (Employee.userId), never an email match.
+  let emp = null;
+  let departmentName = "";
   if (session?.user?.id) {
     await dbConnect();
-    const emp = await employeeOfUser(session.user.id, "photoUrl");
-    livePhoto = emp?.photoUrl || null;
+    emp = await employeeOfUser(session.user.id, "photoUrl firstNameTh lastNameTh department departmentId");
+    if (emp?.departmentId) {
+      const dept = await Department.findById(emp.departmentId).select("name").lean();
+      departmentName = dept?.name || "";
+    }
+    departmentName = departmentName || emp?.department || "";
   }
+  const livePhoto = emp?.photoUrl || null;
+  const thaiName = [emp?.firstNameTh, emp?.lastNameTh].filter(Boolean).join(" ");
+  const account = {
+    name: thaiName || session?.user?.name || "",
+    department: departmentName,
+    photoUrl: session?.user?.id ? livePhoto : session?.user?.photoUrl,
+  };
 
   return (
-    <>
-      {/* Inject focus style via <style> tag — no JS needed */}
-      <style>{`
-        .topbar-search:focus {
-          border-color: #005CFF !important;
-          box-shadow: 0 0 0 3px rgba(0,92,255,0.12) !important;
-          outline: none;
-        }
-      `}</style>
+    <header
+      className="sticky top-0 z-40 flex h-16 items-center gap-3 px-4 md:px-6"
+      style={{
+        background: "#FFFFFF",
+        borderBottom: "1px solid rgba(0,92,255,0.08)",
+        boxShadow: "0 1px 4px rgba(13,27,42,0.06)",
+      }}
+    >
+      {/* Phones: ☰ opens the sidebar as a drawer (the rail is hidden below 768 px). */}
+      <MobileNav account={account} />
 
-      <header
-        className="sticky top-0 z-40 h-16 flex items-center gap-4 px-4"
-        style={{
-          background: "#FFFFFF",
-          borderBottom: "1px solid rgba(0,92,255,0.08)",
-          boxShadow: "0 1px 4px rgba(13,27,42,0.06)",
-        }}
-      >
-        {/* Phones: ☰ opens the sidebar as a drawer (the rail is hidden below 768 px). */}
-        <MobileNav />
+      {/* Section name over the page title, from the menu. */}
+      <TopbarTitle />
 
-        {/* Search — desktop only (on phones it took half the bar). */}
-        <div className="hidden md:block flex-1 max-w-xl">
-          <input
-            placeholder="Search here…"
-            className="topbar-search"
-            style={{
-              width: "100%",
-              height: "38px",
-              borderRadius: "10px",
-              background: "#F8FAFD",
-              border: "1px solid rgba(0,92,255,0.12)",
-              padding: "0 1rem",
-              fontSize: "13px",
-              color: "#0D1B2A",
-              outline: "none",
-              transition: "border-color 200ms ease, box-shadow 200ms ease",
-            }}
-          />
-        </div>
-
-        {/* "รอคุณดำเนินการ" bell, then the user menu (ครบเดิม) */}
-        <div className="ml-auto flex items-center gap-2">
-          <InboxBell />
+      {/* "รอคุณดำเนินการ" bell, then the profile control (desktop / tablet; phones use the drawer). */}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <InboxBell />
+        <div className="hidden md:block">
           <UserMenu
             user={{
               ...session.user,
-              photoUrl: session.user.id ? livePhoto : session.user.photoUrl,
+              photoUrl: account.photoUrl,
             }}
           />
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   );
 }

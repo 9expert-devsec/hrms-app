@@ -12,11 +12,8 @@ import useMenuBadges from "./useMenuBadges";
 export default function MobileSidebar({ open, onClose }) {
   const { data, status } = useSession();
   const user = data?.user;
-  // Top-level children of the MAIN group, filtered by the registry.
-  const menu = useMemo(
-    () => filterMenu(menuConfig, user, canOpenPage).flatMap((n) => n.children ?? []),
-    [user]
-  );
+  // Top-level links and sections, filtered by the registry.
+  const menu = useMemo(() => filterMenu(menuConfig, user, canOpenPage), [user]);
   const badges = useMenuBadges(user);
 
   // ล็อก scroll เมื่อเมนูเปิด

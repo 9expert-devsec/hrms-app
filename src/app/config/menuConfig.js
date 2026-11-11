@@ -17,14 +17,19 @@
 //   /dashboard/assets/borrow            /dashboard/assets/maintenance
 //   /dashboard/assets/audit             /dashboard/assets/reports
 //   /dashboard/exit/interview           /dashboard/exit/checklist
-//   /dashboard/exit/archive             /dashboard/settings/users
-//   /dashboard/settings/workflows       /dashboard/settings/integrations
-//   /dashboard/settings/policy-audit
+//   /dashboard/exit/archive             /dashboard/settings/workflows
+//   /dashboard/settings/integrations    /dashboard/settings/policy-audit
+//
+// Round 31: grouped by who uses it. Top level = the แดชบอร์ด link, then one
+// section (`type: "group"`) per audience: ของฉัน, งานอนุมัติ, ฝ่ายบุคคล,
+// เวลาทำงาน, ตั้งค่าระบบ. A section's `icon` is its button on the collapsed
+// rail; `inDevelopment` puts the "กำลังพัฒนา" tag on its header and
+// `defaultCollapsed` starts it closed. pageKeys, hrefs and badge keys did not
+// change — RBAC is exactly what it was.
 import {
-  LayoutDashboard,
+  LayoutGrid,
   UserCircle2,
-  CalendarCheck2,
-  Clock4,
+  User,
   Users,
   Network,
   ShieldCheck,
@@ -47,276 +52,82 @@ import {
   Mail,
 } from "lucide-react";
 
+const link = (key, label, href, icon, pageKey, extra = {}) => ({ key, type: "link", label, href, icon, pageKey, ...extra });
+
 export const menuConfig = [
+  // "/dashboard" is the parent of every route: active only on itself.
+  link("dash", "แดชบอร์ด", "/dashboard", LayoutGrid, "dashboard", { exact: true }),
   {
-    key: "main",
+    key: "me",
     type: "group",
-    label: "MAIN",
+    label: "ของฉัน",
+    icon: User,
     children: [
-      {
-        key: "dash",
-        type: "link",
-        label: "Dashboards",
-        href: "/dashboard",
-        icon: LayoutDashboard,
-        pageKey: "dashboard",
-      },
-
-      {
-        key: "emp",
-        type: "group",
-        label: "พนักงาน (Employee)",
-        icon: Users,
-        children: [
-          {
-            key: "emp-profile",
-            type: "link",
-            icon: UserCircle2,
-            label: "โปรไฟล์ของฉัน",
-            href: "/dashboard/hrm/employee-profile",
-            pageKey: "self_profile",
-          },
-          {
-            key: "emp-my-team",
-            type: "link",
-            icon: Users,
-            label: "ทีมของฉัน",
-            href: "/dashboard/hrm/employee-my-team",
-            pageKey: "self_team",
-          },
-          // {
-          //   key: "emp.leave.request",
-          //   type: "link",
-          //   icon: CalendarCheck2,
-          //   label: "ขอ/ตรวจสอบการลา",
-          //   href: "/dashboard/leave/request",
-          // },
-        ],
-      },
-      {
-        key: "hr",
-        type: "group",
-        label: "HR / Admin",
-        icon: ShieldCheck,
-        children: [
-          {
-            key: "hr.employee.list",
-            type: "link",
-            icon: Users,
-            label: "ข้อมูลพนักงาน",
-            href: "/dashboard/hrm/employee",
-            pageKey: "employees",
-          },
-          {
-            key: "hr.orgchart",
-            type: "link",
-            icon: Network,
-            label: "โครงสร้างองค์กร (Org Chart)",
-            href: "/dashboard/hrm/orgchart",
-            pageKey: "orgchart",
-          },
-        ],
-      },
-      {
-        key: "time",
-        type: "group",
-        label: "เวลา & การทำงาน",
-        icon: Clock4,
-        children: [
-          {
-            key: "time.clock",
-            type: "link",
-            icon: Timer,
-            label: "บันทึกเวลา",
-            href: "/dashboard/attendance/clock",
-            pageKey: "self_clock",
-          },
-          {
-            key: "time.my-attendance",
-            type: "link",
-            icon: CalendarDays,
-            label: "เวลาทำงานของฉัน",
-            href: "/dashboard/attendance/my-attendance",
-            pageKey: "self_attendance",
-          },
-          {
-            key: "time.ot",
-            type: "link",
-            icon: Clock,
-            label: "แจ้ง OT",
-            href: "/dashboard/attendance/ot",
-            pageKey: "self_ot",
-          },
-          {
-            key: "time.offsite",
-            type: "link",
-            icon: MapPin,
-            label: "ทำงานนอกสถานที่",
-            href: "/dashboard/offsite",
-            pageKey: "offsite_self",
-            // Count from components/useMenuBadges.js (invitations waiting for me).
-            badgeKey: "offsite_invites",
-          },
-          {
-            key: "time.offsite-all",
-            type: "link",
-            icon: FolderOpen,
-            label: "คำขอทำงานนอกสถานที่ทั้งหมด",
-            href: "/dashboard/offsite/all",
-            pageKey: "offsite_hr",
-          },
-          {
-            key: "time.email-log",
-            type: "link",
-            icon: Mail,
-            label: "บันทึกการส่งอีเมล",
-            href: "/dashboard/offsite/all/email-log",
-            pageKey: "offsite_hr",
-          },
-          {
-            key: "time.ot-approve",
-            type: "link",
-            icon: CheckSquare,
-            label: "อนุมัติ OT",
-            href: "/dashboard/attendance/ot-approve",
-            pageKey: "ot_approve",
-          },
-          {
-            key: "time.shifts",
-            type: "link",
-            icon: AlarmClock,
-            label: "รูปแบบเวลาทำงาน",
-            href: "/dashboard/attendance/shifts",
-            pageKey: "shifts",
-          },
-          {
-            key: "time.assign-shift",
-            type: "link",
-            icon: UserCog,
-            label: "กำหนดเวลาพนักงาน",
-            href: "/dashboard/attendance/assign-shift",
-            pageKey: "shift_assign",
-          },
-          {
-            key: "time.report",
-            type: "link",
-            icon: BarChart2,
-            label: "รายงานเวลาทำงาน",
-            href: "/dashboard/attendance/report",
-            pageKey: "attendance_report",
-          },
-          {
-            key: "time.holidays",
-            type: "link",
-            icon: CalendarOff,
-            label: "วันหยุด",
-            href: "/dashboard/attendance/holidays",
-            pageKey: "holidays",
-          },
-        ],
-      },
-      {
-        key: "leave",
-        type: "group",
-        label: "การลา",
-        icon: CalendarCheck2,
-        children: [
-          {
-            key: "leave.request",
-            type: "link",
-            icon: FilePlus,
-            label: "ขอลา",
-            href: "/dashboard/leave/request",
-            pageKey: "self_leave_request",
-          },
-          {
-            key: "leave.history",
-            type: "link",
-            icon: ClipboardList,
-            label: "ประวัติการลา",
-            href: "/dashboard/leave/history",
-            pageKey: "self_leave_history",
-          },
-          {
-            key: "leave.balance",
-            type: "link",
-            icon: CalendarDays,
-            label: "วันลาคงเหลือ",
-            href: "/dashboard/leave/balance",
-            pageKey: "self_leave_balance",
-          },
-          {
-            // Also shown to department heads: canOpenPage applies
-            // canOpenLeaveApproval to this key.
-            key: "leave.approve",
-            type: "link",
-            icon: CheckSquare,
-            label: "อนุมัติการลา",
-            href: "/dashboard/leave/approve",
-            pageKey: "leave_approve",
-          },
-          {
-            key: "leave.calendar",
-            type: "link",
-            icon: CalendarRange,
-            label: "ปฏิทินการลา",
-            href: "/dashboard/leave/calendar",
-            pageKey: "leave_calendar",
-          },
-          {
-            key: "leave.document",
-            type: "link",
-            icon: FileText,
-            label: "เอกสารการลา",
-            href: "/dashboard/leave/document",
-            pageKey: "self_leave_document",
-          },
-        ],
-      },
-      {
-        key: "settings",
-        type: "group",
-        label: "การตั้งค่า (System Settings)",
-        icon: UserCog,
-        children: [
-          {
-            key: "settings.org",
-            type: "link",
-            icon: Building2,
-            label: "แผนก/ตำแหน่ง",
-            href: "/dashboard/hrm/departments",
-            pageKey: "departments",
-          },
-          {
-            key: "settings.hod",
-            type: "link",
-            icon: UserCog,
-            label: "กำหนด HOD",
-            href: "/dashboard/settings/department-head",
-            pageKey: "hod_settings",
-          },
-          {
-            key: "settings.users",
-            type: "link",
-            icon: Users,
-            label: "ผู้ใช้",
-            href: "/dashboard/settings/users",
-            pageKey: "users_manage",
-          },
-          {
-            // No registry key on purpose: pageKey null → canOpenPage allows
-            // only the superadmin (same rule the middleware applies).
-            key: "settings.roles",
-            type: "link",
-            icon: KeyRound,
-            label: "บทบาทและสิทธิ์",
-            href: "/dashboard/settings/roles",
-            pageKey: null,
-          },
-        ],
-      },
-
-      // … กลุ่มอื่น ๆ ต่อได้
+      link("emp-profile", "โปรไฟล์ของฉัน", "/dashboard/hrm/employee-profile", UserCircle2, "self_profile"),
+      link("emp-my-team", "ทีมของฉัน", "/dashboard/hrm/employee-my-team", Users, "self_team"),
+      // Count from components/useMenuBadges.js (invitations + approvals waiting for me).
+      link("time.offsite", "ทำงานนอกสถานที่", "/dashboard/offsite", MapPin, "offsite_self", { badgeKey: "offsite_invites" }),
+      link("leave.request", "ขอลา", "/dashboard/leave/request", FilePlus, "self_leave_request"),
+      link("leave.history", "ประวัติการลา", "/dashboard/leave/history", ClipboardList, "self_leave_history"),
+      link("leave.balance", "วันลาคงเหลือ", "/dashboard/leave/balance", CalendarDays, "self_leave_balance"),
+      link("leave.document", "เอกสารการลา", "/dashboard/leave/document", FileText, "self_leave_document"),
+    ],
+  },
+  {
+    key: "approvals",
+    type: "group",
+    label: "งานอนุมัติ",
+    icon: CheckSquare,
+    children: [
+      // Also shown to department heads: canOpenPage applies
+      // canOpenLeaveApproval to this key.
+      link("leave.approve", "อนุมัติการลา", "/dashboard/leave/approve", CheckSquare, "leave_approve"),
+    ],
+  },
+  {
+    key: "hr",
+    type: "group",
+    label: "ฝ่ายบุคคล",
+    icon: ShieldCheck,
+    children: [
+      link("hr.employee.list", "ข้อมูลพนักงาน", "/dashboard/hrm/employee", Users, "employees"),
+      link("hr.orgchart", "โครงสร้างองค์กร", "/dashboard/hrm/orgchart", Network, "orgchart"),
+      link("time.offsite-all", "คำขอทำงานนอกสถานที่ทั้งหมด", "/dashboard/offsite/all", FolderOpen, "offsite_hr"),
+      link("time.email-log", "บันทึกการส่งอีเมล", "/dashboard/offsite/all/email-log", Mail, "offsite_hr"),
+      link("leave.calendar", "ปฏิทินการลา", "/dashboard/leave/calendar", CalendarRange, "leave_calendar"),
+    ],
+  },
+  {
+    // Every key here is `inDevelopment` in the registry: only the superadmin sees it.
+    key: "time",
+    type: "group",
+    label: "เวลาทำงาน",
+    icon: Timer,
+    inDevelopment: true,
+    defaultCollapsed: true,
+    children: [
+      link("time.clock", "บันทึกเวลา", "/dashboard/attendance/clock", Timer, "self_clock"),
+      link("time.my-attendance", "เวลาทำงานของฉัน", "/dashboard/attendance/my-attendance", CalendarDays, "self_attendance"),
+      link("time.ot", "แจ้ง OT", "/dashboard/attendance/ot", Clock, "self_ot"),
+      link("time.ot-approve", "อนุมัติ OT", "/dashboard/attendance/ot-approve", CheckSquare, "ot_approve"),
+      link("time.shifts", "รูปแบบเวลาทำงาน", "/dashboard/attendance/shifts", AlarmClock, "shifts"),
+      link("time.assign-shift", "กำหนดเวลาพนักงาน", "/dashboard/attendance/assign-shift", UserCog, "shift_assign"),
+      link("time.report", "รายงานเวลาทำงาน", "/dashboard/attendance/report", BarChart2, "attendance_report"),
+      link("time.holidays", "วันหยุด", "/dashboard/attendance/holidays", CalendarOff, "holidays"),
+    ],
+  },
+  {
+    key: "settings",
+    type: "group",
+    label: "ตั้งค่าระบบ",
+    icon: UserCog,
+    children: [
+      link("settings.org", "แผนกและตำแหน่ง", "/dashboard/hrm/departments", Building2, "departments"),
+      link("settings.hod", "กำหนดหัวหน้าแผนก", "/dashboard/settings/department-head", UserCog, "hod_settings"),
+      link("settings.users", "ผู้ใช้", "/dashboard/settings/users", Users, "users_manage"),
+      // No registry key on purpose: pageKey null → canOpenPage allows
+      // only the superadmin (same rule the middleware applies).
+      link("settings.roles", "บทบาทและสิทธิ์", "/dashboard/settings/roles", KeyRound, null),
     ],
   },
 ];
@@ -333,4 +144,29 @@ export function filterMenu(nodes, user, isAllowed) {
     }
     return isAllowed(user, node.pageKey) ? [node] : [];
   });
+}
+
+/** Every link of a (filtered) menu, each with its section (null at top level). */
+export function flattenMenu(nodes, section = null) {
+  return nodes.flatMap((node) =>
+    node.type === "group" ? flattenMenu(node.children ?? [], node) : [{ link: node, section }]
+  );
+}
+
+/**
+ * The link `pathname` belongs to: the link whose href is the path itself or
+ * its closest ancestor (segment-aware, longest href wins; `exact` links match
+ * only themselves). `{ link, section }`, or null when nothing matches.
+ */
+export function findActiveLink(nodes, pathname) {
+  if (!pathname) return null;
+  const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  let best = null;
+  for (const entry of flattenMenu(nodes)) {
+    const { href, exact } = entry.link;
+    if (!href) continue;
+    const hit = path === href || (!exact && path.startsWith(`${href}/`));
+    if (hit && (!best || href.length > best.link.href.length)) best = entry;
+  }
+  return best;
 }
