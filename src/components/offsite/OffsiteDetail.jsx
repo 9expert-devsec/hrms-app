@@ -31,6 +31,7 @@ import {
   formatWorkDateTh,
   offsiteVersion,
   validateHrSummary,
+  STEP_WAITING_LABELS,
 } from "@/lib/offsiteRules";
 import OffsiteProgress from "./OffsiteProgress";
 import { refreshInbox } from "../inbox/InboxProvider";
@@ -52,10 +53,10 @@ const EVENT_LABELS = {
   approvals_reset: "ปรับขั้นการอนุมัติหลังส่งใหม่",
   step1_signed: "ลงนามขั้นที่ 1",
   step1_reconfirmed: "หัวหน้าทีมยืนยันขั้นที่ 1 อีกครั้ง",
-  step2_pending: "รอหัวหน้าฝ่ายบัญชีลงนาม",
-  step3_pending: "รอหัวหน้าฝ่ายบุคคลลงนาม",
-  step2_reconfirm_pending: "รอหัวหน้าฝ่ายบัญชียืนยันอีกครั้ง",
-  step3_reconfirm_pending: "รอหัวหน้าฝ่ายบุคคลยืนยันอีกครั้ง",
+  step2_pending: STEP_WAITING_LABELS.step2_pending,
+  step3_pending: STEP_WAITING_LABELS.step3_pending,
+  step2_reconfirm_pending: STEP_WAITING_LABELS.step2_reconfirm_pending,
+  step3_reconfirm_pending: STEP_WAITING_LABELS.step3_reconfirm_pending,
   step2_approved: "หัวหน้าฝ่ายบัญชีอนุมัติ",
   step3_approved: "หัวหน้าฝ่ายบุคคลอนุมัติ",
   step2_reconfirmed: "หัวหน้าฝ่ายบัญชียืนยันอีกครั้ง",

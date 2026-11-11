@@ -274,6 +274,39 @@ export function progressOf(r) {
   return { position, cancelled: r?.status === "cancelled", done: r?.status === "approved" };
 }
 
+/** Who the request is waiting for, per approval step (detail-page history and progress captions). */
+export const STEP_WAITING_LABELS = {
+  step1_pending: "รอหัวหน้าทีมลงนาม",
+  step1_reconfirm_pending: "รอหัวหน้าทีมยืนยันอีกครั้ง",
+  step2_pending: "รอหัวหน้าฝ่ายบัญชีลงนาม",
+  step3_pending: "รอหัวหน้าฝ่ายบุคคลลงนาม",
+  step2_reconfirm_pending: "รอหัวหน้าฝ่ายบัญชียืนยันอีกครั้ง",
+  step3_reconfirm_pending: "รอหัวหน้าฝ่ายบุคคลยืนยันอีกครั้ง",
+};
+
+/**
+ * One-line progress caption: "ขั้นที่ 3/5 · รอหัวหน้าฝ่ายบัญชีลงนาม". Same
+ * position as progressOf (and so OffsiteProgress); the text says who it
+ * waits for — members (with the accepted count), a step's approver, or the
+ * request's own status (returned / approved / cancelled).
+ */
+export function progressCaption(r) {
+  const { position } = progressOf(r);
+  const step = (n) => (r?.approvals || []).find((a) => a.step === n);
+  const members = Array.isArray(r?.members) ? r.members : [];
+  let text;
+  if (r?.status === "draft") text = STATUS_LABELS.draft;
+  else if (r?.status === "inviting") text = `${STATUS_LABELS.inviting} ${members.filter((m) => m.status === "accepted").length}/${members.length} คน`;
+  else if (["returned", "approved", "cancelled"].includes(r?.status)) text = STATUS_LABELS[r.status];
+  else if (r?.status === "members_ready" || position <= 1)
+    text = step(1)?.status === "needs_reconfirm" ? STEP_WAITING_LABELS.step1_reconfirm_pending : STEP_WAITING_LABELS.step1_pending;
+  else {
+    const reconfirm = step(position)?.status === "needs_reconfirm";
+    text = STEP_WAITING_LABELS[`step${position}_${reconfirm ? "reconfirm_" : ""}pending`] || STATUS_LABELS[r.status];
+  }
+  return `ขั้นที่ ${position + 1}/${PROGRESS_STEPS.length} · ${text}`;
+}
+
 /** What a step asks of its approver after a return. */
 export const APPROVAL_ASK_LABELS = {
   needs_resign: "เซ็นใหม่",

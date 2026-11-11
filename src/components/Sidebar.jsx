@@ -23,7 +23,7 @@ const LABEL = "#AEB9C9"; // item labels — 8.77:1 on NAVY
 // flyout), under WCAG AA; #7D8BA0 is the nearest shade on the same hue that
 // passes on both (5.03:1 / 4.53:1).
 const HEAD = "#7D8BA0";
-const FOOT = "#5E6A7E";
+const FOOT = "#8592A6"; // © line — 5.52:1 on NAVY
 const RED = "#E5484D";
 const LOGOUT = "#FF8A8D";
 
