@@ -245,9 +245,6 @@ export default function LoginClient() {
             <p className="font-semibold text-9e-navy">
               ระบบสำหรับบุคลากร 9Expert เท่านั้น
             </p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              หากพบปัญหาการเข้าสู่ระบบ กรุณาติดต่อฝ่าย IT
-            </p>
           </div>
         </div>
       </section>
