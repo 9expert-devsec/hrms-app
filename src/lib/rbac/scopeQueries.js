@@ -59,6 +59,13 @@ export async function isEmployeeInScope(scope, employeeId) {
   return ids.includes(String(employeeId));
 }
 
+/** The head (Employee _id string) of the department with this code, or null. */
+export async function departmentHeadIdOfCode(code) {
+  if (!code) return null;
+  const dept = await Department.findOne({ code }).select("headOfDepartment").lean();
+  return dept?.headOfDepartment ? String(dept.headOfDepartment) : null;
+}
+
 /**
  * An employee's Department _id (string): departmentId, else looked up by
  * the department code older documents carry.

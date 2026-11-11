@@ -8,7 +8,7 @@ import { Building2, ChevronRight, KeyRound, PenLine, Pencil, User } from "lucide
 import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import { profileAccess } from "@/lib/rbac/scopes";
-import { departmentIdOf, employeeOfUser } from "@/lib/rbac/scopeQueries";
+import { departmentHeadIdOfCode, departmentIdOf, employeeOfUser } from "@/lib/rbac/scopeQueries";
 import { getSignature } from "@/lib/offsite";
 import { employeeDisplayName, employeeFullNameTh, employeeNameEn } from "@/lib/employeeName";
 import dbConnect from "@/lib/mongoose";
@@ -61,12 +61,18 @@ export default async function EmployeeProfilePage({ searchParams }) {
   const isSelf = !!e.userId && String(e.userId) === String(session.user.id || "");
 
   // Someone else's profile: employees / users_manage holders, superadmin, a
-  // head of their department, or a colleague in the same department (ทีมของฉัน
-  // links). Anyone else gets 404, so the page does not confirm the person exists.
+  // head of their department, a colleague in the same department, or the head
+  // of the viewer's own department (ทีมของฉัน links). Anyone else gets 404, so
+  // the page does not confirm the person exists.
+  const [targetDepartmentId, viewerDepartmentHeadId] = await Promise.all([
+    departmentIdOf(e),
+    isSelf ? null : departmentHeadIdOfCode(session.user.department),
+  ]);
   const access = profileAccess(session.user, {
     targetEmployeeId: e._id,
-    targetDepartmentId: await departmentIdOf(e),
+    targetDepartmentId,
     targetDepartmentCode: e.department,
+    viewerDepartmentHeadId,
   });
   if (!isSelf && !access.canView) notFound();
 

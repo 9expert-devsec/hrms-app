@@ -66,19 +66,24 @@ export function canViewLeaveDocument(user, { ownerEmployeeId, ownerDepartmentId 
  * Another employee's profile.
  *   canView: `employees` holders, `users_manage` holders (IT — to find the
  *            person behind an account), the superadmin, a head of the target's
- *            department, or a member of the same department (ทีมของฉัน links).
+ *            department, a member of the same department (ทีมของฉัน links), or
+ *            a member whose own department this person heads — the head may
+ *            belong to another department.
  *   canSeePrivate (bank, emergency contact): the owner, `employees`, superadmin
  *            — never users_manage alone.
- * `viewerDepartmentCode` is session.user.department (the viewer's code).
+ * The viewer's department is session.user.department (a code);
+ * `viewerDepartmentHeadId` is that department's headOfDepartment
+ * (scopeQueries.departmentHeadIdOfCode), or null.
  */
-export function profileAccess(user, { targetEmployeeId, targetDepartmentId, targetDepartmentCode }) {
+export function profileAccess(user, { targetEmployeeId, targetDepartmentId, targetDepartmentCode, viewerDepartmentHeadId = null }) {
   if (!user) return { canView: false, canSeePrivate: false };
   const self = isOwnEmployee(user, targetEmployeeId);
   const manager = canAccess(user, "employees");
   const sameDepartment =
     !!user.department && !!targetDepartmentCode && String(user.department) === String(targetDepartmentCode);
+  const ownHead = !!viewerDepartmentHeadId && !!targetEmployeeId && String(viewerDepartmentHeadId) === String(targetEmployeeId);
   return {
-    canView: self || manager || canAccess(user, "users_manage") || isHeadOf(user, targetDepartmentId) || sameDepartment,
+    canView: self || manager || canAccess(user, "users_manage") || isHeadOf(user, targetDepartmentId) || sameDepartment || ownHead,
     canSeePrivate: self || manager,
   };
 }

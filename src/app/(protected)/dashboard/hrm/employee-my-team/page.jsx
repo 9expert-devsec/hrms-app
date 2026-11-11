@@ -8,7 +8,7 @@ import { Building2, ChevronRight } from "lucide-react";
 import dbConnect from "@/lib/mongoose";
 import { requirePage } from "@/lib/rbac/guard";
 import { profileAccess } from "@/lib/rbac/scopes";
-import { employeeOfUser } from "@/lib/rbac/scopeQueries";
+import { departmentHeadIdOfCode, employeeOfUser } from "@/lib/rbac/scopeQueries";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import { employeeDisplayName } from "@/lib/employeeName";
@@ -84,13 +84,14 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
     );
   }
 
-  const [depts, members] = await Promise.all([
+  const [depts, members, viewerDepartmentHeadId] = await Promise.all([
     Department.find({ _id: { $in: deptIds } })
       .select("_id code name headOfDepartment")
       .populate("headOfDepartment", personFields)
       .lean(),
     // Members = every employee whose departmentId is one of these departments.
     Employee.find({ departmentId: { $in: deptIds } }).select(personFields).lean(),
+    departmentHeadIdOfCode(session.user.department),
   ]);
 
   // The card shows a nickname only to viewers who can already see it on that
@@ -100,7 +101,7 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
     const canView =
       id === viewerId && !overrideId
         ? true
-        : profileAccess(session.user, { targetEmployeeId: e._id, targetDepartmentId: departmentId, targetDepartmentCode: e.department }).canView;
+        : profileAccess(session.user, { targetEmployeeId: e._id, targetDepartmentId: departmentId, targetDepartmentCode: e.department, viewerDepartmentHeadId }).canView;
     const nickName = canView ? (e.nickName || "").trim() : "";
     return {
       id,
