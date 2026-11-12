@@ -24,8 +24,15 @@ export default async function ProtectedLayout({ children }) {
   return (
     // One shared "รอคุณดำเนินการ" count for the sidebar badges, the top-bar bell and the pages.
     <InboxProvider>
+    {/* The shell is exactly one screen tall and <main> is the only scroller.
+        Both are positioned so every absolutely-positioned descendant (sr-only
+        labels and live regions, popovers) is contained and clipped by them —
+        otherwise such an element is placed against the page itself, makes the
+        document taller than the shell, and scrolling past the end of <main>
+        then scrolls the whole shell away, leaving a blank area below it. */}
     <div
       style={{
+        position: "relative",
         display: "flex",
         flexDirection: "row",
         height: "100dvh",
@@ -47,7 +54,7 @@ export default async function ProtectedLayout({ children }) {
         }}
       >
         <Topbar />
-        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "24px" }}>
+        <main style={{ position: "relative", flex: 1, overflowY: "auto", overflowX: "hidden", overscrollBehaviorY: "contain", padding: "24px" }}>
           <Suspense fallback={null}>
             <SelfServiceGate linked={linked}>{children}</SelfServiceGate>
           </Suspense>

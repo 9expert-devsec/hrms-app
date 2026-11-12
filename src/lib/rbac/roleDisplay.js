@@ -5,7 +5,8 @@
  *     System roles have fixed Thai names and colours; a custom role shows its
  *     Role document's name and colour (else #64748B).
  *   rolePageCount(role)  → number of registry PAGES (keys with an href) the
- *     role holds; null for superadmin ("ทุกหน้า").
+ *     role holds that its people can open — in-development pages excluded;
+ *     null for superadmin ("ทุกหน้า").
  *   roleDataScope(role)  → one label for how far the role's data reaches.
  */
 import { HRMS_PAGES } from "./pages.js";
@@ -42,9 +43,11 @@ const PAGE_KEYS = new Set(FLAT.filter((p) => p.href).map((p) => p.key));
 const SCOPE_KEYS = FLAT.filter((p) => p.match === "none");
 const IN_DEVELOPMENT = new Set(FLAT.filter((p) => p.inDevelopment).map((p) => p.key));
 
+// In-development pages open for the superadmin only (round 27), so they are
+// not counted: the number is how many pages the role's people can open today.
 export function rolePageCount(role) {
   if (role?.isSuperadmin) return null;
-  return (role?.pages || []).filter((k) => PAGE_KEYS.has(k)).length;
+  return (role?.pages || []).filter((k) => PAGE_KEYS.has(k) && !IN_DEVELOPMENT.has(k)).length;
 }
 
 export const SCOPE_LABELS = {

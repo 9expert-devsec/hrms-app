@@ -314,7 +314,8 @@ export default function UsersClient({ initial, actor }) {
           <PersonAvatar src={u.employee?.photoUrl} name={u.employee?.name || displayName(u)} size={36} />
           <div className="min-w-0">
             <div className="break-words text-[15px] font-semibold" style={{ color: NAVY }} data-testid="user-name">{displayName(u)}</div>
-            <div className="break-all text-[13px]" style={{ color: SLATE }} data-testid="user-email">{u.email}</div>
+            {/* One line: an address too long for the column ends in "…", never breaks mid-word. */}
+            <div className="truncate text-[13px]" style={{ color: SLATE }} title={u.email} data-testid="user-email">{u.email}</div>
             {u.employee?.emailMismatch && (
               <div className="mt-0.5 flex items-center gap-1 text-[12px] font-medium" style={{ color: "#B45309" }} data-testid="user-email-mismatch">
                 <AlertTriangle size={13} aria-hidden /> อีเมลไม่ตรงกับพนักงาน
@@ -418,22 +419,24 @@ export default function UsersClient({ initial, actor }) {
             {/* tablet / desktop */}
             <div className="hidden overflow-hidden rounded-2xl bg-white md:block" style={{ border: `1px solid ${LINE}` }} data-testid="user-table">
               <table className="w-full table-fixed border-collapse text-left">
+                {/* At 1280 px the account column gets ~240 px — room for a typical
+                    name.x@9expert.co.th on one line; longer addresses truncate. */}
                 <colgroup>
                   <col />
-                  <col className="w-[150px]" />
-                  <col className="w-[20%]" />
-                  <col className="w-[150px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[170px]" />
+                  <col className="w-[144px]" />
+                  <col className="w-[156px]" />
+                  <col className="w-[140px]" />
+                  <col className="w-[104px]" />
+                  <col className="w-[168px]" />
                 </colgroup>
                 <thead>
                   <tr className="text-[13px]" style={{ background: "#F8FAFD", color: SLATE }}>
-                    <th className="p-4 font-semibold">บัญชี</th>
-                    <th className="p-4 font-semibold">บทบาท</th>
-                    <th className="p-4 font-semibold">พนักงานที่ผูก</th>
-                    <th className="p-4 font-semibold">สถานะ</th>
-                    <th className="p-4 font-semibold">เข้าสู่ระบบล่าสุด</th>
-                    <th className="p-4"><span className="sr-only">จัดการ</span></th>
+                    <th className="py-4 pl-4 pr-3 font-semibold">บัญชี</th>
+                    <th className="px-3 py-4 font-semibold">บทบาท</th>
+                    <th className="px-3 py-4 font-semibold">พนักงานที่ผูก</th>
+                    <th className="px-3 py-4 font-semibold">สถานะ</th>
+                    <th className="px-3 py-4 font-semibold">เข้าสู่ระบบล่าสุด</th>
+                    <th className="py-4 pl-3 pr-4"><span className="sr-only">จัดการ</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -441,12 +444,12 @@ export default function UsersClient({ initial, actor }) {
                     const c = cells(u, state);
                     return (
                       <tr key={u._id} style={{ borderTop: "1px solid #EEF2F8" }} data-testid="user-row" data-email={u.email}>
-                        <td className="p-4 align-middle">{c.account}</td>
-                        <td className="p-4 align-middle">{c.role}</td>
-                        <td className="p-4 align-middle">{c.employee}</td>
-                        <td className="p-4 align-middle">{c.status}</td>
-                        <td className="p-4 align-middle">{c.lastLogin}</td>
-                        <td className="p-4 align-middle">{c.actions}</td>
+                        <td className="py-4 pl-4 pr-3 align-middle">{c.account}</td>
+                        <td className="px-3 py-4 align-middle">{c.role}</td>
+                        <td className="px-3 py-4 align-middle">{c.employee}</td>
+                        <td className="px-3 py-4 align-middle">{c.status}</td>
+                        <td className="px-3 py-4 align-middle">{c.lastLogin}</td>
+                        <td className="py-4 pl-3 pr-4 align-middle">{c.actions}</td>
                       </tr>
                     );
                   })}
