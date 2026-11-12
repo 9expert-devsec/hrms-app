@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import useModalLayer from "./useModalLayer";
 import Cropper from "react-easy-crop";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { cropFromPercentages, cropToPercentages, cssCropStyle } from "@/lib/photoCrop";
@@ -43,28 +43,9 @@ export default function PhotoCropDialog({ src, initialCrop = null, onApply, onCa
   const [initial] = useState(() => cropToPercentages(initialCrop));
   const boxRef = useRef(null);
   const dialogRef = useRef(null);
-  const [mounted, setMounted] = useState(false);
+  // Portal to document.body, focus trap, scroll lock, focus return (useModalLayer).
+  const { mounted, portal, trapTab } = useModalLayer(dialogRef);
   const zoomTo = (z) => setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100)));
-
-  // Rendered on document.body (portal): an ancestor with a transform — e.g. a
-  // card lifted on :hover by globals.css — would otherwise become the
-  // containing block of this fixed overlay and trap it under later content.
-  useEffect(() => setMounted(true), []);
-
-  // While open: the page behind does not scroll (window and the app shell's
-  // <main>); on close, focus returns to the control that opened the dialog.
-  useEffect(() => {
-    const opener = document.activeElement;
-    const main = document.querySelector("main main");
-    const prev = { body: document.body.style.overflow, main: main?.style.overflowY };
-    document.body.style.overflow = "hidden";
-    if (main) main.style.overflowY = "hidden";
-    return () => {
-      document.body.style.overflow = prev.body;
-      if (main) main.style.overflowY = prev.main;
-      if (opener && typeof opener.focus === "function" && document.contains(opener)) opener.focus({ preventScroll: true });
-    };
-  }, []);
 
   // Focus the frame (arrow keys move it) once the image is in.
   useEffect(() => {
@@ -78,22 +59,6 @@ export default function PhotoCropDialog({ src, initialCrop = null, onApply, onCa
     }, 50);
     return () => clearInterval(t);
   }, [mounted]);
-
-  /** Tab / Shift+Tab stay inside the dialog. */
-  function trapTab(e) {
-    const items = [...(dialogRef.current?.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex="0"]') || [])];
-    if (!items.length) return;
-    const first = items[0];
-    const last = items[items.length - 1];
-    const inside = dialogRef.current.contains(document.activeElement);
-    if (e.shiftKey && (document.activeElement === first || !inside)) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
 
   function onKeyDown(e) {
     if (e.key === "Tab") {
@@ -110,8 +75,7 @@ export default function PhotoCropDialog({ src, initialCrop = null, onApply, onCa
     }
   }
 
-  if (!mounted) return null;
-  return createPortal(
+  return portal(
     <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto overscroll-contain p-4" style={{ background: "rgba(13,27,42,0.55)" }} onKeyDown={onKeyDown}>
       <div
         ref={dialogRef}
@@ -189,7 +153,6 @@ export default function PhotoCropDialog({ src, initialCrop = null, onApply, onCa
           </div>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }

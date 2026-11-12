@@ -1,16 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy } from "lucide-react";
+import useModalLayer from "./useModalLayer";
 
 /**
  * One-time display of a temporary password: a reset (POST
  * /api/users/[id]/reset-password — users page, employee edit form) or a new
  * account (POST /api/auth/register, POST /api/employees). The password exists
  * only in this dialog's props; closing it discards it.
+ *
+ * Rendered on document.body with a focus trap and scroll lock
+ * (useModalLayer) — on the HR edit page it opens from inside a hover-lifted
+ * card that would otherwise trap it. Escape closes; focus returns to the opener.
  */
 export default function TempPasswordDialog({ email, tempPassword, onClose }) {
   const [copied, setCopied] = useState(false);
+  const dialogRef = useRef(null);
+  const copyRef = useRef(null);
+  const { mounted, portal, trapTab } = useModalLayer(dialogRef);
+
+  useEffect(() => {
+    if (mounted) copyRef.current?.focus({ preventScroll: true });
+  }, [mounted]);
+
+  function onKeyDown(e) {
+    if (e.key === "Tab") trapTab(e);
+    else if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+    }
+  }
 
   async function copy() {
     try {
@@ -21,15 +41,18 @@ export default function TempPasswordDialog({ email, tempPassword, onClose }) {
     }
   }
 
-  return (
+  return portal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
       style={{ background: "rgba(13,27,42,0.6)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onKeyDown={onKeyDown}
     >
       <div
+        ref={dialogRef}
+        data-testid="temp-password-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="temp-password-title"
@@ -48,6 +71,7 @@ export default function TempPasswordDialog({ email, tempPassword, onClose }) {
             {tempPassword}
           </code>
           <button
+            ref={copyRef}
             type="button"
             onClick={copy}
             className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5"
@@ -75,6 +99,7 @@ export default function TempPasswordDialog({ email, tempPassword, onClose }) {
           <button
             type="button"
             onClick={onClose}
+            data-testid="temp-password-close"
             style={{
               border: "1px solid rgba(0,92,255,0.10)",
               color: "#0D1B2A",

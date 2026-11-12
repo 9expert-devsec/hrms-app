@@ -139,18 +139,6 @@ export async function PUT(req, { params }) {
   }
   update.updatedAt = new Date();
 
-  if (
-    update.photoPublicId &&
-    update.photoPublicId !== emp.photoPublicId &&
-    emp.photoPublicId
-  ) {
-    try {
-      await cloudinary.uploader.destroy(emp.photoPublicId);
-    } catch (e) {
-      console.warn("Cloudinary destroy failed:", e?.message);
-    }
-  }
-
   // Schema validators too (required, level 1–6, enums): they did not run here before.
   try {
     await Employee.findByIdAndUpdate(id, clearCrop ? { ...update, $unset: { photoCrop: "" } } : update, { runValidators: true });
@@ -161,6 +149,17 @@ export async function PUT(req, { params }) {
       return bad(`ข้อมูลไม่ถูกต้อง: ${FIELD_LABELS[field] || path}`, field);
     }
     throw e;
+  }
+
+  // The replaced photo is removed only AFTER the record saved (same order as
+  // PATCH /api/employees/me): a failed save keeps the old photo the record
+  // still points to; a failed delete is logged and does not fail the save.
+  if (update.photoPublicId && emp.photoPublicId && update.photoPublicId !== emp.photoPublicId) {
+    try {
+      await cloudinary.uploader.destroy(emp.photoPublicId);
+    } catch (e) {
+      console.warn("Cloudinary destroy failed:", e?.message);
+    }
   }
   return new Response(JSON.stringify({ ok: true }), { status: 200 });
 }
