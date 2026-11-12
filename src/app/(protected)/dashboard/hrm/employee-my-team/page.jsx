@@ -13,6 +13,7 @@ import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import { employeeDisplayName } from "@/lib/employeeName";
 import { normalizePhotoCrop } from "@/lib/photoCrop";
+import { compareDepartments } from "@/lib/departmentOrder";
 import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
 import PersonAvatar from "./../../../../../components/PersonAvatar";
 
@@ -87,7 +88,7 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
 
   const [depts, members, viewerDepartmentHeadId] = await Promise.all([
     Department.find({ _id: { $in: deptIds } })
-      .select("_id code name headOfDepartment")
+      .select("_id code name headOfDepartment sortOrder")
       .populate("headOfDepartment", personFields)
       .lean(),
     // Members = every employee whose departmentId is one of these departments.
@@ -133,13 +134,15 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
         id,
         code: (d.code || "").trim(),
         name: d.name || d.code || "-",
+        sortOrder: d.sortOrder ?? null,
         isOwn: id === ownDeptId,
         isHead: !!head && head.id === viewerId,
         head,
         members: list,
       };
     })
-    .sort((a, b) => (a.isOwn === b.isOwn ? a.name.localeCompare(b.name, "th") : a.isOwn ? -1 : 1));
+    // Own department first, then the others I head in HR's order (lib/departmentOrder.js).
+    .sort((a, b) => (a.isOwn === b.isOwn ? compareDepartments(a, b) : a.isOwn ? -1 : 1));
 
   return (
     <Page>

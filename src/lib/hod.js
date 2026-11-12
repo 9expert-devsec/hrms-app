@@ -2,6 +2,7 @@ import "server-only";
 import mongoose from "mongoose";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
+import { sortDepartments } from "@/lib/departmentOrder";
 
 /**
  * Head of department — single store: Department.headOfDepartment (→ Employee).
@@ -121,9 +122,8 @@ export async function listHeadCandidates(q = "") {
 /** Every department with its head: [{ _id, code, name, head, headHasAccount }]. */
 export async function listDepartmentHeads() {
   const depts = await Department.find({})
-    .select("_id code name color headOfDepartment")
+    .select("_id code name color headOfDepartment sortOrder")
     .populate("headOfDepartment", LIST_HEAD_FIELDS)
-    .sort({ code: 1 })
     .lean();
-  return depts.map(toItem);
+  return sortDepartments(depts).map(toItem); // HR's display order (lib/departmentOrder.js)
 }

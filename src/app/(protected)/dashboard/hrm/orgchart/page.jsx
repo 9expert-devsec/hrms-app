@@ -5,15 +5,15 @@ import dbConnect from "@/lib/mongoose";
 import Employee from "@/models/Employee";
 import Department from "@/models/Department";
 import { requirePage } from "@/lib/rbac/guard";
+import { sortDepartments } from "@/lib/departmentOrder";
 import OrgFlowClient from "./OrgFlowClient";
 
 export default async function OrgChartPage() {
   await requirePage("orgchart");
   await dbConnect();
 
-  const deps = await Department.find({})
-    .select("_id code name color")
-    .lean();
+  // HR's display order (lib/departmentOrder.js) for the department columns.
+  const deps = sortDepartments(await Department.find({}).select("_id code name color sortOrder").lean());
 
   const emps = await Employee.find({})
     .select("_id firstName lastName firstNameTh lastNameTh nickName position level department departmentId photoUrl photoCrop")

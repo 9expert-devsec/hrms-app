@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAnyPageApi, requirePageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import Department from "@/models/Department";
+import { SORT_ORDER_STEP, sortDepartments } from "@/lib/departmentOrder";
 
 const LEVEL_SET = new Set([1, 2, 3, 4, 5, 6]);
 
@@ -13,12 +14,10 @@ export async function GET() {
   await dbConnect();
 
   // ดึงข้อมูลเฉพาะที่เกี่ยวกับการสร้างพนักงาน
-  const items = await Department.find(
-    {},
-    "code name empIdPrefix color allowedLevels positions"
-  )
-    .sort({ code: 1 })
-    .lean();
+  // HR's display order (lib/departmentOrder.js) — the employee form's select.
+  const items = sortDepartments(
+    await Department.find({}, "code name empIdPrefix color allowedLevels positions sortOrder").lean()
+  );
 
   return NextResponse.json({ ok: true, items });
 }
@@ -120,8 +119,12 @@ export async function POST(req) {
       });
     }
 
+    // A new department goes to the end of a saved order (none saved yet → name order).
+    const last = await Department.findOne({ sortOrder: { $type: "number" } }).sort({ sortOrder: -1 }).select("sortOrder").lean();
+
     // สร้าง Department
     const created = await Department.create({
+      sortOrder: last ? last.sortOrder + SORT_ORDER_STEP : null,
       name: name.trim(),
       code,
       color: color || "#6366f1",

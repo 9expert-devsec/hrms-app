@@ -9,6 +9,7 @@ import { requirePage } from "@/lib/rbac/guard";
 import { canAccess } from "@/lib/rbac/access";
 import EmployeeEditForm from "./EmployeeEditForm";
 import { employeeDisplayName } from "@/lib/employeeName";
+import { sortDepartments } from "@/lib/departmentOrder";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +36,10 @@ export default async function EditEmployeePage({ searchParams }) {
   }
 
   // โหลด departments สำหรับ select ตำแหน่ง/เลเวล
-  const deps = await Department.find({})
-    .select("_id code name empIdPrefix positions")
-    .lean();
+  // In HR's display order (lib/departmentOrder.js) for the department select.
+  const deps = sortDepartments(
+    await Department.find({}).select("_id code name empIdPrefix positions sortOrder").lean()
+  );
 
   // หา user ที่ผูกกับ employee คนนี้ — Employee.userId only (lib/accountLinks.js);
   // an account that merely shares the email is not this employee's.

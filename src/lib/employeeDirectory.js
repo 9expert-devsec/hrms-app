@@ -5,6 +5,7 @@ import User from "@/models/User";
 import { employeeDisplayName, employeeFullNameTh, employeeNameEn } from "@/lib/employeeName";
 import { NO_DEPARTMENT, NO_DEPARTMENT_LABEL, rowSearchText } from "@/lib/employeeDirectoryFilter";
 import { normalizePhotoCrop } from "@/lib/photoCrop";
+import { compareDepartments } from "@/lib/departmentOrder";
 
 /**
  * ข้อมูลพนักงาน: every employee with the fields the list page shows, grouped
@@ -24,7 +25,7 @@ const byTh = (a, b) => a.localeCompare(b, "th");
 export async function loadEmployeeDirectory() {
   const [docs, departments] = await Promise.all([
     Employee.find({}).select(FIELDS).lean(),
-    Department.find({}).select("_id code name color").lean(),
+    Department.find({}).select("_id code name color sortOrder").lean(),
   ]);
   const users = await User.find({ _id: { $in: docs.map((e) => e.userId).filter(Boolean) } }).select("_id status").lean();
   const userStatus = new Map(users.map((u) => [String(u._id), u.status || "active"]));
@@ -63,17 +64,18 @@ export async function loadEmployeeDirectory() {
     return row;
   });
 
-  // Groups in department-name order, "ไม่ระบุแผนก" last; rows by name inside.
+  // Groups in HR's department order (lib/departmentOrder.js), "ไม่ระบุแผนก"
+  // last; rows by name inside.
   const groups = new Map();
   for (const r of rows) {
     if (!groups.has(r.deptKey)) {
       const d = r.deptKey === NO_DEPARTMENT ? null : byId.get(r.deptKey);
-      groups.set(r.deptKey, { key: r.deptKey, code: d?.code || "", name: r.deptName, color: d?.color || DEFAULT_COLOR, rows: [] });
+      groups.set(r.deptKey, { key: r.deptKey, code: d?.code || "", name: r.deptName, color: d?.color || DEFAULT_COLOR, sortOrder: d?.sortOrder ?? null, rows: [] });
     }
     groups.get(r.deptKey).rows.push(r);
   }
   const ordered = [...groups.values()].sort((a, b) =>
-    a.key === NO_DEPARTMENT ? 1 : b.key === NO_DEPARTMENT ? -1 : byTh(a.name, b.name) || byTh(a.code, b.code)
+    a.key === NO_DEPARTMENT ? 1 : b.key === NO_DEPARTMENT ? -1 : compareDepartments(a, b)
   );
   // Sorted by name without the title ("นาย…" would otherwise group by title).
   const sortName = (r) => r.nameThPlain || r.nameEn || r.nameTh;

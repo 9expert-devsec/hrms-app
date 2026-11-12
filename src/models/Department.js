@@ -7,6 +7,9 @@ const DepartmentSchema = new Schema(
     color: { type: String, default: "#6366f1" },
     empIdPrefix: { type: String, default: "" },
     description: { type: String, default: "" },
+    // Display order chosen by HR (lib/departmentOrder.js): 10, 20, 30…;
+    // null until an order is saved → name order.
+    sortOrder: { type: Number, default: null },
 
     // เดิมคุณใช้ allowLevels/allowedLevels ทั้งคู่ เจออันไหนใน DB ก็ปล่อยไว้
     allowLevels: { type: [Number], default: [] },

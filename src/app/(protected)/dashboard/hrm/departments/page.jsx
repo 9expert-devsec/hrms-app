@@ -8,13 +8,11 @@ import dbConnect from "@/lib/mongoose";
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
+import { sortDepartments } from "@/lib/departmentOrder";
 import DepartmentsClient from "../departments/ui/DepartmentsClient";
 import { BTN_PRIMARY, PAGE, PAGE_BG, Summary } from "../../../../../components/hr/hrUi";
 
 export const dynamic = "force-dynamic";
-
-// ลำดับแผนกที่ต้องการ
-const DEPT_ORDER = ["MD", "EX", "HR", "AC", "IT", "TR", "MK", "SD", "AM", "FM", "ME"];
 
 export default async function DepartmentsPage() {
   const session = await requirePage("departments");
@@ -22,9 +20,8 @@ export default async function DepartmentsPage() {
 
   const [departments, counts, totalEmployees] = await Promise.all([
     Department.find({})
-      .select("_id code name color description positions headOfDepartment")
+      .select("_id code name color description positions headOfDepartment sortOrder")
       .populate("headOfDepartment", `_id ${EMPLOYEE_NAME_FIELDS}`)
-      .sort({ code: 1 })
       .lean(),
     // One key per employee: departmentId when set, else the department code.
     Employee.aggregate([
@@ -36,7 +33,8 @@ export default async function DepartmentsPage() {
   ]);
   const countMap = Object.fromEntries(counts.map((c) => [String(c._id), c.count]));
 
-  const items = departments
+  // HR's display order (lib/departmentOrder.js; "จัดลำดับ" below).
+  const items = sortDepartments(departments)
     .map((d) => {
       const head = d.headOfDepartment && typeof d.headOfDepartment === "object" ? d.headOfDepartment : null;
       return {
@@ -49,14 +47,6 @@ export default async function DepartmentsPage() {
         positions: (d.positions || []).map((p) => (p?.name || "").trim()).filter(Boolean),
         empCount: countMap[String(d._id)] ?? countMap[d.code] ?? 0,
       };
-    })
-    .sort((a, b) => {
-      const ia = DEPT_ORDER.indexOf(a.code);
-      const ib = DEPT_ORDER.indexOf(b.code);
-      if (ia !== -1 && ib !== -1) return ia - ib;
-      if (ia !== -1) return -1;
-      if (ib !== -1) return 1;
-      return a.code.localeCompare(b.code);
     });
 
   const canEdit = canAccess(session.user, "departments");
