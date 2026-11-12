@@ -9,7 +9,7 @@ import { countActiveSuperadmins, listRoles } from "@/lib/rbac/roles";
 import { accountActionBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
 import { isLocked } from "@/lib/loginLockout";
-import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
+import { employeeDisplayName, employeeFullNameTh, employeeNameSearchText } from "@/lib/employeeName";
 import { validateNewPassword } from "@/lib/passwordRules";
 
 /**
@@ -178,7 +178,7 @@ export async function listUsers() {
   ]);
 
   const emps = await Employee.find({ userId: { $in: users.map((u) => u._id) } })
-    .select("_id firstName lastName firstNameTh lastNameTh nickName empAutoId userId email")
+    .select("_id firstName lastName titleTh firstNameTh lastNameTh nickName empAutoId userId email photoUrl position")
     .lean();
   const empByUser = new Map(emps.map((e) => [String(e.userId), e]));
   const roleByKey = new Map(roles.map((r) => [r.key, r]));
@@ -204,7 +204,10 @@ export async function listUsers() {
               _id: String(emp._id),
               empAutoId: emp.empAutoId ?? null,
               name: employeeDisplayName(emp),
+              fullNameTh: employeeFullNameTh(emp) || employeeDisplayName(emp),
               nameSearch: employeeNameSearchText(emp),
+              photoUrl: emp.photoUrl || null,
+              position: emp.position || "",
               // For "ใช้อีเมลเดียวกับพนักงาน"; the badge compares trimmed, case-insensitive.
               email: emp.email || "",
               emailMismatch: normalizeEmail(emp.email) !== normalizeEmail(u.email),

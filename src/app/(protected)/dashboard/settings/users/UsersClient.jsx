@@ -1,63 +1,85 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Users,
-  Search,
-  KeyRound,
+  AlertTriangle,
   Ban,
-  CheckCircle2,
   Check,
-  X,
+  CheckCircle2,
+  KeyRound,
+  Link2,
   Loader2,
   LockOpen,
-  Trash2,
   Mail,
-  UserPlus,
-  Link2,
-  Unlink,
   MoreHorizontal,
+  Search,
+  Trash2,
+  Unlink,
+  UserCog,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { accountActionBlock, accountDeleteBlock, linkActionBlock, roleChangeBlock } from "@/lib/rbac/accountRules";
+import { roleDisplay, sortRoles } from "@/lib/rbac/roleDisplay";
+import { fullDateTimeTh, lastSeenTh, timeTh } from "@/lib/relativeTimeTh";
 import ResetPasswordDialog from "../../../../../components/ResetPasswordDialog";
 import TempPasswordDialog from "../../../../../components/TempPasswordDialog";
+import PersonAvatar from "../../../../../components/PersonAvatar";
+import {
+  BLUE,
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  FOCUS,
+  INPUT,
+  LINE,
+  MUTED,
+  NAVY,
+  PAGE,
+  PAGE_BG,
+  SLATE,
+} from "../../../../../components/hr/hrUi";
 
-/* ── design tokens (same as the other settings pages) ───────── */
-const NAVY = "#0D1B2A";
-const BLUE = "#005CFF";
-const SLATE = "#5E6A7E";
-const ICE = "#F8FAFD";
-const CARD = {
-  background: "#FFFFFF",
-  border: "1px solid rgba(0,92,255,0.10)",
-  borderRadius: "16px",
-  boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
-};
+const RED = "#B91C1C";
 
-function fmtDateTime(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("th-TH", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+/** First match wins: ระงับ → ล็อกอยู่ (lock still ahead) → ต้องเปลี่ยนรหัส → ใช้งาน. */
+function accountState(u, now = Date.now()) {
+  if (u.status === "suspended") return "suspended";
+  if (u.lockedUntil && new Date(u.lockedUntil).getTime() > now) return "locked";
+  if (u.mustChangePassword) return "mustChange";
+  return "active";
 }
 
-function fmtTime(d) {
-  return new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
-}
+const TABS = [
+  { key: "all", label: "ทั้งหมด", test: () => true },
+  { key: "active", label: "ใช้งาน", test: (u, s) => s === "active" },
+  { key: "suspended", label: "ระงับ", test: (u, s) => s === "suspended" },
+  { key: "locked", label: "ล็อกอยู่", test: (u, s) => s === "locked" },
+  { key: "unlinked", label: "ไม่ได้ผูกพนักงาน", test: (u) => !u.employee },
+];
 
-function Pill({ children, bg, color }) {
+function StatusPill({ u, state }) {
+  const map = {
+    suspended: { bg: "#FEE2E2", color: RED, text: "ระงับ" },
+    locked: { bg: "#FEF3C7", color: "#92400E", text: `ล็อกอยู่ ถึง ${u.lockedUntil ? timeTh(u.lockedUntil) : ""}` },
+    mustChange: { bg: "#EEF4FF", color: BLUE, text: "ต้องเปลี่ยนรหัส" },
+    active: { bg: "#DCFCE7", color: "#15803D", text: "ใช้งาน" },
+  };
+  const s = map[state];
   return (
-    <span
-      className="inline-flex items-center rounded-full px-2 py-0.5"
-      style={{ background: bg, color, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}
-    >
-      {children}
+    <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-semibold" style={{ background: s.bg, color: s.color }} data-testid="user-status" data-state={state}>
+      {s.text}
+    </span>
+  );
+}
+
+function RolePill({ roleKey, role }) {
+  const d = roleDisplay(roleKey, role);
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium" style={{ background: "#F5F7FB", color: NAVY }} data-testid="user-role" data-role={roleKey}>
+      <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.color }} />
+      {d.name}
     </span>
   );
 }
@@ -68,12 +90,12 @@ export default function UsersClient({ initial, actor }) {
   useEffect(() => setData(initial), [initial]);
 
   const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [linkFilter, setLinkFilter] = useState("all"); // "all" | "unlinked"
-  const [deleting, setDeleting] = useState(null); // { user, typed } — superadmin delete dialog
+  const [tab, setTab] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
 
   const [confirm, setConfirm] = useState(null); // { user, action: "suspend" | "activate" | "unlock" | "unlink" }
+  const [deleting, setDeleting] = useState(null); // { user, typed } — superadmin delete dialog
+  const [roleFor, setRoleFor] = useState(null); // { user, role } — role change dialog (superadmin)
   const [busy, setBusy] = useState(false);
   const [resetFor, setResetFor] = useState(null); // user — ResetPasswordDialog
   const [editingEmail, setEditingEmail] = useState(null); // { user, value, error }
@@ -81,6 +103,7 @@ export default function UsersClient({ initial, actor }) {
   const [created, setCreated] = useState(null); // { email, tempPassword } — shown once
   const [toast, setToast] = useState(null);
 
+  const roles = useMemo(() => sortRoles(data.roles), [data.roles]);
   const roleByKey = useMemo(() => new Map(data.roles.map((r) => [r.key, r])), [data.roles]);
 
   function showToast(message, type = "success") {
@@ -88,31 +111,56 @@ export default function UsersClient({ initial, actor }) {
     setTimeout(() => setToast(null), 3500);
   }
 
+  // State per user, from one clock reading per render.
+  const now = Date.now();
+  const withState = useMemo(() => data.users.map((u) => ({ u, state: accountState(u, now) })), [data.users, now]);
+  const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withState.filter(({ u, state }) => t.test(u, state)).length])), [withState]);
+
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return data.users.filter((u) => {
-      if (statusFilter !== "all" && u.status !== statusFilter) return false;
-      if (linkFilter === "unlinked" && u.employee) return false;
+    const tabTest = TABS.find((t) => t.key === tab).test;
+    return withState.filter(({ u, state }) => {
+      if (!tabTest(u, state)) return false;
       if (roleFilter !== "all" && u.role !== roleFilter) return false;
       if (!needle) return true;
       // employee.nameSearch: Thai + English + nickname (lib/employeeName.js)
-      return [u.name, u.email, u.employee?.name, u.employee?.nameSearch].some((v) =>
-        (v || "").toLowerCase().includes(needle)
-      );
+      return [u.name, u.email, u.employee?.name, u.employee?.fullNameTh, u.employee?.nameSearch].some((v) => (v || "").toLowerCase().includes(needle));
     });
-  }, [data.users, q, statusFilter, roleFilter, linkFilter]);
+  }, [withState, q, tab, roleFilter]);
 
   function targetOf(u) {
     return { id: u._id, isSuperadmin: u.isSuperadmin, status: u.status };
   }
 
   function actionBlock(u, action) {
-    return accountActionBlock({
-      actor,
-      target: targetOf(u),
-      action,
-      activeSuperadminCount: data.activeSuperadminCount,
-    });
+    return accountActionBlock({ actor, target: targetOf(u), action, activeSuperadminCount: data.activeSuperadminCount });
+  }
+
+  /** The row's menu: only what this viewer may do on this account, in the design's order. */
+  function menuItems(u, state) {
+    const statusAction = u.status === "suspended" ? "activate" : "suspend";
+    const roleBlock = actor.isSuperadmin
+      ? roleChangeBlock({ actor, target: targetOf(u), newRoleIsSuperadmin: false, activeSuperadminCount: data.activeSuperadminCount })
+      : true;
+    const linkBlock = linkActionBlock({ actor, target: targetOf(u), action: u.employee ? "unlink" : "link" });
+    const deleteBlock = actor.isSuperadmin ? accountDeleteBlock({ actor, target: targetOf(u), activeSuperadminCount: data.activeSuperadminCount }) : true;
+    return [
+      !roleBlock && { key: "role", label: "เปลี่ยนบทบาท", Icon: UserCog, onClick: () => setRoleFor({ user: u, role: u.role }) },
+      !actionBlock(u, "email") && { key: "email", label: "แก้ไขอีเมล", Icon: Mail, onClick: () => setEditingEmail({ user: u, value: u.email, error: "" }) },
+      !linkBlock &&
+        (u.employee
+          ? { key: "unlink", label: "ยกเลิกผูกพนักงาน", Icon: Unlink, onClick: () => setConfirm({ user: u, action: "unlink" }) }
+          : { key: "link", label: "ผูกพนักงาน", Icon: Link2, onClick: () => setPicker({ mode: "link", user: u }) }),
+      state === "locked" && !actionBlock(u, "unlock") && { key: "unlock", label: "ปลดล็อก", Icon: LockOpen, onClick: () => setConfirm({ user: u, action: "unlock" }) },
+      !actionBlock(u, statusAction) && {
+        key: "status",
+        label: statusAction === "suspend" ? "ระงับบัญชี" : "เปิดใช้งานบัญชี",
+        Icon: statusAction === "suspend" ? Ban : CheckCircle2,
+        tone: statusAction === "suspend" ? "danger" : undefined,
+        onClick: () => setConfirm({ user: u, action: statusAction }),
+      },
+      !deleteBlock && { key: "delete", label: "ลบบัญชี", Icon: Trash2, tone: "danger", divider: true, onClick: () => setDeleting({ user: u, typed: "" }) },
+    ].filter(Boolean);
   }
 
   async function runConfirmed() {
@@ -173,9 +221,11 @@ export default function UsersClient({ initial, actor }) {
     }
   }
 
-  async function changeRole(user, role) {
-    if (role === user.role) return;
-    if (!window.confirm(`เปลี่ยนบทบาทของ ${user.email} เป็น "${roleByKey.get(role)?.name || role}" ?`)) return;
+  async function saveRole() {
+    if (!roleFor) return;
+    const { user, role } = roleFor;
+    if (role === user.role) return setRoleFor(null);
+    setBusy(true);
     try {
       const res = await fetch(`/api/users/${user._id}`, {
         method: "PATCH",
@@ -184,10 +234,14 @@ export default function UsersClient({ initial, actor }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || j.ok === false) throw new Error(j.message || j.error || "เปลี่ยนบทบาทไม่สำเร็จ");
+      setRoleFor(null);
       showToast("เปลี่ยนบทบาทแล้ว — มีผลภายในประมาณ 5 นาที");
       router.refresh();
     } catch (err) {
+      setRoleFor(null);
       showToast(err.message, "error");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -243,339 +297,270 @@ export default function UsersClient({ initial, actor }) {
   }
 
   const confirmCopy = {
-    unlink: {
-      title: "ยกเลิกการผูกพนักงาน",
-      body: "บัญชีจะยังอยู่พร้อมบทบาทเดิม แต่จะไม่เห็นข้อมูลของพนักงานคนนี้อีก — ผูกใหม่ได้ภายหลัง",
-      cta: "ยกเลิกการผูก",
-    },
-    suspend: {
-      title: "ระงับบัญชี",
-      body: "ผู้ใช้จะเข้าสู่ระบบไม่ได้ และการใช้งานที่เปิดอยู่จะถูกตัดภายในประมาณ 5 นาที",
-      cta: "ระงับบัญชี",
-    },
-    activate: {
-      title: "เปิดใช้งานบัญชี",
-      body: "ผู้ใช้จะกลับมาเข้าสู่ระบบได้ตามปกติ",
-      cta: "เปิดใช้งาน",
-    },
-    unlock: {
-      title: "ปลดล็อกบัญชี",
-      body: "บัญชีถูกล็อกชั่วคราวเพราะใส่รหัสผ่านผิดหลายครั้ง — ปลดล็อกแล้วผู้ใช้จะเข้าสู่ระบบได้ทันที",
-      cta: "ปลดล็อก",
-    },
+    unlink: { title: "ยกเลิกการผูกพนักงาน", body: "บัญชีจะยังอยู่พร้อมบทบาทเดิม แต่จะไม่เห็นข้อมูลของพนักงานคนนี้อีก — ผูกใหม่ได้ภายหลัง", cta: "ยกเลิกการผูก", danger: true },
+    suspend: { title: "ระงับบัญชี", body: "ผู้ใช้จะเข้าสู่ระบบไม่ได้ และการใช้งานที่เปิดอยู่จะถูกตัดภายในประมาณ 5 นาที", cta: "ระงับบัญชี", danger: true },
+    activate: { title: "เปิดใช้งานบัญชี", body: "ผู้ใช้จะกลับมาเข้าสู่ระบบได้ตามปกติ", cta: "เปิดใช้งาน" },
+    unlock: { title: "ปลดล็อกบัญชี", body: "บัญชีถูกล็อกชั่วคราวเพราะใส่รหัสผ่านผิดหลายครั้ง — ปลดล็อกแล้วผู้ใช้จะเข้าสู่ระบบได้ทันที", cta: "ปลดล็อก" },
+  };
+
+  const displayName = (u) => u.name || u.employee?.fullNameTh || u.employee?.name || u.email.split("@")[0];
+
+  const cells = (u, state) => {
+    const items = menuItems(u, state);
+    const resetBlock = actionBlock(u, "reset");
+    return {
+      account: (
+        <div className="flex min-w-0 items-center gap-3">
+          <PersonAvatar src={u.employee?.photoUrl} name={u.employee?.name || displayName(u)} size={36} />
+          <div className="min-w-0">
+            <div className="break-words text-[15px] font-semibold" style={{ color: NAVY }} data-testid="user-name">{displayName(u)}</div>
+            <div className="break-all text-[13px]" style={{ color: SLATE }} data-testid="user-email">{u.email}</div>
+            {u.employee?.emailMismatch && (
+              <div className="mt-0.5 flex items-center gap-1 text-[12px] font-medium" style={{ color: "#B45309" }} data-testid="user-email-mismatch">
+                <AlertTriangle size={13} aria-hidden /> อีเมลไม่ตรงกับพนักงาน
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+      role: <RolePill roleKey={u.role} role={roleByKey.get(u.role)} />,
+      employee: u.employee ? (
+        <div className="min-w-0" data-testid="user-employee">
+          <Link href={`/dashboard/hrm/employee-profile?id=${u.employee._id}`} className={`inline-flex items-center gap-1.5 text-[14px] font-medium no-underline hover:underline ${FOCUS}`} style={{ color: BLUE }}>
+            <Link2 size={14} aria-hidden className="shrink-0" /> <span className="break-words">{u.employee.fullNameTh || u.employee.name || "-"}</span>
+          </Link>
+          {u.employee.position && <div className="text-[12px]" style={{ color: SLATE }}>{u.employee.position}</div>}
+        </div>
+      ) : (
+        <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-semibold" style={{ background: "#FEF3C7", color: "#92400E" }} data-testid="user-unlinked">
+          ไม่ได้ผูกพนักงาน
+        </span>
+      ),
+      status: <StatusPill u={u} state={state} />,
+      lastLogin: (
+        <span className="text-[13px]" style={{ color: SLATE }} title={u.lastLoginAt ? fullDateTimeTh(u.lastLoginAt) : undefined} data-testid="user-last-login" suppressHydrationWarning>
+          {lastSeenTh(u.lastLoginAt)}
+        </span>
+      ),
+      actions: (
+        <div className="flex items-center justify-end gap-2">
+          {!resetBlock && (
+            <button
+              type="button"
+              onClick={() => setResetFor(u)}
+              className={`inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-[10px] bg-white px-3 text-[13px] font-semibold md:min-h-[36px] ${FOCUS}`}
+              style={{ border: "1px solid #D6E0F0", color: BLUE }}
+              data-testid="user-reset"
+            >
+              <KeyRound size={14} aria-hidden /> รีเซ็ตรหัส
+            </button>
+          )}
+          {items.length > 0 && <RowMenu label={`การดำเนินการเพิ่มเติมสำหรับ ${u.email}`} items={items} />}
+        </div>
+      ),
+    };
   };
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto" }} className="space-y-6">
-      {/* ── Header ─────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl"
-          style={{ background: "rgba(0,92,255,0.08)", color: BLUE }}
-        >
-          <Users size={22} strokeWidth={1.8} />
+    <div className={PAGE} style={PAGE_BG}>
+      <div className="mx-auto max-w-[1360px] space-y-4 md:space-y-5">
+        {/* ── Tabs + create ─────────────────────── */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 overflow-x-auto">
+            <div role="tablist" aria-label="สถานะบัญชี" className="inline-flex gap-1 rounded-xl bg-white p-1" style={{ border: `1px solid ${LINE}` }}>
+              {TABS.map((t) => {
+                const active = tab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(t.key)}
+                    className={`inline-flex min-h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 text-[14px] font-medium ${FOCUS}`}
+                    style={active ? { background: NAVY, color: "#FFFFFF" } : { color: NAVY }}
+                    data-testid="user-tab"
+                    data-tab={t.key}
+                  >
+                    {t.label}
+                    <span className="text-[13px] font-semibold" style={{ color: active ? "#D4F73F" : SLATE }} data-testid="user-tab-count">{counts[t.key]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <button type="button" onClick={() => setPicker({ mode: "create" })} className={`${BTN_PRIMARY} shrink-0`} data-testid="create-account-for-employee">
+            <UserPlus size={16} aria-hidden /> สร้างบัญชีให้พนักงาน
+          </button>
         </div>
-        <div style={{ flex: "1 1 320px" }}>
-          <h1 style={{ color: NAVY, fontSize: 22, fontWeight: 700 }}>ผู้ใช้</h1>
-          <p style={{ color: SLATE, fontSize: 13 }}>
-            บัญชีเข้าสู่ระบบทั้งหมด — รีเซ็ตรหัสผ่าน แก้ไขอีเมล ระงับ/เปิดใช้งาน ปลดล็อก สร้างบัญชีและผูกพนักงาน
-            {actor.isSuperadmin ? " และกำหนดบทบาท" : ""}
-          </p>
-        </div>
-        <button
-          onClick={() => setPicker({ mode: "create" })}
-          className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5"
-          style={{ background: BLUE, color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
-          data-testid="create-account-for-employee"
-        >
-          <UserPlus size={15} />
-          สร้างบัญชีให้พนักงาน
-        </button>
-      </div>
 
-      {/* ── Filters ────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative" style={{ flex: "1 1 260px" }}>
-          <Search
-            size={16}
-            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: SLATE }}
-          />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="ค้นหาชื่อหรืออีเมล…"
-            aria-label="ค้นหาชื่อหรืออีเมล"
-            style={{ ...inputStyle, paddingLeft: 36 }}
-          />
+        {/* ── Toolbar ───────────────────────────── */}
+        <div className="flex flex-col gap-2 md:flex-row">
+          <label className="relative block min-w-0 flex-1">
+            <span className="sr-only">ค้นหาชื่อหรืออีเมล</span>
+            <Search size={18} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: MUTED }} />
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อหรืออีเมล" className={`${INPUT} pl-10`} data-testid="user-search" />
+          </label>
+          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} aria-label="บทบาท" className={`${INPUT} md:w-60`} data-testid="user-role-filter">
+            <option value="all">ทุกบทบาท</option>
+            {roles.map((r) => (
+              <option key={r.key} value={r.key}>{roleDisplay(r.key, r).name}</option>
+            ))}
+          </select>
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle} aria-label="สถานะ">
-          <option value="all">ทุกสถานะ</option>
-          <option value="active">ใช้งาน</option>
-          <option value="suspended">ระงับ</option>
-        </select>
-        <select value={linkFilter} onChange={(e) => setLinkFilter(e.target.value)} style={selectStyle} aria-label="การผูกพนักงาน">
-          <option value="all">ทุกบัญชี</option>
-          <option value="unlinked">ไม่ได้ผูกพนักงาน</option>
-        </select>
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={selectStyle} aria-label="บทบาท">
-          <option value="all">ทุกบทบาท</option>
-          {data.roles.map((r) => (
-            <option key={r.key} value={r.key}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-        <span style={{ color: SLATE, fontSize: 13 }}>{rows.length} บัญชี</span>
-      </div>
 
-      {/* ── Table ──────────────────────────────── */}
-      <div style={{ ...CARD, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
-          <thead>
-            <tr style={{ background: ICE }}>
-              <th style={thStyle}>ผู้ใช้</th>
-              <th style={thStyle}>บทบาท</th>
-              <th style={thStyle}>พนักงานที่ผูก</th>
-              <th style={thStyle}>สถานะ</th>
-              <th style={thStyle}>เข้าสู่ระบบล่าสุด</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((u) => {
-              const role = roleByKey.get(u.role);
-              const resetBlock = actionBlock(u, "reset");
-              const emailBlock = actionBlock(u, "email");
-              const statusAction = u.status === "suspended" ? "activate" : "suspend";
-              const statusBlock = actionBlock(u, statusAction);
-              const unlockBlock = u.lockedUntil ? actionBlock(u, "unlock") : null;
-              const linkBlock = linkActionBlock({ actor, target: targetOf(u), action: u.employee ? "unlink" : "link" });
-              const deleteBlock = actor.isSuperadmin
-                ? accountDeleteBlock({ actor, target: targetOf(u), activeSuperadminCount: data.activeSuperadminCount })
-                : null;
-              const roleBlock = actor.isSuperadmin
-                ? roleChangeBlock({
-                    actor,
-                    target: targetOf(u),
-                    newRoleIsSuperadmin: false,
-                    activeSuperadminCount: data.activeSuperadminCount,
-                  })
-                : null;
-              return (
-                <tr key={u._id} style={{ borderBottom: "1px solid rgba(0,92,255,0.08)" }}>
-                  <td style={tdStyle}>
-                    <div style={{ color: NAVY, fontWeight: 600 }}>{u.name || u.employee?.name || u.email.split("@")[0]}</div>
-                    <div style={{ color: SLATE, fontSize: 12 }}>{u.email}</div>
-                    {u.mustChangePassword && (
-                      <div className="mt-1">
-                        <Pill bg="#FEF3C7" color="#92400E">ต้องเปลี่ยนรหัส</Pill>
-                      </div>
-                    )}
-                  </td>
-                  <td style={tdStyle}>
-                    {actor.isSuperadmin ? (
-                      <span title={roleBlock?.error}>
-                        <select
-                          value={u.role}
-                          onChange={(e) => changeRole(u, e.target.value)}
-                          disabled={!!roleBlock}
-                          style={{ ...selectStyle, padding: "6px 8px", fontSize: 13 }}
-                          aria-label={`บทบาทของ ${u.email}`}
-                        >
-                          {!role && <option value={u.role}>{u.role}</option>}
-                          {data.roles.map((r) => (
-                            <option key={r.key} value={r.key}>
-                              {r.name}
-                            </option>
-                          ))}
-                        </select>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5" style={{ fontSize: 13, color: NAVY }}>
-                        <span
-                          aria-hidden="true"
-                          style={{ width: 9, height: 9, borderRadius: 999, background: role?.color || "#6b7280" }}
-                        />
-                        {role?.name || u.role}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ ...tdStyle, fontSize: 13 }}>
-                    {u.employee ? (
-                      <>
-                        <span style={{ color: SLATE }}>#{u.employee.empAutoId ?? "-"}</span>{" "}
-                        <Link
-                          href={`/dashboard/hrm/employee-profile?id=${u.employee._id}`}
-                          style={{ color: BLUE, textDecoration: "underline", textUnderlineOffset: 2 }}
-                        >
-                          {u.employee.name || "-"}
-                        </Link>
-                        {u.employee.emailMismatch && (
-                          <div className="mt-1" title="อีเมลของบัญชีไม่ตรงกับอีเมลพนักงาน">
-                            <Pill bg="#FEF3C7" color="#92400E">อีเมลไม่ตรงกับพนักงาน</Pill>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <span style={{ color: SLATE }}>ไม่ได้ผูกพนักงาน</span>
-                    )}
-                  </td>
-                  <td style={tdStyle}>
-                    {u.status === "suspended" ? (
-                      <Pill bg="#FEE2E2" color="#991B1B">ระงับ</Pill>
-                    ) : (
-                      <Pill bg="#D1FAE5" color="#065F46">ใช้งาน</Pill>
-                    )}
-                    {u.lockedUntil && (
-                      <div className="mt-1">
-                        <Pill bg="#FEF3C7" color="#92400E">ล็อกอยู่ถึง {fmtTime(u.lockedUntil)}</Pill>
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ ...tdStyle, fontSize: 13, color: SLATE }}>{fmtDateTime(u.lastLoginAt)}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
-                    <div className="inline-flex items-center gap-2">
-                      <span title={resetBlock?.error}>
-                        <button
-                          onClick={() => setResetFor(u)}
-                          disabled={!!resetBlock}
-                          style={{ ...actionBtn(BLUE), opacity: resetBlock ? 0.45 : 1 }}
-                        >
-                          <KeyRound size={13} />
-                          รีเซ็ตรหัสผ่าน
-                        </button>
-                      </span>
-                      {/* Only the items this viewer may use on this row (blocked ones are left out). */}
-                      <RowMenu
-                        label={`การดำเนินการเพิ่มเติมสำหรับ ${u.email}`}
-                        items={[
-                          !emailBlock && {
-                            key: "email",
-                            label: "แก้ไขอีเมล",
-                            Icon: Mail,
-                            onClick: () => setEditingEmail({ user: u, value: u.email, error: "" }),
-                          },
-                          !linkBlock &&
-                            (u.employee
-                              ? { key: "unlink", label: "ยกเลิกการผูก", Icon: Unlink, onClick: () => setConfirm({ user: u, action: "unlink" }) }
-                              : { key: "link", label: "ผูกพนักงาน", Icon: Link2, onClick: () => setPicker({ mode: "link", user: u }) }),
-                          !statusBlock && {
-                            key: "status",
-                            label: statusAction === "suspend" ? "ระงับบัญชี" : "เปิดใช้งาน",
-                            Icon: statusAction === "suspend" ? Ban : CheckCircle2,
-                            onClick: () => setConfirm({ user: u, action: statusAction }),
-                          },
-                          u.lockedUntil &&
-                            !unlockBlock && {
-                              key: "unlock",
-                              label: "ปลดล็อก",
-                              Icon: LockOpen,
-                              onClick: () => setConfirm({ user: u, action: "unlock" }),
-                            },
-                          actor.isSuperadmin &&
-                            !deleteBlock && {
-                              key: "delete",
-                              label: "ลบบัญชี",
-                              Icon: Trash2,
-                              danger: true,
-                              onClick: () => setDeleting({ user: u, typed: "" }),
-                            },
-                        ].filter(Boolean)}
-                      />
+        {rows.length === 0 ? (
+          <div className="rounded-2xl bg-white p-10 text-center text-[14px]" style={{ border: `1px solid ${LINE}`, color: SLATE }} data-testid="user-empty">
+            ไม่พบบัญชีที่ตรงกับการค้นหา
+          </div>
+        ) : (
+          <>
+            {/* tablet / desktop */}
+            <div className="hidden overflow-hidden rounded-2xl bg-white md:block" style={{ border: `1px solid ${LINE}` }} data-testid="user-table">
+              <table className="w-full table-fixed border-collapse text-left">
+                <colgroup>
+                  <col />
+                  <col className="w-[150px]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[170px]" />
+                </colgroup>
+                <thead>
+                  <tr className="text-[13px]" style={{ background: "#F8FAFD", color: SLATE }}>
+                    <th className="p-4 font-semibold">บัญชี</th>
+                    <th className="p-4 font-semibold">บทบาท</th>
+                    <th className="p-4 font-semibold">พนักงานที่ผูก</th>
+                    <th className="p-4 font-semibold">สถานะ</th>
+                    <th className="p-4 font-semibold">เข้าสู่ระบบล่าสุด</th>
+                    <th className="p-4"><span className="sr-only">จัดการ</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ u, state }) => {
+                    const c = cells(u, state);
+                    return (
+                      <tr key={u._id} style={{ borderTop: "1px solid #EEF2F8" }} data-testid="user-row" data-email={u.email}>
+                        <td className="p-4 align-middle">{c.account}</td>
+                        <td className="p-4 align-middle">{c.role}</td>
+                        <td className="p-4 align-middle">{c.employee}</td>
+                        <td className="p-4 align-middle">{c.status}</td>
+                        <td className="p-4 align-middle">{c.lastLogin}</td>
+                        <td className="p-4 align-middle">{c.actions}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* phone */}
+            <div className="space-y-3 md:hidden" data-testid="user-cards">
+              {rows.map(({ u, state }) => {
+                const c = cells(u, state);
+                return (
+                  <div key={u._id} className="space-y-3 rounded-2xl bg-white p-4" style={{ border: `1px solid ${LINE}` }} data-testid="user-card" data-email={u.email}>
+                    {c.account}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {c.role}
+                      {c.status}
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: 40, color: SLATE }}>
-                  ไม่พบผู้ใช้ที่ตรงเงื่อนไข
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                    <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-3 gap-y-2 text-[13px]">
+                      <dt style={{ color: SLATE }}>พนักงาน</dt>
+                      <dd className="min-w-0">{c.employee}</dd>
+                      <dt style={{ color: SLATE }}>เข้าล่าสุด</dt>
+                      <dd>{c.lastLogin}</dd>
+                    </dl>
+                    {c.actions}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Confirm dialog ─────────────────────── */}
       {confirm && (
         <Dialog onClose={() => !busy && setConfirm(null)} labelledBy="confirm-title">
-          <h3 id="confirm-title" style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
-            {confirmCopy[confirm.action].title}
-          </h3>
-          <p style={{ color: NAVY, fontSize: 14, marginTop: 8 }}>
+          <h3 id="confirm-title" className="text-[17px] font-bold" style={{ color: NAVY }}>{confirmCopy[confirm.action].title}</h3>
+          <p className="mt-2 break-all text-[14px]" style={{ color: NAVY }}>
             {confirm.user.email}
             {confirm.action === "unlink" && confirm.user.employee ? ` ↔ ${confirm.user.employee.name}` : ""}
           </p>
-          <p style={{ color: SLATE, fontSize: 14, marginTop: 8 }}>{confirmCopy[confirm.action].body}</p>
-          <div className="flex justify-end gap-3 mt-6">
-            <button onClick={() => setConfirm(null)} disabled={busy} style={secondaryBtn}>
-              ยกเลิก
-            </button>
-            <button
-              onClick={runConfirmed}
-              disabled={busy}
-              className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5"
-              style={{
-                background: confirm.action === "suspend" || confirm.action === "unlink" ? "#991B1B" : BLUE,
-                color: "#FFFFFF",
-                fontSize: 13,
-                fontWeight: 600,
-                border: "none",
-              }}
-            >
+          <p className="mt-2 text-[14px]" style={{ color: SLATE }}>{confirmCopy[confirm.action].body}</p>
+          <DialogActions>
+            <button type="button" onClick={() => setConfirm(null)} disabled={busy} className={BTN_SECONDARY}>ยกเลิก</button>
+            <button type="button" onClick={runConfirmed} disabled={busy} className={confirmCopy[confirm.action].danger ? DANGER_SOLID : BTN_PRIMARY} data-testid="confirm-ok">
               {busy && <Loader2 size={15} className="animate-spin" />}
               {confirmCopy[confirm.action].cta}
             </button>
-          </div>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* ── Change role (superadmin) ───────────── */}
+      {roleFor && (
+        <Dialog onClose={() => !busy && setRoleFor(null)} labelledBy="role-title">
+          <h3 id="role-title" className="text-[17px] font-bold" style={{ color: NAVY }}>เปลี่ยนบทบาท</h3>
+          <p className="mt-2 break-all text-[14px]" style={{ color: NAVY }}>{roleFor.user.email}</p>
+          <label className="mt-4 block text-[13px] font-semibold" style={{ color: NAVY }} htmlFor="role-select">บทบาทใหม่</label>
+          <select
+            id="role-select"
+            value={roleFor.role}
+            onChange={(e) => setRoleFor((d) => ({ ...d, role: e.target.value }))}
+            className={`${INPUT} mt-1`}
+            data-testid="role-select"
+          >
+            {!roleByKey.get(roleFor.user.role) && <option value={roleFor.user.role}>{roleFor.user.role}</option>}
+            {roles.map((r) => (
+              <option key={r.key} value={r.key}>{roleDisplay(r.key, r).name} ({r.key})</option>
+            ))}
+          </select>
+          <p className="mt-2 text-[12px]" style={{ color: SLATE }}>มีผลกับผู้ใช้ที่ล็อกอินอยู่ภายในประมาณ 5 นาที</p>
+          <DialogActions>
+            <button type="button" onClick={() => setRoleFor(null)} disabled={busy} className={BTN_SECONDARY}>ยกเลิก</button>
+            <button type="button" onClick={saveRole} disabled={busy || roleFor.role === roleFor.user.role} className={BTN_PRIMARY} data-testid="role-save">
+              {busy && <Loader2 size={15} className="animate-spin" />}
+              เปลี่ยนเป็น {roleDisplay(roleFor.role, roleByKey.get(roleFor.role)).name}
+            </button>
+          </DialogActions>
         </Dialog>
       )}
 
       {/* ── Delete account (superadmin; type the email to confirm) ── */}
       {deleting && (
         <Dialog onClose={() => !busy && setDeleting(null)} labelledBy="delete-title">
-          <h3 id="delete-title" style={{ color: "#991B1B", fontSize: 18, fontWeight: 700 }}>
-            ลบบัญชีผู้ใช้
-          </h3>
-          <p style={{ color: NAVY, fontSize: 14, marginTop: 8 }}>{deleting.user.email}</p>
-          <p style={{ color: SLATE, fontSize: 13, marginTop: 8 }}>
+          <h3 id="delete-title" className="text-[17px] font-bold" style={{ color: RED }}>ลบบัญชีผู้ใช้</h3>
+          <p className="mt-2 break-all text-[14px]" style={{ color: NAVY }}>{deleting.user.email}</p>
+          <p className="mt-2 text-[13px]" style={{ color: SLATE }}>
             ข้อมูลพนักงานและประวัติทั้งหมด (การลา OT การอนุมัติ เวลาทำงาน) จะยังอยู่ครบ — บัญชีจะถูกยกเลิกการผูกแล้วลบ
             และจุดที่เคยอ้างถึงบัญชีนี้จะแสดงว่า “บัญชีถูกลบ”
           </p>
-          <p
-            className="rounded-lg px-3 py-2"
-            style={{ background: "#FEF3C7", color: "#92400E", fontSize: 13, marginTop: 10 }}
-          >
+          <p className="mt-2.5 rounded-xl px-3 py-2 text-[13px]" style={{ background: "#FEF3C7", color: "#92400E" }}>
             พนักงานที่ลาออกแล้ว แนะนำให้ใช้ “ระงับบัญชี” แทน — การลบใช้สำหรับบัญชีที่สร้างผิดหรือซ้ำเท่านั้น และย้อนกลับไม่ได้
           </p>
-          <label style={{ display: "block", color: NAVY, fontSize: 13, marginTop: 14 }}>
-            พิมพ์อีเมลของบัญชีเพื่อยืนยัน
-          </label>
+          <label className="mt-3.5 block text-[13px] font-semibold" style={{ color: NAVY }}>พิมพ์อีเมลของบัญชีเพื่อยืนยัน</label>
           <input
             value={deleting.typed}
             onChange={(e) => setDeleting((d) => ({ ...d, typed: e.target.value }))}
             placeholder={deleting.user.email}
             aria-label="พิมพ์อีเมลของบัญชีเพื่อยืนยัน"
-            style={{ ...inputStyle, marginTop: 6 }}
+            className={`${INPUT} mt-1.5`}
             autoComplete="off"
           />
-          <div className="flex justify-end gap-3 mt-6">
-            <button onClick={() => setDeleting(null)} disabled={busy} style={secondaryBtn}>
-              ยกเลิก
-            </button>
+          <DialogActions>
+            <button type="button" onClick={() => setDeleting(null)} disabled={busy} className={BTN_SECONDARY}>ยกเลิก</button>
             <button
+              type="button"
               onClick={runDelete}
-              disabled={
-                busy || deleting.typed.trim().toLowerCase() !== deleting.user.email.trim().toLowerCase()
-              }
-              className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 disabled:opacity-50"
-              style={{ background: "#991B1B", color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
+              disabled={busy || deleting.typed.trim().toLowerCase() !== deleting.user.email.trim().toLowerCase()}
+              className={DANGER_SOLID}
             >
               {busy && <Loader2 size={15} className="animate-spin" />}
               ลบบัญชีถาวร
             </button>
-          </div>
+          </DialogActions>
         </Dialog>
       )}
 
@@ -594,35 +579,26 @@ export default function UsersClient({ initial, actor }) {
       {/* ── Edit sign-in email ─────────────────── */}
       {editingEmail && (
         <Dialog onClose={() => !busy && setEditingEmail(null)} labelledBy="email-title">
-          <h3 id="email-title" style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
-            แก้ไขอีเมลเข้าสู่ระบบ
-          </h3>
-          <p style={{ color: SLATE, fontSize: 13, marginTop: 6 }}>
-            ผู้ใช้จะต้องเข้าสู่ระบบด้วยอีเมลใหม่ — อีเมลในข้อมูลพนักงานไม่เปลี่ยนตาม
-          </p>
-          <label style={{ display: "block", color: NAVY, fontSize: 13, marginTop: 14 }}>อีเมล</label>
+          <h3 id="email-title" className="text-[17px] font-bold" style={{ color: NAVY }}>แก้ไขอีเมลเข้าสู่ระบบ</h3>
+          <p className="mt-1.5 text-[13px]" style={{ color: SLATE }}>ผู้ใช้จะต้องเข้าสู่ระบบด้วยอีเมลใหม่ — อีเมลในข้อมูลพนักงานไม่เปลี่ยนตาม</p>
+          <label className="mt-3.5 block text-[13px] font-semibold" style={{ color: NAVY }}>อีเมล</label>
           <input
             type="email"
             value={editingEmail.value}
             onChange={(e) => setEditingEmail((d) => ({ ...d, value: e.target.value, error: "" }))}
             aria-label="อีเมลเข้าสู่ระบบ"
             autoComplete="off"
-            style={{ ...inputStyle, marginTop: 6 }}
+            className={`${INPUT} mt-1.5`}
           />
           {editingEmail.user.employee?.emailMismatch && (
-            <div
-              className="rounded-lg px-3 py-2 mt-3"
-              style={{ background: "#FEF3C7", color: "#92400E", fontSize: 13 }}
-            >
-              อีเมลพนักงาน: <b>{editingEmail.user.employee.email || "—"}</b>
+            <div className="mt-3 rounded-xl px-3 py-2 text-[13px]" style={{ background: "#FEF3C7", color: "#92400E" }}>
+              อีเมลพนักงาน: <b className="break-all">{editingEmail.user.employee.email || "—"}</b>
               {editingEmail.user.employee.email && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setEditingEmail((d) => ({ ...d, value: d.user.employee.email, error: "" }))
-                  }
-                  className="block mt-2 rounded-lg px-3 py-1.5"
-                  style={{ border: "1px solid #92400E40", color: "#92400E", fontWeight: 600, background: "#FFFFFF" }}
+                  onClick={() => setEditingEmail((d) => ({ ...d, value: d.user.employee.email, error: "" }))}
+                  className={`mt-2 block min-h-[36px] rounded-[10px] bg-white px-3 font-semibold ${FOCUS}`}
+                  style={{ border: "1px solid #92400E40", color: "#92400E" }}
                 >
                   ใช้อีเมลเดียวกับพนักงาน
                 </button>
@@ -630,24 +606,15 @@ export default function UsersClient({ initial, actor }) {
             </div>
           )}
           {editingEmail.error && (
-            <p role="alert" style={{ color: "#991B1B", fontSize: 13, marginTop: 10 }}>
-              {editingEmail.error}
-            </p>
+            <p role="alert" className="mt-2.5 text-[13px]" style={{ color: RED }}>{editingEmail.error}</p>
           )}
-          <div className="flex justify-end gap-3 mt-6">
-            <button onClick={() => setEditingEmail(null)} disabled={busy} style={secondaryBtn}>
-              ยกเลิก
-            </button>
-            <button
-              onClick={saveEmail}
-              disabled={busy || !editingEmail.value.trim()}
-              className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 disabled:opacity-50"
-              style={{ background: BLUE, color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
-            >
+          <DialogActions>
+            <button type="button" onClick={() => setEditingEmail(null)} disabled={busy} className={BTN_SECONDARY}>ยกเลิก</button>
+            <button type="button" onClick={saveEmail} disabled={busy || !editingEmail.value.trim()} className={BTN_PRIMARY}>
               {busy && <Loader2 size={15} className="animate-spin" />}
               บันทึกอีเมล
             </button>
-          </div>
+          </DialogActions>
         </Dialog>
       )}
 
@@ -669,24 +636,17 @@ export default function UsersClient({ initial, actor }) {
       )}
 
       {/* ── New account's temporary password (shown once) ── */}
-      {created && (
-        <TempPasswordDialog email={created.email} tempPassword={created.tempPassword} onClose={() => setCreated(null)} />
-      )}
+      {created && <TempPasswordDialog email={created.email} tempPassword={created.tempPassword} onClose={() => setCreated(null)} />}
 
       {/* ── Toast ─────────────────────────────── */}
       {toast && (
         <div
           role="status"
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl px-5 py-3"
-          style={{
-            background: toast.type === "error" ? "#991B1B" : "#065F46",
-            color: "#FFFFFF",
-            fontSize: 14,
-            fontWeight: 500,
-            boxShadow: "0 8px 32px rgba(13,27,42,0.25)",
-          }}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-medium text-white"
+          style={{ background: toast.type === "error" ? "#991B1B" : "#065F46", boxShadow: "0 8px 32px rgba(13,27,42,0.25)" }}
+          data-testid="user-toast"
         >
-          {toast.type === "error" ? <X size={16} /> : <Check size={16} />}
+          {toast.type === "error" ? <X size={16} aria-hidden /> : <Check size={16} aria-hidden />}
           {toast.message}
         </div>
       )}
@@ -694,92 +654,123 @@ export default function UsersClient({ initial, actor }) {
   );
 }
 
+const DANGER_SOLID = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#B91C1C] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#991B1B] disabled:opacity-50 ${FOCUS}`;
+
 /**
- * "…" menu of a row's secondary actions. Positioned `fixed` from the button
- * so the table's overflow container never clips it; closes on outside click,
- * Escape, scroll and resize. Danger items (ลบบัญชี) go last, after a divider.
+ * "···" menu of a row's actions. Positioned `fixed` from the button so no
+ * container clips it. Keyboard: opens on the first item; ↑/↓/Home/End move;
+ * Escape closes and returns focus to the button; Tab or an outside click,
+ * scroll or resize closes. Danger items are red; a divider precedes ลบบัญชี.
  */
 function RowMenu({ label, items }) {
   const [pos, setPos] = useState(null); // { top, right } while open
-  const ordered = [...items.filter((i) => !i.danger), ...items.filter((i) => i.danger)];
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
 
+  const close = (focusButton = false) => {
+    setPos(null);
+    if (focusButton) btnRef.current?.focus();
+  };
+
+  const open = !!pos;
   useEffect(() => {
-    if (!pos) return;
-    const close = () => setPos(null);
-    const onKey = (e) => e.key === "Escape" && close();
+    if (!open) return;
+    menuRef.current?.querySelector('[role="menuitem"]')?.focus({ preventScroll: true });
     const onDown = (e) => {
-      if (!e.target.closest?.("[data-row-menu]")) close();
+      if (!menuRef.current?.contains(e.target) && !btnRef.current?.contains(e.target)) setPos(null);
     };
-    window.addEventListener("keydown", onKey);
+    // Scrolling keeps the menu on its button; it closes once the button leaves the screen.
+    const onScroll = () => {
+      const r = btnRef.current?.getBoundingClientRect();
+      if (!r || r.bottom < 0 || r.top > window.innerHeight) return setPos(null);
+      setPos(place(r));
+    };
     window.addEventListener("mousedown", onDown);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
+    window.addEventListener("touchstart", onDown);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
     return () => {
-      window.removeEventListener("keydown", onKey);
       window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
+      window.removeEventListener("touchstart", onDown);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
     };
-  }, [pos]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!ordered.length) return <span style={{ display: "inline-block", width: 32 }} aria-hidden="true" />;
+  function place(r) {
+    const height = items.length * 44 + 16;
+    const below = r.bottom + 4 + height <= window.innerHeight;
+    return { top: below ? r.bottom + 4 : Math.max(8, r.top - 4 - height), right: Math.max(8, window.innerWidth - r.right) };
+  }
 
-  function toggle(e) {
-    if (pos) return setPos(null);
-    const r = e.currentTarget.getBoundingClientRect();
-    setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  function toggle() {
+    if (pos) return close();
+    setPos(place(btnRef.current.getBoundingClientRect()));
+  }
+
+  function onMenuKey(e) {
+    const list = [...menuRef.current.querySelectorAll('[role="menuitem"]')];
+    const i = list.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); list[(i + 1) % list.length]?.focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); list[(i - 1 + list.length) % list.length]?.focus(); }
+    else if (e.key === "Home") { e.preventDefault(); list[0]?.focus(); }
+    else if (e.key === "End") { e.preventDefault(); list.at(-1)?.focus(); }
+    else if (e.key === "Escape") { e.preventDefault(); close(true); }
+    else if (e.key === "Tab") close();
   }
 
   return (
-    <span data-row-menu>
+    <>
       <button
+        ref={btnRef}
         type="button"
         onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" && !pos) { e.preventDefault(); toggle(); }
+        }}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={!!pos}
-        style={{ ...actionBtn(SLATE), padding: "6px 8px" }}
+        className={`grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-white md:h-9 md:w-9 ${FOCUS}`}
+        style={{ border: "1px solid #D6E0F0", color: SLATE }}
         data-testid="row-menu"
       >
-        <MoreHorizontal size={15} />
+        <MoreHorizontal size={18} aria-hidden />
       </button>
       {pos && (
         <div
+          ref={menuRef}
           role="menu"
-          className="rounded-xl py-1"
-          style={{
-            position: "fixed",
-            top: pos.top,
-            right: pos.right,
-            zIndex: 40,
-            minWidth: 180,
-            background: "#FFFFFF",
-            border: "1px solid rgba(0,92,255,0.12)",
-            boxShadow: "0 8px 24px rgba(13,27,42,0.16)",
-            textAlign: "left",
-          }}
+          aria-label={label}
+          onKeyDown={onMenuKey}
+          className="rounded-xl bg-white py-1.5 text-left"
+          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 40, minWidth: 210, border: `1px solid ${LINE}`, boxShadow: "0 12px 32px rgba(13,27,42,0.16)" }}
+          data-testid="row-menu-list"
         >
-          {ordered.map((item, i) => (
+          {items.map((item) => (
             <div key={item.key}>
-              {item.danger && i > 0 && <div style={{ height: 1, background: "rgba(0,92,255,0.08)", margin: "4px 0" }} />}
+              {item.divider && <div role="separator" className="my-1.5 h-px" style={{ background: "#EEF2F8" }} />}
               <button
                 type="button"
                 role="menuitem"
+                tabIndex={-1}
                 onClick={() => {
-                  setPos(null);
+                  close();
                   item.onClick();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 hover:bg-slate-50"
-                style={{ color: item.danger ? "#991B1B" : NAVY, fontSize: 13, fontWeight: item.danger ? 600 : 500 }}
+                className="flex min-h-[40px] w-full items-center gap-2.5 px-3.5 text-[14px] outline-none hover:bg-[#F5F8FF] focus:bg-[#EEF4FF]"
+                style={{ color: item.tone === "danger" ? RED : NAVY, fontWeight: item.tone === "danger" ? 600 : 500 }}
+                data-testid="row-menu-item"
+                data-key={item.key}
               >
-                <item.Icon size={14} />
+                <item.Icon size={16} aria-hidden />
                 {item.label}
               </button>
             </div>
           ))}
         </div>
       )}
-    </span>
+    </>
   );
 }
 
@@ -791,24 +782,14 @@ function EmployeePicker({ title, note, cta, employees, busy, onPick, onClose }) 
   const list = needle ? employees.filter((e) => (e.nameSearch || e.name || "").toLowerCase().includes(needle)) : employees;
   return (
     <Dialog onClose={onClose} labelledBy="picker-title">
-      <h3 id="picker-title" style={{ color: NAVY, fontSize: 18, fontWeight: 700 }}>
-        {title}
-      </h3>
-      <p style={{ color: SLATE, fontSize: 13, marginTop: 6 }}>{note}</p>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="ค้นหาชื่อไทย / อังกฤษ / ชื่อเล่น…"
-        aria-label="ค้นหาพนักงาน"
-        style={{ ...inputStyle, marginTop: 14 }}
-        autoFocus
-      />
-      <ul
-        className="mt-3 overflow-y-auto"
-        style={{ maxHeight: 280, border: "1px solid rgba(0,92,255,0.10)", borderRadius: 10 }}
-        role="listbox"
-        aria-label="พนักงานที่ยังไม่มีบัญชี"
-      >
+      <h3 id="picker-title" className="text-[17px] font-bold" style={{ color: NAVY }}>{title}</h3>
+      <p className="mt-1.5 text-[13px]" style={{ color: SLATE }}>{note}</p>
+      <label className="relative mt-3.5 block">
+        <span className="sr-only">ค้นหาพนักงาน</span>
+        <Search size={16} aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: MUTED }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อไทย / อังกฤษ / ชื่อเล่น" className={`${INPUT} pl-10`} autoFocus />
+      </label>
+      <ul className="mt-3 max-h-[280px] overflow-y-auto rounded-xl" style={{ border: `1px solid ${LINE}` }} role="listbox" aria-label="พนักงานที่ยังไม่มีบัญชี">
         {list.map((e) => (
           <li key={e._id}>
             <button
@@ -816,44 +797,44 @@ function EmployeePicker({ title, note, cta, employees, busy, onPick, onClose }) 
               role="option"
               aria-selected={chosen?._id === e._id}
               onClick={() => setChosen(e)}
-              className="w-full text-left px-3 py-2"
-              style={{ background: chosen?._id === e._id ? "rgba(0,92,255,0.08)" : "#FFFFFF", borderBottom: "1px solid rgba(0,92,255,0.06)" }}
+              className={`min-h-[48px] w-full px-3.5 py-2 text-left ${FOCUS}`}
+              style={{ background: chosen?._id === e._id ? "#EEF4FF" : "#FFFFFF", borderBottom: "1px solid #EEF2F8" }}
             >
-              <div style={{ color: NAVY, fontSize: 14, fontWeight: 600 }}>
+              <div className="text-[14px] font-semibold" style={{ color: NAVY }}>
                 {e.name || "-"}
-                {e.nickName ? <span style={{ color: SLATE, fontWeight: 400 }}> ({e.nickName})</span> : null}
+                {e.nickName ? <span className="font-normal" style={{ color: SLATE }}> ({e.nickName})</span> : null}
               </div>
-              <div style={{ color: SLATE, fontSize: 12 }}>
+              <div className="text-[12px]" style={{ color: SLATE }}>
                 {[e.nameEn !== e.name ? e.nameEn : null, e.department, e.position, e.email].filter(Boolean).join(" · ")}
               </div>
             </button>
           </li>
         ))}
         {list.length === 0 && (
-          <li style={{ padding: 16, color: SLATE, fontSize: 13, textAlign: "center" }}>
-            {employees.length ? "ไม่พบพนักงานที่ตรงคำค้น" : "พนักงานทุกคนมีบัญชีแล้ว"}
-          </li>
+          <li className="p-4 text-center text-[13px]" style={{ color: SLATE }}>{employees.length ? "ไม่พบพนักงานที่ตรงคำค้น" : "พนักงานทุกคนมีบัญชีแล้ว"}</li>
         )}
       </ul>
-      <div className="flex justify-end gap-3 mt-6">
-        <button onClick={onClose} disabled={busy} style={secondaryBtn}>
-          ยกเลิก
-        </button>
-        <button
-          onClick={() => chosen && onPick(chosen)}
-          disabled={busy || !chosen}
-          className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 disabled:opacity-50"
-          style={{ background: BLUE, color: "#FFFFFF", fontSize: 13, fontWeight: 600, border: "none" }}
-        >
+      <DialogActions>
+        <button type="button" onClick={onClose} disabled={busy} className={BTN_SECONDARY}>ยกเลิก</button>
+        <button type="button" onClick={() => chosen && onPick(chosen)} disabled={busy || !chosen} className={BTN_PRIMARY}>
           {busy && <Loader2 size={15} className="animate-spin" />}
           {cta}
         </button>
-      </div>
+      </DialogActions>
     </Dialog>
   );
 }
 
+function DialogActions({ children }) {
+  return <div className="mt-6 flex flex-wrap justify-end gap-2">{children}</div>;
+}
+
 function Dialog({ children, onClose, labelledBy }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -866,64 +847,12 @@ function Dialog({ children, onClose, labelledBy }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className="w-full max-w-md rounded-2xl p-6"
-        style={{ background: "#FFFFFF", boxShadow: "0 16px 48px rgba(13,27,42,0.2)" }}
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[20px] bg-white p-5 md:p-6"
+        style={{ border: `1px solid ${LINE}`, boxShadow: "0 16px 48px rgba(13,27,42,0.2)" }}
+        data-testid="user-dialog"
       >
         {children}
       </div>
     </div>
   );
-}
-
-/* ── styles ─────────────────────────────────────── */
-const thStyle = {
-  padding: "12px 16px",
-  textAlign: "left",
-  fontSize: 13,
-  fontWeight: 600,
-  color: "#5E6A7E",
-  borderBottom: "1px solid rgba(0,92,255,0.08)",
-  whiteSpace: "nowrap",
-};
-const tdStyle = { padding: "12px 16px", fontSize: 14, verticalAlign: "top" };
-const inputStyle = {
-  width: "100%",
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid rgba(0,92,255,0.15)",
-  fontSize: 14,
-  color: "#0D1B2A",
-  background: "#FFFFFF",
-};
-const selectStyle = {
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid rgba(0,92,255,0.15)",
-  fontSize: 14,
-  color: "#0D1B2A",
-  background: "#FFFFFF",
-};
-const secondaryBtn = {
-  border: "1px solid rgba(0,92,255,0.10)",
-  color: "#0D1B2A",
-  fontSize: 13,
-  fontWeight: 600,
-  background: "#FFFFFF",
-  borderRadius: 12,
-  padding: "10px 16px",
-};
-function actionBtn(color) {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    border: `1px solid ${color}20`,
-    color,
-    fontSize: 12,
-    fontWeight: 500,
-    background: `${color}08`,
-    borderRadius: 8,
-    padding: "6px 10px",
-    whiteSpace: "nowrap",
-  };
 }
