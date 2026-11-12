@@ -75,7 +75,7 @@ const profileUrl = (id) => `/dashboard/hrm/employee-profile?id=${id}`;
    ================================================================ */
 
 /* ---------- Avatar helper ---------- */
-function AvatarCircle({ photoUrl, emp, size, ringColor, bgColor, textColor, fontSize }) {
+function AvatarCircle({ photoUrl, crop, emp, size, ringColor, bgColor, textColor, fontSize }) {
   const src = avatar(photoUrl);
   return (
     <div
@@ -94,6 +94,7 @@ function AvatarCircle({ photoUrl, emp, size, ringColor, bgColor, textColor, font
     >
       <Avatar
         src={src}
+        crop={crop}
         size={size}
         radius={0}
         fallback={
@@ -129,7 +130,7 @@ function CEONode({ data }) {
       }}
     >
       <AvatarCircle
-        photoUrl={data.photoUrl}
+        photoUrl={data.photoUrl} crop={data.photoCrop}
         emp={data}
         size={56}
         ringColor="#D4F73F"
@@ -187,7 +188,7 @@ function COONode({ data }) {
       }}
     >
       <AvatarCircle
-        photoUrl={data.photoUrl}
+        photoUrl={data.photoUrl} crop={data.photoCrop}
         emp={data}
         size={56}
         ringColor="#2486FF"
@@ -296,7 +297,7 @@ function HeadNode({ data }) {
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: "#2486FF", borderRadius: "4px 0 0 4px" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 14px 0 18px", flex: 1, minWidth: 0 }}>
         <AvatarCircle
-          photoUrl={data.photoUrl}
+          photoUrl={data.photoUrl} crop={data.photoCrop}
           emp={data}
           size={44}
           ringColor="#2486FF"
@@ -356,7 +357,7 @@ function MemberNode({ data }) {
       }}
     >
       <AvatarCircle
-        photoUrl={data.photoUrl}
+        photoUrl={data.photoUrl} crop={data.photoCrop}
         emp={data}
         size={36}
         ringColor="rgba(36,134,255,0.2)"
@@ -459,6 +460,7 @@ function makeGraph({ departments, employees }) {
         position: ceo.position,
         level: ceo.level,
         photoUrl: ceo.photoUrl,
+        photoCrop: ceo.photoCrop,
         empId: String(ceo._id),
         deptLabel: "Management",
       },
@@ -478,6 +480,7 @@ function makeGraph({ departments, employees }) {
         position: coo.position,
         level: coo.level,
         photoUrl: coo.photoUrl,
+        photoCrop: coo.photoCrop,
         empId: String(coo._id),
         deptLabel: "Management",
       },
@@ -541,6 +544,7 @@ function makeGraph({ departments, employees }) {
           position: g.head.position,
           level: g.head.level,
           photoUrl: g.head.photoUrl,
+          photoCrop: g.head.photoCrop,
           empId: String(g.head._id),
         },
         width: SIZE.head.w,
@@ -572,6 +576,7 @@ function makeGraph({ departments, employees }) {
           position: m.position,
           level: m.level,
           photoUrl: m.photoUrl,
+          photoCrop: m.photoCrop,
           empId: String(m._id),
         },
         width: SIZE.member.w,

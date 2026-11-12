@@ -6,7 +6,9 @@ import { useSession } from "next-auth/react";
 import BankSelect from "./../../../../../../components/BankSelect";
 import RoleSelect from "./../../../../../../components/RoleSelect";
 import ResetPasswordDialog from "./../../../../../../components/ResetPasswordDialog";
-import { Loader2 } from "lucide-react";
+import { Crop, Loader2 } from "lucide-react";
+import PhotoCropDialog from "./../../../../../../components/PhotoCropDialog";
+import { cssCropStyle, normalizePhotoCrop } from "@/lib/photoCrop";
 import { canAccess } from "@/lib/rbac/access";
 import { accountActionBlock, linkActionBlock } from "@/lib/rbac/accountRules";
 import EmployeeAccountLink from "./EmployeeAccountLink";
@@ -50,6 +52,19 @@ export default function EmployeeEditForm({
   /* -------------------- Employee state -------------------- */
   const [preview, setPreview] = useState(employee.photoUrl || "");
   const [photoFile, setPhotoFile] = useState(null);
+  // The chosen photo frame (lib/photoCrop.js); `cropping` = the image being framed.
+  const [crop, setCrop] = useState(() => normalizePhotoCrop(employee.photoCrop));
+  const [cropChanged, setCropChanged] = useState(false);
+  const [cropping, setCropping] = useState(null); // { src, file?, crop }
+  function applyCrop(next) {
+    if (cropping.file) {
+      setPhotoFile(cropping.file);
+      setPreview(cropping.src);
+    }
+    setCrop(next);
+    setCropChanged(true);
+    setCropping(null);
+  }
   const [resizing, setResizing] = useState(false);
   const [savingEmp, setSavingEmp] = useState(false);
   const [deletingEmp, setDeletingEmp] = useState(false);
@@ -143,8 +158,8 @@ export default function EmployeeEditForm({
     setResizing(true);
     try {
       const ready = await prepareUpload(f);
-      setPhotoFile(ready);
-      setPreview(URL.createObjectURL(ready));
+      // Choose the frame before it is used; ยกเลิก drops the new file.
+      setCropping({ src: URL.createObjectURL(ready), file: ready, crop: null });
     } catch (err) {
       alert(err.message);
     } finally {
@@ -251,6 +266,7 @@ export default function EmployeeEditForm({
         },
         photoUrl,
         photoPublicId,
+        ...(cropChanged && crop ? { photoCrop: crop } : {}),
       };
 
       const res = await fetch(`/api/employees/${employee._id}`, {
@@ -382,14 +398,19 @@ export default function EmployeeEditForm({
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <h3 className="font-medium text-slate-100 mb-4">Profile Photo</h3>
           <div className="flex items-center gap-4">
-            <div className="relative h-20 w-20 rounded-2xl overflow-hidden ring-1 ring-white/10">
-              <Image
-                src={preview || "/avatar-default.png"}
-                alt="avatar"
-                fill
-                sizes="80px"
-                className="object-cover object-top"
-              />
+            <div className="relative h-20 w-20 rounded-2xl overflow-hidden ring-1 ring-white/10" data-testid="hr-photo-preview">
+              {crop && preview ? (
+                /* eslint-disable-next-line @next/next/no-img-element -- framed with CSS */
+                <img src={preview} alt="avatar" style={{ ...cssCropStyle(crop), display: "block" }} />
+              ) : (
+                <Image
+                  src={preview || "/avatar-default.png"}
+                  alt="avatar"
+                  fill
+                  sizes="80px"
+                  className="object-cover object-top"
+                />
+              )}
             </div>
             <label className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/10 hover:bg-white/15 cursor-pointer">
               <span>{resizing ? "กำลังปรับขนาดรูป…" : "เลือกไฟล์…"}</span>
@@ -399,9 +420,24 @@ export default function EmployeeEditForm({
                 className="hidden"
                 disabled={resizing}
                 onChange={onPickFile}
+                data-testid="hr-photo-file"
               />
             </label>
+            {preview && (
+              <button
+                type="button"
+                onClick={() => setCropping({ src: preview, file: null, crop })}
+                disabled={resizing || savingEmp}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-white/10 px-4 ring-1 ring-white/10 hover:bg-white/15 disabled:opacity-50"
+                data-testid="hr-photo-reframe"
+              >
+                <Crop size={16} aria-hidden /> ปรับกรอบรูป
+              </button>
+            )}
           </div>
+          {cropping && (
+            <PhotoCropDialog src={cropping.src} initialCrop={cropping.crop} onApply={applyCrop} onCancel={() => setCropping(null)} />
+          )}
         </section>
 
         {/* Basic */}

@@ -311,7 +311,7 @@ export default function UsersClient({ initial, actor }) {
     return {
       account: (
         <div className="flex min-w-0 items-center gap-3">
-          <PersonAvatar src={u.employee?.photoUrl} name={u.employee?.name || displayName(u)} size={36} />
+          <PersonAvatar src={u.employee?.photoUrl} crop={u.employee?.photoCrop} name={u.employee?.name || displayName(u)} size={36} />
           <div className="min-w-0">
             <div className="break-words text-[15px] font-semibold" style={{ color: NAVY }} data-testid="user-name">{displayName(u)}</div>
             {/* One line: an address too long for the column ends in "…", never breaks mid-word. */}

@@ -197,7 +197,7 @@ export default function RolesClient({ initialRoles, groups, holders = {} }) {
                       <div className="flex -space-x-2" aria-hidden>
                         {people.map((p) => (
                           <span key={p.id} className="rounded-full" style={{ boxShadow: "0 0 0 2px #FFFFFF" }}>
-                            <PersonAvatar src={p.photoUrl} name={p.name} size={28} />
+                            <PersonAvatar src={p.photoUrl} crop={p.photoCrop} name={p.name} size={28} />
                           </span>
                         ))}
                       </div>

@@ -6,6 +6,7 @@ import cloudinary from "@/lib/cloudinary";
 import { requirePageApi } from "@/lib/rbac/guard";
 import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
 import { SELF_EDIT_FIELDS, SELF_EDIT_LABELS, validateSelfProfile } from "@/lib/employeeFormRules";
+import { parsePhotoCropInput } from "@/lib/photoCrop";
 
 // Same text as components/SelfServiceGate.jsx (a client module; not imported here).
 const UNLINKED_MESSAGE = "บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน";
@@ -26,7 +27,7 @@ function validPhoto(url, publicId) {
 }
 
 /**
- * PATCH { photoUrl?, photoPublicId?, nickName?, phone? } — the caller's OWN
+ * PATCH { photoUrl?, photoPublicId?, photoCrop?, nickName?, phone? } — the caller's OWN
  * linked employee only, and only these fields (SELF_EDIT_FIELDS); any other
  * key is a 400. Names, address, emergency contact, bank and everything else
  * are HR-only (PUT /api/employees/[id], `employees`).
@@ -56,16 +57,28 @@ export async function PATCH(req) {
     }
 
     const update = {};
+    const unset = {};
     if ("nickName" in body) update.nickName = body.nickName.trim();
     if ("phone" in body) update.phone = body.phone.trim();
     if ("photoUrl" in body || "photoPublicId" in body) {
       if (!validPhoto(body.photoUrl, body.photoPublicId)) return bad("รูปโปรไฟล์ไม่ถูกต้อง", { field: "photo" });
       update.photoUrl = body.photoUrl;
       update.photoPublicId = body.photoPublicId;
+      // A new photo without a frame goes back to the automatic framing.
+      if (!("photoCrop" in body)) unset.photoCrop = "";
+    }
+    if ("photoCrop" in body) {
+      const crop = parsePhotoCropInput(body.photoCrop);
+      if (!crop) return bad("กรอบรูปไม่ถูกต้อง", { field: "photo" });
+      if (!update.photoUrl && !emp.photoUrl) return bad("ยังไม่มีรูปโปรไฟล์", { field: "photo" });
+      update.photoCrop = crop;
     }
     if (!Object.keys(update).length) return NextResponse.json({ ok: true }, { headers: NO_STORE });
 
-    await Employee.updateOne({ _id: emp._id }, { $set: { ...update, updatedAt: new Date() } });
+    await Employee.updateOne(
+      { _id: emp._id },
+      { $set: { ...update, updatedAt: new Date() }, ...(Object.keys(unset).length ? { $unset: unset } : {}) }
+    );
 
     // The replaced photo is removed after the save (same as PUT /api/employees/[id]).
     if (update.photoPublicId && emp.photoPublicId && emp.photoPublicId !== update.photoPublicId) {

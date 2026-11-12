@@ -15,7 +15,7 @@ import Employee from "@/models/Employee";
 export const HEAD_FIELDS = "_id firstName lastName firstNameTh lastNameTh empAutoId userId";
 // The HOD page also shows the head's avatar, title and position (fields the
 // head-candidates list already gives that page).
-const LIST_HEAD_FIELDS = `${HEAD_FIELDS} titleTh photoUrl position`;
+const LIST_HEAD_FIELDS = `${HEAD_FIELDS} titleTh photoUrl photoCrop position`;
 
 /** Thrown for bad input; `status` is the HTTP status to answer with. */
 export class HodError extends Error {
@@ -43,6 +43,7 @@ function toItem(dept) {
           empAutoId: head.empAutoId ?? null,
           userId: head.userId ? String(head.userId) : null,
           photoUrl: head.photoUrl ?? null,
+          photoCrop: head.photoCrop ?? null,
           position: head.position ?? "",
         }
       : null,
@@ -112,7 +113,7 @@ export async function listHeadCandidates(q = "") {
     ];
   }
   return Employee.find(match)
-    .select("_id firstName lastName firstNameTh lastNameTh nickName empAutoId position level department userId photoUrl")
+    .select("_id firstName lastName firstNameTh lastNameTh nickName empAutoId position level department userId photoUrl photoCrop")
     .sort({ level: -1, firstName: 1 })
     .lean();
 }

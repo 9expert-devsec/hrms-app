@@ -7,6 +7,7 @@ import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import { inboxCounts } from "@/lib/inbox";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
 import { STATUS_LABELS, THAI_MONTHS, progressCaption, progressOf } from "@/lib/offsiteRules";
+import { normalizePhotoCrop } from "@/lib/photoCrop";
 
 /**
  * Everything the dashboard shows, from real data only. Each block is null
@@ -26,7 +27,7 @@ const IN_PROGRESS = ["inviting", "members_ready", "in_approval", "returned"];
 const WEEKDAYS_TH = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 export const THAI_MONTHS_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
-const PROFILE_FIELDS = `_id ${EMPLOYEE_NAME_FIELDS} photoUrl department departmentId position`;
+const PROFILE_FIELDS = `_id ${EMPLOYEE_NAME_FIELDS} photoUrl photoCrop department departmentId position`;
 
 /** Bangkok calendar today → { today, monthStart, monthEnd } (UTC-midnight Dates) and the Thai long date. */
 export function bangkokToday(now = new Date()) {
@@ -154,6 +155,7 @@ export async function dashboardData(session) {
           name: nameOf(emp),
           nickName: (emp.nickName || "").trim(),
           photoUrl: emp.photoUrl || null,
+          photoCrop: normalizePhotoCrop(emp.photoCrop),
           initialsFrom: employeeDisplayName(emp),
           department: departmentName,
           position: emp.position || "",

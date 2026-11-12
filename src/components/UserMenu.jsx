@@ -32,7 +32,7 @@ export default function UserMenu({ user }) {
         aria-expanded={open}
       >
         <div className="ml-auto relative h-9 w-9 rounded-full overflow-hidden ring-2 ring-[#005CFF]/20">
-          <Avatar src={avatar} alt="avatar" size={36} radius={0} />
+          <Avatar src={avatar} crop={user?.photoUrl ? user?.photoCrop : null} alt="avatar" size={36} radius={0} />
         </div>
         <div className="hidden md:flex flex-col items-start leading-tight">
           <span className="text-sm font-medium text-[#0D1B2A] truncate max-w-[140px]">

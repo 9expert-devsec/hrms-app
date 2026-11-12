@@ -69,7 +69,7 @@ function Person({ r }) {
   const sub = subLine(r);
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <PersonAvatar src={r.photoUrl} name={r.nameThPlain || r.nameEn || r.nameTh} size={40} />
+      <PersonAvatar src={r.photoUrl} crop={r.photoCrop} name={r.nameThPlain || r.nameEn || r.nameTh} size={40} />
       <div className="min-w-0">
         <div className="break-words text-[15px] font-semibold" style={{ color: NAVY }} data-testid="emp-name">{r.nameTh}</div>
         {sub && <div className="break-words text-[13px]" style={{ color: SLATE }} data-testid="emp-sub">{sub}</div>}

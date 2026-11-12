@@ -45,6 +45,12 @@ const EmployeeSchema = new Schema(
     gender: { type: String, enum: ["male", "female", "other"] },
     photoUrl: { type: String },
     photoPublicId: { type: String, default: null },
+    // The frame chosen for the photo: fractions (0–1) of the original image
+    // (lib/photoCrop.js). Unset → avatars keep the automatic framing.
+    photoCrop: {
+      type: new Schema({ x: Number, y: Number, width: Number, height: Number }, { _id: false }),
+      default: undefined,
+    },
     empAutoId: { type: Number, unique: true }, // อย่าให้เป็น null
     departmentId: {
       type: Schema.Types.ObjectId,

@@ -28,6 +28,7 @@
     "postmark": "^5.1.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-easy-crop": "6.2.4",
     "reactflow": "^11.11.4",
     "sass": "^1.92.1",
     "styled-components": "^6.1.19",

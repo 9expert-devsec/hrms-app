@@ -12,6 +12,7 @@ import { departmentHeadIdOfCode, employeeOfUser } from "@/lib/rbac/scopeQueries"
 import Department from "@/models/Department";
 import Employee from "@/models/Employee";
 import { employeeDisplayName } from "@/lib/employeeName";
+import { normalizePhotoCrop } from "@/lib/photoCrop";
 import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
 import PersonAvatar from "./../../../../../components/PersonAvatar";
 
@@ -20,7 +21,7 @@ const BLUE = "#005CFF";
 const LIME = "#D4F73F";
 const SLATE = "#5E6A7E";
 
-const personFields = "_id firstName lastName firstNameTh lastNameTh nickName position photoUrl department departmentId";
+const personFields = "_id firstName lastName firstNameTh lastNameTh nickName position photoUrl photoCrop department departmentId";
 
 // Thai name when present, else English (lib/employeeName.js)
 const nameOf = (e) => employeeDisplayName(e) || e?.nickName || "-";
@@ -108,6 +109,7 @@ export default async function EmployeeMyTeamPage({ searchParams }) {
       name: nameOf(e),
       sub: [nickName, (e.position || "").trim()].filter(Boolean).join(" · "),
       photoUrl: e.photoUrl || null,
+      photoCrop: normalizePhotoCrop(e.photoCrop),
       isSelf: id === viewerId,
     };
   };
@@ -234,7 +236,7 @@ function PersonCard({ p, variant }) {
       data-self={p.isSelf ? "1" : "0"}
       data-id={p.id}
     >
-      <PersonAvatar src={p.photoUrl} name={p.name} size={44} />
+      <PersonAvatar src={p.photoUrl} crop={p.photoCrop} name={p.name} size={44} />
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-[15px] font-semibold" style={{ color: NAVY }} data-testid="team-person-name">{p.name}</span>

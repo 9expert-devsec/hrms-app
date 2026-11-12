@@ -9,14 +9,16 @@ export function initialsOf(name) {
 
 /**
  * Photo when present, else initials on #DCE6F7 with #005CFF text. `name`
- * should be the Thai-first display name (lib/employeeName.js). Fills its box
+ * should be the Thai-first display name (lib/employeeName.js); `crop` is the
+ * chosen photo frame (Employee.photoCrop) when there is one. Fills its box
  * when `fill` is set (the caller sizes the wrapper), else `size` × `size`.
  */
-export default function PersonAvatar({ src, name, size = 44, radius = 9999, fill = false, fontSize }) {
+export default function PersonAvatar({ src, name, size = 44, radius = 9999, fill = false, fontSize, crop = null }) {
   const box = fill ? { width: "100%", height: "100%", minWidth: 0 } : { width: size, height: size, minWidth: size };
   return (
     <Avatar
       src={src}
+      crop={crop}
       size={size}
       alt=""
       radius={radius}

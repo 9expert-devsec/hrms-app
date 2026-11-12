@@ -273,7 +273,7 @@ export default function LeaveApprovePage() {
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-2">
                         {emp.photoUrl ? (
-                          <Avatar src={emp.photoUrl} alt={empName} size={32} />
+                          <Avatar src={emp.photoUrl} crop={emp.photoCrop} alt={empName} size={32} />
                         ) : (
                           <div
                             className="flex h-8 w-8 items-center justify-center rounded-full"

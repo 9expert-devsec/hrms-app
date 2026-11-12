@@ -39,7 +39,7 @@ export const FIELD_LABELS = {
 /* ── Self-edit ("แก้ไขโปรไฟล์ของฉัน", PATCH /api/employees/me) ─────────── */
 
 /** The only fields an employee may change on their own record. */
-export const SELF_EDIT_FIELDS = ["photoUrl", "photoPublicId", "nickName", "phone"];
+export const SELF_EDIT_FIELDS = ["photoUrl", "photoPublicId", "photoCrop", "nickName", "phone"];
 export const SELF_EDIT_LABELS = { photo: "รูปโปรไฟล์", nickName: "ชื่อเล่น", phone: "เบอร์โทร" };
 export const NICKNAME_MAX = 50;
 

@@ -10,6 +10,7 @@ import { accountActionBlock } from "@/lib/rbac/accountRules";
 import { forgetCachedPermissions } from "@/lib/rbac/sessionPerms";
 import { isLocked } from "@/lib/loginLockout";
 import { employeeDisplayName, employeeFullNameTh, employeeNameSearchText } from "@/lib/employeeName";
+import { normalizePhotoCrop } from "@/lib/photoCrop";
 import { validateNewPassword } from "@/lib/passwordRules";
 
 /**
@@ -178,7 +179,7 @@ export async function listUsers() {
   ]);
 
   const emps = await Employee.find({ userId: { $in: users.map((u) => u._id) } })
-    .select("_id firstName lastName titleTh firstNameTh lastNameTh nickName empAutoId userId email photoUrl position")
+    .select("_id firstName lastName titleTh firstNameTh lastNameTh nickName empAutoId userId email photoUrl photoCrop position")
     .lean();
   const empByUser = new Map(emps.map((e) => [String(e.userId), e]));
   const roleByKey = new Map(roles.map((r) => [r.key, r]));
@@ -207,6 +208,7 @@ export async function listUsers() {
               fullNameTh: employeeFullNameTh(emp) || employeeDisplayName(emp),
               nameSearch: employeeNameSearchText(emp),
               photoUrl: emp.photoUrl || null,
+              photoCrop: normalizePhotoCrop(emp.photoCrop),
               position: emp.position || "",
               // For "ใช้อีเมลเดียวกับพนักงาน"; the badge compares trimmed, case-insensitive.
               email: emp.email || "",

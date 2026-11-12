@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Loader2, Save } from "lucide-react";
+import { Camera, Crop, Loader2, Save } from "lucide-react";
+import PhotoCropDialog from "../../../../../../components/PhotoCropDialog";
+import { cssCropStyle } from "@/lib/photoCrop";
 import { FieldError, ErrorSummary, Req } from "../../../../../../components/FormValidation";
 import { SELF_EDIT_LABELS, NICKNAME_MAX, validateSelfProfile } from "@/lib/employeeFormRules";
 import { prepareUpload, uploadErrorMessage } from "@/lib/client/resizeImage";
@@ -29,6 +31,10 @@ export default function SelfProfileForm({ initial }) {
   const [phone, setPhone] = useState(initial.phone);
   const [preview, setPreview] = useState(initial.photoUrl);
   const [photoFile, setPhotoFile] = useState(null);
+  // The chosen frame; `cropping` holds the image being framed (new file or the current photo).
+  const [crop, setCrop] = useState(initial.photoCrop || null);
+  const [cropChanged, setCropChanged] = useState(false);
+  const [cropping, setCropping] = useState(null); // { src, file?, crop }
   const [resizing, setResizing] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [serverError, setServerError] = useState(null); // { message, field }
@@ -49,13 +55,23 @@ export default function SelfProfileForm({ initial }) {
     setResizing(true);
     try {
       const ready = await prepareUpload(f); // resized in the browser first
-      setPhotoFile(ready);
-      setPreview(URL.createObjectURL(ready));
+      // Choose the frame before it is used; ยกเลิก drops the new file.
+      setCropping({ src: URL.createObjectURL(ready), file: ready, crop: null });
     } catch (err) {
       setServerError({ message: err.message, field: "photo" });
     } finally {
       setResizing(false);
     }
+  }
+
+  function applyCrop(next) {
+    if (cropping.file) {
+      setPhotoFile(cropping.file);
+      setPreview(cropping.src);
+    }
+    setCrop(next);
+    setCropChanged(true);
+    setCropping(null);
   }
 
   async function save() {
@@ -78,6 +94,7 @@ export default function SelfProfileForm({ initial }) {
         body.photoUrl = uj.url;
         body.photoPublicId = uj.public_id || "";
       }
+      if (cropChanged && crop) body.photoCrop = crop;
       const res = await fetch("/api/employees/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -100,19 +117,38 @@ export default function SelfProfileForm({ initial }) {
       data-testid="self-profile-form"
     >
       <div className="flex items-center gap-5">
-        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl" style={{ background: "#F8FAFD", border: "1px solid rgba(0,92,255,0.10)" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview || "/avatar-default.png"} alt="รูปโปรไฟล์" className="h-full w-full object-cover object-top" />
+        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl" style={{ background: "#F8FAFD", border: "1px solid rgba(0,92,255,0.10)" }} data-testid="self-photo-preview">
+          {crop && preview ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={preview} alt="รูปโปรไฟล์" style={{ ...cssCropStyle(crop), display: "block" }} />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={preview || "/avatar-default.png"} alt="รูปโปรไฟล์" className="h-full w-full object-cover object-top" />
+          )}
         </div>
         <div>
           <div style={{ color: NAVY, fontSize: 14, fontWeight: 600 }}>{SELF_EDIT_LABELS.photo}</div>
-          <label
-            className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium"
-            style={{ border: "1px solid rgba(0,92,255,0.15)", color: "#334155", background: "#FFFFFF" }}
-          >
-            {resizing ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />} เลือกรูปใหม่
-            <input type="file" accept="image/*" className="sr-only" onChange={onPickFile} disabled={resizing || saving} aria-label="เลือกรูปโปรไฟล์ใหม่" />
-          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <label
+              className="relative inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-xl px-4 text-sm font-medium focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#005CFF]"
+              style={{ border: "1px solid rgba(0,92,255,0.15)", color: "#334155", background: "#FFFFFF" }}
+            >
+              {resizing ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />} เลือกรูปใหม่
+              <input type="file" accept="image/*" className="sr-only" onChange={onPickFile} disabled={resizing || saving} aria-label="เลือกรูปโปรไฟล์ใหม่" data-testid="self-photo-file" />
+            </label>
+            {preview && (
+              <button
+                type="button"
+                onClick={() => setCropping({ src: preview, file: null, crop })}
+                disabled={resizing || saving}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005CFF] disabled:opacity-50"
+                style={{ border: "1px solid rgba(0,92,255,0.15)", color: "#334155", background: "#FFFFFF" }}
+                data-testid="self-photo-reframe"
+              >
+                <Crop size={14} aria-hidden /> ปรับกรอบรูป
+              </button>
+            )}
+          </div>
           <p style={{ color: SLATE, fontSize: 12, marginTop: 6 }}>JPG, PNG, WEBP — ย่อขนาดอัตโนมัติก่อนอัปโหลด</p>
           <FieldError k="photo" errors={fieldErrors} prefix="self" />
         </div>
@@ -167,6 +203,7 @@ export default function SelfProfileForm({ initial }) {
           {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} บันทึก
         </button>
       </div>
+      {cropping && <PhotoCropDialog src={cropping.src} initialCrop={cropping.crop} onApply={applyCrop} onCancel={() => setCropping(null)} />}
     </section>
   );
 }

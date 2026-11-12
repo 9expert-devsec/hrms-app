@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { requirePageApi } from "@/lib/rbac/guard";
 import cloudinary from "@/lib/cloudinary";
 import { thaiNameError } from "@/lib/employeeName";
+import { parsePhotoCropInput } from "@/lib/photoCrop";
 import {
   FIELD_LABELS,
   LEVEL_ERROR,
@@ -98,6 +99,21 @@ export async function PUT(req, { params }) {
     if (payload[k] !== undefined) update[k] = payload[k];
   }
 
+  // Photo frame (lib/photoCrop.js): set with a valid crop, cleared with null;
+  // a replaced photo without a frame goes back to the automatic framing.
+  let clearCrop = false;
+  if (payload.photoCrop !== undefined) {
+    if (payload.photoCrop === null) clearCrop = true;
+    else {
+      const crop = parsePhotoCropInput(payload.photoCrop);
+      if (!crop) return bad("กรอบรูปไม่ถูกต้อง", "photo");
+      if (!(update.photoUrl ?? emp.photoUrl)) return bad("ยังไม่มีรูปโปรไฟล์", "photo");
+      update.photoCrop = crop;
+    }
+  } else if (update.photoUrl !== undefined && update.photoUrl !== emp.photoUrl) {
+    clearCrop = true;
+  }
+
   // The form's rules on the record as it would be saved (stored + changes):
   // required fields may not be cleared; phone / email format only for a value
   // that CHANGED (a stored 9-digit phone stays saveable on unrelated edits).
@@ -137,7 +153,7 @@ export async function PUT(req, { params }) {
 
   // Schema validators too (required, level 1–6, enums): they did not run here before.
   try {
-    await Employee.findByIdAndUpdate(id, update, { runValidators: true });
+    await Employee.findByIdAndUpdate(id, clearCrop ? { ...update, $unset: { photoCrop: "" } } : update, { runValidators: true });
   } catch (e) {
     if (e instanceof mongoose.Error.ValidationError || e instanceof mongoose.Error.CastError) {
       const path = e.errors ? Object.keys(e.errors)[0] : e.path;

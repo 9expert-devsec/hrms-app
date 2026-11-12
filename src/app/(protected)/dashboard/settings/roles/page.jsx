@@ -8,6 +8,7 @@ import { HRMS_PAGES } from "@/lib/rbac/pages";
 import User from "@/models/User";
 import Employee from "@/models/Employee";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName } from "@/lib/employeeName";
+import { normalizePhotoCrop } from "@/lib/photoCrop";
 import RolesClient from "./RolesClient";
 
 export const dynamic = "force-dynamic";
@@ -20,14 +21,14 @@ export default async function RolesPage() {
   const [roles, users] = await Promise.all([listRoles(), User.find({}).select("_id name email role").sort({ email: 1 }).lean()]);
 
   // Up to 4 holders per role for the card's avatar stack (linked employee's photo / name).
-  const emps = await Employee.find({ userId: { $in: users.map((u) => u._id) } }).select(`userId photoUrl ${EMPLOYEE_NAME_FIELDS}`).lean();
+  const emps = await Employee.find({ userId: { $in: users.map((u) => u._id) } }).select(`userId photoUrl photoCrop ${EMPLOYEE_NAME_FIELDS}`).lean();
   const empByUser = new Map(emps.map((e) => [String(e.userId), e]));
   const holders = {};
   for (const u of users) {
     const list = (holders[u.role] ||= []);
     if (list.length >= AVATARS_PER_ROLE) continue;
     const e = empByUser.get(String(u._id));
-    list.push({ id: String(u._id), name: (e && employeeDisplayName(e)) || u.name || u.email, photoUrl: e?.photoUrl || null });
+    list.push({ id: String(u._id), name: (e && employeeDisplayName(e)) || u.name || u.email, photoUrl: e?.photoUrl || null, photoCrop: e?.photoUrl ? normalizePhotoCrop(e.photoCrop) : null });
   }
 
   // Checklist groups, with scope keys (match "none") and in-development rows flagged.

@@ -4,6 +4,7 @@ import Department from "@/models/Department";
 import User from "@/models/User";
 import { employeeDisplayName, employeeFullNameTh, employeeNameEn } from "@/lib/employeeName";
 import { NO_DEPARTMENT, NO_DEPARTMENT_LABEL, rowSearchText } from "@/lib/employeeDirectoryFilter";
+import { normalizePhotoCrop } from "@/lib/photoCrop";
 
 /**
  * ข้อมูลพนักงาน: every employee with the fields the list page shows, grouped
@@ -15,7 +16,7 @@ import { NO_DEPARTMENT, NO_DEPARTMENT_LABEL, rowSearchText } from "@/lib/employe
  * Account: Employee.userId points at a user that still exists.
  */
 
-const FIELDS = "empAutoId firstName lastName titleTh firstNameTh lastNameTh nickName department departmentId position phone email photoUrl userId";
+const FIELDS = "empAutoId firstName lastName titleTh firstNameTh lastNameTh nickName department departmentId position phone email photoUrl photoCrop userId";
 const DEFAULT_COLOR = "#475569";
 const clean = (v) => (typeof v === "string" ? v.trim() : "");
 const byTh = (a, b) => a.localeCompare(b, "th");
@@ -52,6 +53,7 @@ export async function loadEmployeeDirectory() {
       phone: clean(e.phone),
       email: clean(e.email),
       photoUrl: e.photoUrl || null,
+      photoCrop: normalizePhotoCrop(e.photoCrop),
       deptKey: dept ? String(dept._id) : NO_DEPARTMENT,
       deptName: dept ? dept.name || dept.code : NO_DEPARTMENT_LABEL,
       hasAccount: status !== undefined,

@@ -17,13 +17,15 @@ import Department from "@/models/Department";
 import { UnlinkedNotice } from "./../../../../../components/SelfServiceGate";
 import { initialsOf } from "./../../../../../components/PersonAvatar";
 import CopyBtn from "./CopyBtn";
+import { avatarUrl, isCloudinaryUrl } from "@/lib/avatarUrl";
+import { cssCropStyle, normalizePhotoCrop } from "@/lib/photoCrop";
 
 export const dynamic = "force-dynamic";
 
 // The view shows these fields only; everything else (email, birthday,
 // address, employment, bank, emergency contact) lives on the edit page.
 const PROFILE_FIELDS =
-  "_id userId photoUrl titleTh firstNameTh lastNameTh firstName lastName nickName phone department departmentId position";
+  "_id userId photoUrl photoCrop titleTh firstNameTh lastNameTh firstName lastName nickName phone department departmentId position";
 
 const NAVY = "#0D1B2A";
 const BLUE = "#005CFF";
@@ -121,7 +123,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
   return (
     <div className="-m-6 min-h-full px-4 py-4 md:px-8 md:py-7" style={{ background: "#F5F7FB" }}>
       <div className="mx-auto max-w-[1360px] space-y-4 md:space-y-6">
-        <Hero name={heroName} nameEn={thaiName ? nameEn : ""} nickName={nickName} position={position} department={department} photo={photoSrc(e.photoUrl)} edit={edit} />
+        <Hero name={heroName} nameEn={thaiName ? nameEn : ""} nickName={nickName} position={position} department={department} photo={photoSrc(e.photoUrl)} crop={normalizePhotoCrop(e.photoCrop)} edit={edit} />
 
         {isSelf ? (
           // Phone/tablet: one column, contact → personal → signature → account.
@@ -168,7 +170,7 @@ export default async function EmployeeProfilePage({ searchParams }) {
 }
 
 /* ── A. hero ──────────────────────────────────────────────────── */
-function Hero({ name, nameEn, nickName, position, department, photo, edit }) {
+function Hero({ name, nameEn, nickName, position, department, photo, crop, edit }) {
   const chip = "rounded-full px-3 py-1 text-[13px] font-medium";
   return (
     <section
@@ -194,7 +196,16 @@ function Hero({ name, nameEn, nickName, position, department, photo, edit }) {
           style={{ border: `3px solid ${LIME}`, background: "#DCE6F7" }}
           data-testid="profile-photo"
         >
-          {photo ? (
+          {photo && crop ? (
+            // The frame the person chose — the same one the small avatars use.
+            isCloudinaryUrl(photo) ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Cloudinary cuts the frame
+              <img src={avatarUrl(photo, 148, crop)} alt={name} className="block h-full w-full object-cover" data-testid="profile-photo-img" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- framed with CSS
+              <img src={photo} alt={name} style={{ ...cssCropStyle(crop), display: "block" }} data-testid="profile-photo-img" />
+            )
+          ) : photo ? (
             // Full photo, top-anchored (no face crop on the profile page).
             <Image src={photo} alt={name} fill sizes="148px" className="object-cover object-top" />
           ) : (

@@ -4,6 +4,7 @@ import { requirePage } from "@/lib/rbac/guard";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import dbConnect from "@/lib/mongoose";
 import { employeeFullNameTh, employeeDisplayName } from "@/lib/employeeName";
+import { normalizePhotoCrop } from "@/lib/photoCrop";
 import { UnlinkedNotice } from "../../../../../../components/SelfServiceGate";
 import SelfProfileForm from "./SelfProfileForm";
 
@@ -16,7 +17,7 @@ export default async function EditMyProfilePage() {
   await dbConnect();
   const emp = await employeeOfUser(
     session.user.id,
-    "_id photoUrl nickName phone titleTh firstNameTh lastNameTh firstName lastName"
+    "_id photoUrl photoCrop nickName phone titleTh firstNameTh lastNameTh firstName lastName"
   );
   if (!emp) return <UnlinkedNotice />;
 
@@ -29,7 +30,7 @@ export default async function EditMyProfilePage() {
         <h1 style={{ color: "#0D1B2A", fontSize: "1.5rem", fontWeight: 600 }}>แก้ไขโปรไฟล์ของฉัน</h1>
         <p style={{ color: "#5E6A7E", fontSize: 14 }}>{employeeFullNameTh(emp) || employeeDisplayName(emp)}</p>
       </div>
-      <SelfProfileForm initial={{ photoUrl: emp.photoUrl || "", nickName: emp.nickName || "", phone: emp.phone || "" }} />
+      <SelfProfileForm initial={{ photoUrl: emp.photoUrl || "", photoCrop: normalizePhotoCrop(emp.photoCrop), nickName: emp.nickName || "", phone: emp.phone || "" }} />
     </div>
   );
 }

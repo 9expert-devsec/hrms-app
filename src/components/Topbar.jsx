@@ -11,6 +11,7 @@ import TopbarTitle from "./TopbarTitle";
 import dbConnect from "@/lib/mongoose";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import Department from "@/models/Department";
+import { normalizePhotoCrop } from "@/lib/photoCrop";
 
 export default async function Topbar() {
   const session = await getServerSession(authOptions);
@@ -20,7 +21,7 @@ export default async function Topbar() {
   let departmentName = "";
   if (session?.user?.id) {
     await dbConnect();
-    emp = await employeeOfUser(session.user.id, "photoUrl firstNameTh lastNameTh department departmentId");
+    emp = await employeeOfUser(session.user.id, "photoUrl photoCrop firstNameTh lastNameTh department departmentId");
     if (emp?.departmentId) {
       const dept = await Department.findById(emp.departmentId).select("name").lean();
       departmentName = dept?.name || "";
@@ -33,6 +34,8 @@ export default async function Topbar() {
     name: thaiName || session?.user?.name || "",
     department: departmentName,
     photoUrl: session?.user?.id ? livePhoto : session?.user?.photoUrl,
+    // The chosen frame goes with the live photo only.
+    photoCrop: livePhoto ? normalizePhotoCrop(emp?.photoCrop) : null,
   };
 
   return (
@@ -58,6 +61,7 @@ export default async function Topbar() {
             user={{
               ...session.user,
               photoUrl: account.photoUrl,
+              photoCrop: account.photoCrop,
             }}
           />
         </div>

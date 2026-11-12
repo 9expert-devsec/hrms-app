@@ -407,6 +407,7 @@ function Account({ account }) {
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 16px 8px" }} data-testid="drawer-account">
       <Avatar
         src={account?.photoUrl}
+        crop={account?.photoCrop}
         size={44}
         alt=""
         fallback={

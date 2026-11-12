@@ -288,6 +288,7 @@ function Profile({ p }) {
       <div className="flex items-center gap-4">
         <Avatar
           src={p.photoUrl}
+          crop={p.photoCrop}
           size={56}
           alt=""
           fallback={

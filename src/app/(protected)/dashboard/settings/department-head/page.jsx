@@ -346,7 +346,7 @@ export default function HodSettingsPage() {
                       data-testid="hod-candidate"
                       data-id={emp._id}
                     >
-                      <PersonAvatar src={emp.photoUrl} name={plainName(emp)} size={32} />
+                      <PersonAvatar src={emp.photoUrl} crop={emp.photoCrop} name={plainName(emp)} size={32} />
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-1.5">
                           <span className="text-[14px] font-semibold" style={{ color: NAVY }}>{plainName(emp)}</span>
@@ -417,7 +417,7 @@ function HeadCell({ dept }) {
   }
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <PersonAvatar src={dept.head.photoUrl} name={plainName(dept.head)} size={36} />
+      <PersonAvatar src={dept.head.photoUrl} crop={dept.head.photoCrop} name={plainName(dept.head)} size={36} />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="break-words text-[14px] font-semibold" style={{ color: NAVY }} data-testid="hod-head-name">{fullName(dept.head)}</span>
