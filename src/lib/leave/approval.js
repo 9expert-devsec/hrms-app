@@ -53,7 +53,7 @@ const iso = (d) => (d ? new Date(d).toISOString() : null);
  * The caller's employee, the settings and the HR signer ids (strings). A
  * plain read (no seeding): the inbox badge calls this on every poll.
  */
-async function viewerOf(session) {
+export async function viewerOf(session) {
   const [emp, settings] = await Promise.all([
     getOwnEmployee(session, `_id ${EMPLOYEE_NAME_FIELDS}`),
     LeaveSettings.findOne({ key: "default" }).select("hrSigners hoursPerDay").lean(),
@@ -201,8 +201,9 @@ export async function decideHr(session, id, body = {}) {
   const at = new Date();
   const userId = oid(session.user.id);
   const hrStep = { employeeId: emp._id, userId, name: nameOf(emp), signature, note, at, role: "hr", decision, selfApproved: self.self && decision === "approved" };
+  // The form's HR stats are frozen as of this decision (lib/leave/document.js).
   const set = decision === "approved"
-    ? { status: "approved", hrStep }
+    ? { status: "approved", hrStep, hrStats: await fiscalYearStats(leave) }
     : { status: "returned", hrStep, returnInfo: { step: 2, byUserId: userId, byName: hrStep.name, at, reason: note } };
   const entry = decision === "approved"
     ? { action: "approved_hr", byUserId: userId, at, note, revision: leave.revision || 1, step: 2, selfApproved: hrStep.selfApproved }
@@ -214,10 +215,13 @@ export async function decideHr(session, id, body = {}) {
 
 /* ── lists ──────────────────────────────────────────────────── */
 
-export const APPROVAL_TABS = ["approve", "acknowledge", "hr", "done"];
+export const APPROVAL_TABS = ["approve", "acknowledge", "hr", "cancel", "done"];
+/** Tabs that count toward the อนุมัติการลา badge. */
+const WAITING_TABS = ["approve", "acknowledge", "hr", "cancel"];
 
 function tabQuery(tab, v, userId) {
   const me = oid(v.empId);
+  if (tab === "cancel") return v.isSigner ? { status: "cancel_requested" } : null;
   if (tab === "approve") return me ? { status: "pending_approval", $or: [{ approver1Id: me }, { approver2Id: me }], employeeId: { $ne: me } } : null;
   if (tab === "acknowledge") return me ? { status: { $in: ACK_OPEN_STATUSES }, "step1Ack.expectedBy": me, "step1Ack.at": null } : null;
   if (tab === "hr") return v.isSigner ? { status: "pending_hr" } : null;
@@ -228,12 +232,12 @@ function tabQuery(tab, v, userId) {
   return null;
 }
 
-/** Badge counts for the caller: { approve, acknowledge, hr }. */
+/** Badge counts for the caller: { approve, acknowledge, hr, cancel }. */
 export async function approvalCounts(session) {
   const v = await viewerOf(session);
-  const out = { approve: 0, acknowledge: 0, hr: 0 };
+  const out = { approve: 0, acknowledge: 0, hr: 0, cancel: 0 };
   await Promise.all(
-    ["approve", "acknowledge", "hr"].map(async (t) => {
+    WAITING_TABS.map(async (t) => {
       const q = tabQuery(t, v, session.user.id);
       out[t] = q ? await Leave.countDocuments(q) : 0;
     })
@@ -244,8 +248,8 @@ export async function approvalCounts(session) {
 /** Which tabs this user has (a tab that is always empty is left out) + counts. */
 export async function approvalTabs(session) {
   const v = await viewerOf(session);
-  const counts = { approve: 0, acknowledge: 0, hr: 0 };
-  for (const t of ["approve", "acknowledge", "hr"]) {
+  const counts = { approve: 0, acknowledge: 0, hr: 0, cancel: 0 };
+  for (const t of WAITING_TABS) {
     const q = tabQuery(t, v, session.user.id);
     counts[t] = q ? await Leave.countDocuments(q) : 0;
   }
@@ -255,7 +259,7 @@ export async function approvalTabs(session) {
   const tabs = [];
   if (mapped || counts.approve) tabs.push("approve");
   if (mapped || counts.acknowledge) tabs.push("acknowledge");
-  if (v.isSigner) tabs.push("hr");
+  if (v.isSigner) tabs.push("hr", "cancel");
   tabs.push("done");
   return { tabs, counts, isSigner: v.isSigner, noSigner: !v.signerIds.length, linked: !!v.emp };
 }
@@ -288,7 +292,7 @@ async function employeesById(ids) {
 function roleOn(tab, leave, v, userId) {
   if (tab === "approve") return step1RoleOf(leave, v.empId);
   if (tab === "acknowledge") return "acknowledger";
-  if (tab === "hr") return "hr";
+  if (tab === "hr" || tab === "cancel") return "hr";
   const mine = (leave.history || []).filter((h) => str(h.byUserId) === str(userId) && ACTED_ACTIONS.includes(h.action)).pop();
   if (!mine) return null;
   if (mine.action === "acknowledged") return "acknowledger";
@@ -345,7 +349,7 @@ export async function listApprovals(session, tab) {
  * the leave's fiscal year per form category (other types → อื่นๆ), this
  * leave excluded; plus this leave in its own row.
  */
-async function fiscalYearStats(leave) {
+export async function fiscalYearStats(leave) {
   const rows = Object.fromEntries(FORM_CATEGORIES.map((c) => [c, { before: 0, now: 0 }]));
   if (leave.fiscalYear != null) {
     const sums = await Leave.aggregate([
@@ -416,7 +420,10 @@ export async function approvalDetail(session, id) {
     acknowledge: ackOpen,
     hr: leave.status === "pending_hr" && v.isSigner && self.allowed,
     hrSelf: leave.status === "pending_hr" && v.isSigner && self.allowed && self.self,
+    cancel: leave.status === "cancel_requested" && v.isSigner && self.allowed,
+    cancelSelf: leave.status === "cancel_requested" && v.isSigner && self.allowed && self.self,
   };
+  // Cancel decisions are not signed on the form; only the other steps need a signature.
   const anyAction = !!(actions.step1 || actions.acknowledge || actions.hr);
   const profileSignature = anyAction && v.emp ? !!(await getSignature(v.emp._id))?.png : false;
 
@@ -439,6 +446,17 @@ export async function approvalDetail(session, id) {
       hr: stepOut(leave.hrStep),
       returnInfo: leave.returnInfo ? { step: leave.returnInfo.step, byName: leave.returnInfo.byName || "", at: iso(leave.returnInfo.at), reason: leave.returnInfo.reason || "" } : null,
       withdrawnAt: iso(leave.withdrawnAt),
+      cancelRequest: leave.cancelRequest
+        ? {
+            requestedAt: iso(leave.cancelRequest.requestedAt),
+            reason: leave.cancelRequest.reason || "",
+            decision: leave.cancelRequest.decision || null,
+            decidedAt: iso(leave.cancelRequest.decidedAt),
+            decidedByName: leave.cancelRequest.decidedByName || "",
+            note: leave.cancelRequest.note || "",
+            selfApproved: !!leave.cancelRequest.selfApproved,
+          }
+        : null,
     },
     quota,
     hrSigners: signers.map(nameOf),

@@ -93,7 +93,7 @@ const LeaveSchema = new Schema(
     // "ข้าพเจ้าได้…ครั้งล่าสุด": the last approved leave before this one.
     lastLeaveSnapshot: {
       type: new Schema(
-        { leaveTypeName: String, startDate: Date, endDate: Date, totalHours: Number, unit: String },
+        { leaveTypeName: String, formCategory: String, startDate: Date, endDate: Date, totalHours: Number, unit: String },
         { _id: false }
       ),
       default: null,
@@ -119,21 +119,32 @@ const LeaveSchema = new Schema(
       ),
       default: null,
     },
-    // Cancelling after final approval (round 42): HR decides; approved → days come back.
+    // Cancelling after final approval (lib/leave/cancel.js): the owner asks,
+    // an HR signer decides; approved → cancelled (the days come back through
+    // the status), rejected → approved again. The last request stays here.
     cancelRequest: {
       type: new Schema(
         {
-          reason: String,
+          requestedBy: { type: Schema.Types.ObjectId, ref: "User" },
           requestedAt: Date,
-          byUserId: { type: Schema.Types.ObjectId, ref: "User" },
-          decision: { type: String, enum: ["approved", "rejected"] },
+          reason: String,
+          decidedBy: { type: Schema.Types.ObjectId, ref: "User" },
+          decidedByEmployeeId: { type: Schema.Types.ObjectId, ref: "Employee" },
+          decidedByName: String,
           decidedAt: Date,
-          decidedByUserId: { type: Schema.Types.ObjectId, ref: "User" },
+          decision: { type: String, enum: ["approved", "rejected"] },
           note: String,
+          selfApproved: { type: Boolean, default: false },
         },
         { _id: false }
       ),
       default: null,
+    },
+    // "สถิติการลาในปีงบประมาณนี้" frozen when HR approves (lib/leave/approval.js
+    // fiscalYearStats): [{ category, before, now, total }] in hours.
+    hrStats: {
+      type: [new Schema({ category: String, before: Number, now: Number, total: Number }, { _id: false })],
+      default: undefined,
     },
     withdrawnAt: { type: Date, default: null },
 

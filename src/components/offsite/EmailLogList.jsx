@@ -14,8 +14,19 @@ const TYPE_LABELS = {
   offsite_returned: "ส่งกลับให้แก้ไข",
   offsite_approved: "อนุมัติแล้ว",
   offsite_cancelled: "ยกเลิก",
-  password_reset: "ตั้งรหัสผ่านใหม่", // superadmin only (the API narrows others to off-site types)
+  password_reset: "ตั้งรหัสผ่านใหม่", // superadmin only (the API narrows others to their types)
+  leave_approval_pending: "ใบลา · รออนุมัติ",
+  leave_hr_pending: "ใบลา · รอฝ่ายบุคคล",
+  leave_ack_pending: "ใบลา · รอรับทราบ",
+  leave_returned: "ใบลา · ส่งกลับแก้ไข",
+  leave_approved: "ใบลา · อนุมัติแล้ว",
+  leave_cancel_pending: "ใบลา · คำขอยกเลิก",
+  leave_cancel_approved: "ใบลา · อนุมัติการยกเลิก",
+  leave_cancel_fyi: "ใบลา · แจ้งการยกเลิก",
+  leave_cancel_rejected: "ใบลา · ปฏิเสธการยกเลิก",
 };
+/** Where a row's request opens: the leave document or the off-site request. */
+const requestHref = (r) => (String(r.type || "").startsWith("leave_") ? `/dashboard/leave/document?id=${r.requestId}` : `/dashboard/offsite/${r.requestId}`);
 const STATUS_TONE = { sent: "green", failed: "red", skipped: "grey" };
 
 /** บันทึกการส่งอีเมล — read-only, latest 200 rows. */
@@ -77,7 +88,7 @@ export default function EmailLogList() {
                 <td className="px-3 py-2">{r.to || "—"}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {r.requestId ? (
-                    <Link href={`/dashboard/offsite/${r.requestId}`} className="underline" style={{ color: "#005CFF" }}>{r.docNo || "—"}</Link>
+                    <Link href={requestHref(r)} className="underline" style={{ color: "#005CFF" }}>{r.docNo || (String(r.type).startsWith("leave_") ? "ใบลา" : "—")}</Link>
                   ) : (
                     r.docNo || "—"
                   )}

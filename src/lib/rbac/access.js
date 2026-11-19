@@ -44,10 +44,32 @@ export function canOpenLeaveApproval(user) {
   return canAccess(user, "leave_approve") || isAnyHead(user) || user?.isLeaveApprover === true;
 }
 
-/** canAccess plus the leave-approval exception. */
-export function canOpenPage(user, pageKey) {
-  return pageKey === "leave_approve" ? canOpenLeaveApproval(user) : canAccess(user, pageKey);
+/**
+ * เอกสารการลา: holders of `self_leave_document`, OR anyone the leave flow
+ * names (approver / HR signer — round 42). The API then decides per leave
+ * (lib/rbac/leaveScope.js canSeeLeaveDocument), so a page opened this way
+ * shows only the leaves that person is on, plus their own.
+ */
+export function canOpenLeaveDocument(user) {
+  return canAccess(user, "self_leave_document") || user?.isLeaveApprover === true;
 }
+
+/** canAccess plus the leave-approval and leave-document exceptions. */
+export function canOpenPage(user, pageKey) {
+  if (pageKey === "leave_approve") return canOpenLeaveApproval(user);
+  if (pageKey === "self_leave_document") return canOpenLeaveDocument(user);
+  return canAccess(user, pageKey);
+}
+
+/**
+ * บันทึกการส่งอีเมล (/dashboard/offsite/all/email-log): off-site HR
+ * (`offsite_hr`, off-site rows), leave-settings holders and HR signers
+ * (`isLeaveHrSigner`, leave rows — round 42). The API filters the types.
+ */
+export function canOpenEmailLog(user) {
+  return canAccess(user, "offsite_hr") || canAccess(user, "leave_settings") || user?.isLeaveHrSigner === true;
+}
+const EMAIL_LOG_RE = /^\/dashboard\/offsite\/all\/email-log\/?$/;
 
 /**
  * The printable off-site form (/dashboard/offsite/<id>/print) sits under the
@@ -63,5 +85,6 @@ const OFFSITE_PRINT_RE = /^\/dashboard\/offsite\/[^/]+\/print\/?$/;
  */
 export function canAccessPath(user, pathname) {
   if (OFFSITE_PRINT_RE.test(pathname || "")) return OFFSITE_PRINT_PAGES.some((key) => canAccess(user, key));
+  if (EMAIL_LOG_RE.test(pathname || "")) return canOpenEmailLog(user);
   return canOpenPage(user, resolvePageKey(pathname));
 }

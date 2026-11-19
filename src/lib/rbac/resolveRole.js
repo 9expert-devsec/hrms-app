@@ -66,7 +66,13 @@ export async function isLeaveApproverEmployee(employeeId) {
   if (!employeeId) return false;
   const [mapped, signer] = await Promise.all([
     Employee.exists({ $or: [{ leaveApprover1Id: employeeId }, { leaveApprover2Id: employeeId }] }),
-    LeaveSettings.exists({ key: "default", hrSigners: employeeId }),
+    isLeaveHrSignerEmployee(employeeId),
   ]);
   return !!(mapped || signer);
+}
+
+/** Is this person an HR signer (ตั้งค่าการลา)? Opens the email log's leave rows (round 42). */
+export async function isLeaveHrSignerEmployee(employeeId) {
+  if (!employeeId) return false;
+  return !!(await LeaveSettings.exists({ key: "default", hrSigners: employeeId }));
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Check, Eye, FileText, Info, Loader2, Paperclip, Search, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Eye, FileText, Info, Loader2, Paperclip, Search, Undo2, X } from "lucide-react";
 import { BLUE, BTN_PRIMARY, BTN_SECONDARY, FOCUS, LINE, MUTED, NAVY, SLATE } from "../../../../../components/hr/hrUi";
 import PersonAvatar from "../../../../../components/PersonAvatar";
 import MySignaturePicker from "../../../../../components/MySignaturePicker";
@@ -12,7 +12,7 @@ import { formatLeaveAmount, leavePeriodText, thaiDateRange, thaiDateShort, thaiD
 import { STATUS_CHIPS } from "@/lib/leave/flow";
 import { FORM_CATEGORY_LABELS } from "@/lib/leaveRules";
 
-const TAB_LABELS = { approve: "รอฉันอนุมัติ", acknowledge: "รอฉันรับทราบ", hr: "รอ HR ตรวจสอบ", done: "ดำเนินการแล้ว" };
+const TAB_LABELS = { approve: "รอฉันอนุมัติ", acknowledge: "รอฉันรับทราบ", hr: "รอ HR ตรวจสอบ", cancel: "คำขอยกเลิก", done: "ดำเนินการแล้ว" };
 const ROLE_LABELS = { approver1: "ผู้อนุมัติ (1)", approver2: "ผู้อนุมัติ (2)", acknowledger: "ผู้รับทราบ", hr: "ฝ่ายบุคคล" };
 const STAT_LABELS = { ...FORM_CATEGORY_LABELS, other: "ลาอื่นๆ" };
 const GREEN = "#15803D";
@@ -260,7 +260,7 @@ function LeaveCard({ item, hoursPerDay, selected, onSelect }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <p className="truncate text-[15px] font-bold" style={{ color: NAVY }}>{item.employee.name}</p>
-            {item.myRole && <RoleChip role={item.myRole} />}
+            {item.status === "cancel_requested" ? <StatusChip status="cancel_requested" testid="card-cancel-chip" /> : item.myRole && <RoleChip role={item.myRole} />}
           </div>
           <p className="truncate text-[13px]" style={{ color: SLATE }}>{item.employee.department || "-"}</p>
         </div>
@@ -283,10 +283,10 @@ const RoleChip = ({ role }) => (
 const TypeChip = ({ name }) => (
   <span className="rounded-md px-2 py-0.5 text-[13px] font-semibold" style={{ background: "#E0EDFF", color: "#1D4ED8" }}>{name}</span>
 );
-function StatusChip({ status }) {
+function StatusChip({ status, testid = "detail-status" }) {
   const c = STATUS_CHIPS[status] || { label: status, bg: "#EEF2F7", color: "#475569" };
   return (
-    <span className="shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: c.bg, color: c.color }} data-testid="detail-status">
+    <span className="shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: c.bg, color: c.color }} data-testid={testid}>
       {c.label}
     </span>
   );
@@ -375,6 +375,8 @@ function LeaveDetail({ d, onDone }) {
         <AckPanel d={d} onDone={onDone} />
       ) : a.hr ? (
         <HrPanel d={d} onDone={onDone} />
+      ) : a.cancel ? (
+        <CancelPanel d={d} onDone={onDone} />
       ) : (
         <DecisionSummary d={d} />
       )}
@@ -706,6 +708,84 @@ function HrPanel({ d, onDone }) {
   );
 }
 
+/** คำขอยกเลิกใบลา (HR signers): approve → cancelled, days back; reject → approved. */
+function CancelPanel({ d, onDone }) {
+  const l = d.leave;
+  const cr = l.cancelRequest || {};
+  const amt = (h) => formatLeaveAmount(h, { hoursPerDay: d.hoursPerDay });
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const decide = async (decision) => {
+    setBusy(true);
+    setError("");
+    const { ok, json } = await callJson(`/api/leave/${l._id}/cancel-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, note, revision: l.revision }),
+    });
+    if (!ok) {
+      setBusy(false);
+      setError(json.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      if (json.message === "ใบลานี้ถูกดำเนินการไปแล้ว") setTimeout(onDone, 1200);
+      return;
+    }
+    await onDone();
+  };
+  return (
+    <section className={PANEL} style={PANEL_BG} data-testid="panel-cancel">
+      <h3 className="text-[15px] font-bold" style={{ color: NAVY }}>คำขอยกเลิกใบลา</h3>
+      <p className="mt-3 flex items-start gap-2 rounded-xl bg-white px-3 py-2.5 text-[13px]" style={{ color: SLATE }}>
+        <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
+        ใบลานี้อนุมัติแล้วเมื่อ {thaiDateShort(l.hr?.at, { weekday: false })} — ผู้ขอยื่นขอยกเลิก {thaiDateShort(cr.requestedAt, { weekday: false })}
+      </p>
+      <div className="mt-3 rounded-xl bg-white px-3 py-2.5">
+        <p className="text-[12px]" style={{ color: SLATE }}>เหตุผลที่ขอยกเลิก</p>
+        <p className="mt-0.5 break-words text-[14px] font-semibold" style={{ color: NAVY }} data-testid="cancel-reason-text">{cr.reason || "-"}</p>
+      </div>
+      <div className="mt-3 rounded-xl px-3 py-2.5 text-[13px]" style={{ background: "#DCFCE7", color: "#166534" }} data-testid="cancel-restore">
+        <p className="font-bold">เมื่ออนุมัติการยกเลิก</p>
+        <p className="mt-1 flex justify-between gap-3">
+          <span>คืนวันลา · {l.leaveTypeName}</span>
+          <span className="font-bold">+{amt(l.totalHours)}</span>
+        </p>
+        {d.quota && (
+          <p className="flex justify-between gap-3">
+            <span>คงเหลือ</span>
+            <span className="font-bold">{amt(d.quota.after)} → {amt(d.quota.before)}</span>
+          </p>
+        )}
+      </div>
+      {d.actions.cancelSelf && (
+        <p className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-[13px] font-medium" style={{ background: "#FEF3C7", color: "#92400E" }} data-testid="cancel-self-warning">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+          คุณกำลังอนุมัติใบลาของตนเอง — จะบันทึกว่าอนุมัติตนเอง
+        </p>
+      )}
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={2}
+        maxLength={1000}
+        placeholder="หมายเหตุถึงผู้ขอ (ถ้ามี)"
+        aria-label="หมายเหตุถึงผู้ขอ"
+        className={`${TEXTAREA} mt-3`}
+        style={{ borderColor: LINE }}
+        data-testid="cancel-note"
+      />
+      <ErrorLine text={error} />
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <button type="button" className={BTN_SECONDARY} onClick={() => decide("rejected")} disabled={busy} data-testid="cancel-reject">
+          ปฏิเสธคำขอ
+        </button>
+        <button type="button" className={BTN_PRIMARY} onClick={() => decide("approved")} disabled={busy} data-testid="cancel-approve">
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Undo2 size={16} />} อนุมัติยกเลิก · คืนวันลา
+        </button>
+      </div>
+    </section>
+  );
+}
+
 /** No action for this viewer: what has been decided so far. */
 function DecisionSummary({ d }) {
   const l = d.leave;
@@ -716,7 +796,13 @@ function DecisionSummary({ d }) {
   if (l.hr?.decision === "approved") lines.push({ text: `ฝ่ายบุคคล ${l.hr.name} อนุมัติเมื่อ ${thaiDateTime(l.hr.at)}${l.hr.selfApproved ? " · อนุมัติตนเอง" : ""}`, color: GREEN });
   if (l.status === "returned" && l.returnInfo)
     lines.push({ text: `ส่งกลับโดย ${l.returnInfo.byName} (${l.returnInfo.step === 2 ? "ฝ่ายบุคคล" : "ผู้อนุมัติ"}) เมื่อ ${thaiDateTime(l.returnInfo.at)} — เหตุผล: ${l.returnInfo.reason}`, color: RED });
-  if (l.status === "cancelled") lines.push({ text: l.withdrawnAt ? `ผู้ขอยกเลิกใบลาเมื่อ ${thaiDateTime(l.withdrawnAt)}` : "ใบลานี้ถูกยกเลิก" });
+  if (l.cancelRequest?.requestedAt) lines.push({ text: `ผู้ขอยื่นขอยกเลิกเมื่อ ${thaiDateTime(l.cancelRequest.requestedAt)} — ${l.cancelRequest.reason}` });
+  if (l.cancelRequest?.decision === "approved")
+    lines.push({ text: `ฝ่ายบุคคล ${l.cancelRequest.decidedByName} อนุมัติการยกเลิกเมื่อ ${thaiDateTime(l.cancelRequest.decidedAt)}${l.cancelRequest.selfApproved ? " · อนุมัติตนเอง" : ""}`, color: GREEN });
+  if (l.cancelRequest?.decision === "rejected")
+    lines.push({ text: `ฝ่ายบุคคล ${l.cancelRequest.decidedByName} ปฏิเสธคำขอยกเลิกเมื่อ ${thaiDateTime(l.cancelRequest.decidedAt)}${l.cancelRequest.note ? ` — ${l.cancelRequest.note}` : ""}`, color: RED });
+  if (l.status === "cancel_requested" && !d.actions.cancel) lines.push({ text: d.noSigner ? "รอผู้ลงนามฝ่ายบุคคลพิจารณาคำขอยกเลิก" : `รอฝ่ายบุคคลพิจารณาคำขอยกเลิก: ${d.hrSigners.join(" / ")}` });
+  if (l.status === "cancelled" && !l.cancelRequest?.decision) lines.push({ text: l.withdrawnAt ? `ผู้ขอยกเลิกใบลาเมื่อ ${thaiDateTime(l.withdrawnAt)}` : "ใบลานี้ถูกยกเลิก" });
   if (l.status === "pending_approval") lines.push({ text: `รอผู้อนุมัติ: ${l.approvers.map((x) => x.name).join(" / ") || "-"}` });
   if (l.status === "pending_hr" && !d.noSigner) lines.push({ text: `รอฝ่ายบุคคลลงนาม: ${d.hrSigners.join(" / ")}` });
 

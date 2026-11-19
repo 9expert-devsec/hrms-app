@@ -15,7 +15,13 @@ export const LEAVE_EMAIL_TYPES = [
   "leave_ack_pending",
   "leave_returned",
   "leave_approved",
+  "leave_cancel_pending",
+  "leave_cancel_approved",
+  "leave_cancel_fyi",
+  "leave_cancel_rejected",
 ];
+
+const amountOf = (ctx) => formatLeaveAmount(ctx.leave.totalHours, { unit: ctx.leave.unit, hoursPerDay: ctx.hoursPerDay });
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -62,6 +68,26 @@ const COPY = {
     ],
     button: "ดูประวัติการลา",
   }),
+  leave_cancel_pending: (ctx) => ({
+    subject: `มีคำขอยกเลิกใบลา: ${ctx.requesterName}`,
+    intro: [`${ctx.requesterName} ขอยกเลิกใบลาที่อนุมัติแล้ว กรุณาพิจารณา — เมื่ออนุมัติการยกเลิก ระบบจะคืนวันลา ${amountOf(ctx)}`],
+    button: "พิจารณาคำขอยกเลิก",
+  }),
+  leave_cancel_approved: (ctx) => ({
+    subject: `อนุมัติการยกเลิกใบลาแล้ว — คืนวันลา ${amountOf(ctx)}`,
+    intro: [`ฝ่ายบุคคลอนุมัติการยกเลิกใบลาของคุณแล้ว ระบบคืนวันลา ${amountOf(ctx)}`, "อย่าลืมแก้ไขข้อมูลการลาใน Calendar และ Portal ด้วย"],
+    button: "ดูใบลา",
+  }),
+  leave_cancel_fyi: (ctx) => ({
+    subject: `แจ้งเพื่อทราบ: ใบลาของ ${ctx.requesterName} ถูกยกเลิก`,
+    intro: [`ใบลาที่คุณอนุมัติของ ${ctx.requesterName} ถูกยกเลิกแล้ว (ฝ่ายบุคคลอนุมัติการยกเลิก) ไม่ต้องดำเนินการใด ๆ`],
+    button: "ดูใบลา",
+  }),
+  leave_cancel_rejected: () => ({
+    subject: "คำขอยกเลิกใบลาไม่ได้รับอนุมัติ",
+    intro: ["ฝ่ายบุคคลไม่อนุมัติคำขอยกเลิกใบลาของคุณ ใบลายังมีผลตามเดิม"],
+    button: "ดูใบลา",
+  }),
 };
 
 function facts(type, ctx) {
@@ -72,6 +98,11 @@ function facts(type, ctx) {
     ["ช่วงวันที่", leavePeriodText(l)],
     ["จำนวน", formatLeaveAmount(l.totalHours, { unit: l.unit, hoursPerDay: ctx.hoursPerDay })],
   ];
+  if (type.startsWith("leave_cancel")) {
+    if (l.cancelRequest?.reason) rows.push(["เหตุผลที่ขอยกเลิก", l.cancelRequest.reason]);
+    if (type === "leave_cancel_rejected") rows.push(["หมายเหตุจากฝ่ายบุคคล", l.cancelRequest?.note || "-"]);
+    return rows;
+  }
   if (type !== "leave_returned" && type !== "leave_approved") rows.push(["เหตุผล", l.reason || "-"]);
   if (type === "leave_returned" && ctx.returnInfo) {
     rows.push(["ส่งกลับโดย", `${ctx.returnInfo.byName || "-"} (${STEP_LABELS[ctx.returnInfo.step] || "ผู้อนุมัติ"})`]);

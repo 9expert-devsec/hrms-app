@@ -8,11 +8,15 @@ import Leave from "@/models/Leave";
 import Employee from "@/models/Employee";
 import { deletedAccount } from "@/lib/deletedAccount";
 import { EMPLOYEE_NAME_FIELDS, employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
+import { isNewFlowLeave, leaveDocument } from "@/lib/leave/document";
+import { leaveErrorResponse } from "@/lib/leave/requests";
 
 /* ---------- GET ---------- */
 export async function GET(_req, { params }) {
   try {
-    const gate = await requireAnyPageApi(["self_leave_document", "self_leave_history", "leave_approve"]);
+    // Any signed-in user (every role has `dashboard`); who may read THIS leave
+    // is decided per leave below (owner, approvers on it, HR signers, scopes).
+    const gate = await requireAnyPageApi(["dashboard", "self_leave_document", "self_leave_history", "leave_approve"]);
     if (gate.res) return gate.res;
     const { session } = gate;
 
@@ -21,6 +25,18 @@ export async function GET(_req, { params }) {
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) {
       return NextResponse.json({ ok: false, message: "Invalid id" }, { status: 400 });
+    }
+
+    // Round 40+ leaves: the QF-HRD-001 document (lib/leave/document.js).
+    // Old-flow records keep the response below (read-only old layout).
+    const kind = await Leave.findById(id).select("leaveTypeId").lean();
+    if (kind && isNewFlowLeave(kind)) {
+      try {
+        return NextResponse.json({ ok: true, document: await leaveDocument(session, id) }, { headers: { "Cache-Control": "no-store" } });
+      } catch (e) {
+        const { body, status } = leaveErrorResponse(e, "GET /api/leave/[id]");
+        return NextResponse.json(body, { status });
+      }
     }
 
     const leave = await Leave.findById(id)

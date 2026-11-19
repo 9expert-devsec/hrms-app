@@ -19,6 +19,10 @@ import { employeeDisplayName, employeeFullNameTh } from "@/lib/employeeName";
  *                                  + the acknowledger        (leave_ack_pending)
  *   returned (either step)       → requester                 (leave_returned)
  *   hr_approved                  → requester                 (leave_approved)
+ *   cancel_requested             → HR signers                (leave_cancel_pending)
+ *   cancel_approved              → requester                 (leave_cancel_approved)
+ *                                  + the step-1 decider, FYI (leave_cancel_fyi)
+ *   cancel_rejected              → requester, with the note  (leave_cancel_rejected)
  */
 
 const str = (v) => (v == null ? "" : String(v));
@@ -42,6 +46,14 @@ export function planLeaveEmails(leave, event, hrSignerIds = []) {
     add("leave_returned", leave.employeeId);
   } else if (event === "hr_approved") {
     add("leave_approved", leave.employeeId);
+  } else if (event === "cancel_requested") {
+    for (const id of hrSignerIds) add("leave_cancel_pending", id);
+  } else if (event === "cancel_approved") {
+    add("leave_cancel_approved", leave.employeeId);
+    // FYI to the step-1 decider (none for an auto-approved step 1).
+    if (!leave.step1?.auto && str(leave.step1?.employeeId) !== str(leave.employeeId)) add("leave_cancel_fyi", leave.step1?.employeeId);
+  } else if (event === "cancel_rejected") {
+    add("leave_cancel_rejected", leave.employeeId);
   }
   return plan;
 }
@@ -64,6 +76,10 @@ const URL_OF = {
   leave_ack_pending: (l) => `/dashboard/leave/approve?tab=acknowledge&id=${l._id}`,
   leave_returned: (l) => `/dashboard/leave/request?id=${l._id}`,
   leave_approved: () => "/dashboard/leave/history",
+  leave_cancel_pending: (l) => `/dashboard/leave/approve?tab=cancel&id=${l._id}`,
+  leave_cancel_approved: (l) => `/dashboard/leave/document?id=${l._id}`,
+  leave_cancel_fyi: (l) => `/dashboard/leave/document?id=${l._id}`,
+  leave_cancel_rejected: (l) => `/dashboard/leave/document?id=${l._id}`,
 };
 
 async function deliver(leave, plan, actorUserId, settings) {
@@ -87,7 +103,8 @@ async function deliver(leave, plan, actorUserId, settings) {
 
 /**
  * Called after a leave action is saved. `event`: submitted | step1_approved |
- * returned | hr_approved. Resolves quickly inside a request.
+ * returned | hr_approved | cancel_requested | cancel_approved |
+ * cancel_rejected. Resolves quickly inside a request.
  */
 export async function notifyLeave(doc, event, session) {
   try {

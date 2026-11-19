@@ -13,7 +13,8 @@ import { employeeIdsForScope } from "@/lib/rbac/scopeQueries";
  *   - off-site invitations / approvals: lib/offsite.js badgeCounts (step 1
  *     for the leader, steps 2–3 for the approver, reconfirms included)
  *   - leave: step-1 approvals, open รับทราบ tasks and (HR signers) the HR
- *     step, as the อนุมัติการลา tabs list them (lib/leave/approval.js)
+ *     step and cancel requests, as the อนุมัติการลา tabs list them
+ *     (lib/leave/approval.js)
  *   - OT: pending requests inside otScope, as GET /api/attendance/ot lists
  *     them for ot_approve holders
  * Only countDocuments on small, filtered sets. Only groups with something
@@ -34,8 +35,8 @@ export const INBOX_GROUPS = {
  * tabs (lib/leave/approval.js). Decided by the leave, not by a role.
  */
 async function leaveCount(session) {
-  const { approve, acknowledge, hr } = await approvalCounts(session);
-  return approve + acknowledge + hr;
+  const { approve, acknowledge, hr, cancel } = await approvalCounts(session);
+  return approve + acknowledge + hr + cancel;
 }
 
 /** Pending OT inside the caller's OT scope (ot_approve holders only). */

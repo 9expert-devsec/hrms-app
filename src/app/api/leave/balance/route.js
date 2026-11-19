@@ -1,64 +1,23 @@
-// src/app/api/leave/balance/route.js
+// GET /api/leave/balance?fy=<Gregorian start year> — วันลาคงเหลือ on the
+// round-39 quotas and the round-40 usage (lib/leave/balance.js). The old
+// LeaveBalance collection is no longer read (nor written, nor deleted).
 import { NextResponse } from "next/server";
 import { requireAnyPageApi } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
-import LeaveBalance from "@/models/LeaveBalance";
-import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
+import { leaveBalance } from "@/lib/leave/balance";
+import { leaveErrorResponse } from "@/lib/leave/requests";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req) {
   try {
     const gate = await requireAnyPageApi(["self_leave_balance", "self_leave_request"]);
     if (gate.res) return gate.res;
-    const { session } = gate;
-
     await dbConnect();
-    // Without a linked employee the default record below would be created
-    // with employeeId null. The link is read from the DB, not the token.
-    const own = await getOwnEmployee(session, "_id");
-    if (!own) {
-      return NextResponse.json({ ok: false, message: "บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน" }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const year = Number(searchParams.get("year")) || new Date().getFullYear();
-
-    let balance = await LeaveBalance.findOne({
-      employeeId: own._id,
-      year,
-    }).lean();
-
-    // ถ้ายังไม่มี record → สร้าง default
-    if (!balance) {
-      balance = await LeaveBalance.create({
-        employeeId: own._id,
-        year,
-      });
-      balance = balance.toObject();
-    }
-
-    return NextResponse.json({
-      ok: true,
-      balance: {
-        year: balance.year,
-        sick: {
-          total: balance.sick.total,
-          used: balance.sick.used,
-          remaining: balance.sick.total - balance.sick.used,
-        },
-        annual: {
-          total: balance.annual.total,
-          used: balance.annual.used,
-          remaining: balance.annual.total - balance.annual.used,
-        },
-        personal: {
-          total: balance.personal.total,
-          used: balance.personal.used,
-          remaining: balance.personal.total - balance.personal.used,
-        },
-      },
-    });
+    const fy = new URL(req.url).searchParams.get("fy");
+    return NextResponse.json({ ok: true, ...(await leaveBalance(gate.session, { fiscalYear: fy })) }, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
-    console.error("GET /api/leave/balance error:", err);
-    return NextResponse.json({ ok: false, message: err.message }, { status: 500 });
+    const { body, status } = leaveErrorResponse(err, "GET /api/leave/balance");
+    return NextResponse.json(body, { status });
   }
 }

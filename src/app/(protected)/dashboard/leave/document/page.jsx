@@ -1,6 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useState, useMemo } from "react";
+import LeaveDocumentView from "./LeaveDocumentView";
+import { STATUS_CHIPS } from "@/lib/leave/flow";
+import { formatLeaveAmount } from "@/lib/leave/format";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -183,11 +186,13 @@ function DocumentList() {
           style={selectStyle}
         >
           <option value="">ทุกสถานะ</option>
-          <option value="pending">รอ HOD อนุมัติ</option>
-          <option value="hod_approved">รอ HR อนุมัติ</option>
+          <option value="pending_approval">รอผู้อนุมัติ</option>
+          <option value="returned">ส่งกลับแก้ไข</option>
+          <option value="pending_hr">รอ HR</option>
           <option value="approved">อนุมัติแล้ว</option>
-          <option value="rejected">ไม่อนุมัติ</option>
-          <option value="cancelled">ยกเลิก</option>
+          <option value="cancel_requested">ขอยกเลิก</option>
+          <option value="cancelled">ยกเลิกแล้ว</option>
+          <option value="rejected">ไม่อนุมัติ (ระบบเดิม)</option>
         </select>
 
         {isAdmin && departments.length > 0 && (
@@ -245,7 +250,7 @@ function DocumentList() {
               {filtered.map((item) => {
                 const emp = item.employeeId || {};
                 const empName = employeeDisplayName(emp) || "-";
-                const badge = STATUS_BADGE[item.status] || STATUS_BADGE.pending;
+                const badge = STATUS_CHIPS[item.status] || STATUS_BADGE[item.status] || STATUS_BADGE.pending;
 
                 return (
                   <tr key={item._id} style={{ borderBottom: "1px solid rgba(0,92,255,0.08)" }}>
@@ -261,7 +266,7 @@ function DocumentList() {
                     )}
                     <td style={tdStyle}>
                       <span style={{ color: NAVY, fontSize: 13 }}>
-                        {TYPE_LABELS_EN[item.leaveType] || item.leaveType}
+                        {item.leaveTypeName || TYPE_LABELS[item.leaveType] || TYPE_LABELS_EN[item.leaveType] || item.leaveType}
                       </span>
                     </td>
                     <td style={tdStyle}>
@@ -271,7 +276,11 @@ function DocumentList() {
                       </span>
                     </td>
                     <td style={{ ...tdStyle, textAlign: "center" }}>
-                      <span style={{ color: NAVY, fontSize: 13 }}>{item.totalDays}</span>
+                      <span style={{ color: NAVY, fontSize: 13 }}>
+                        {typeof item.totalHours === "number"
+                          ? formatLeaveAmount(item.totalHours, { unit: item.unit, hoursPerDay: item.totalDays ? item.totalHours / item.totalDays : undefined })
+                          : item.totalDays}
+                      </span>
                     </td>
                     <td style={{ ...tdStyle, textAlign: "center" }}>
                       <span
@@ -315,27 +324,31 @@ function DocumentList() {
 
 /* ══════════════════════════════════════════════════════
    DETAIL VIEW — shown when ?id=[leaveId]
+   Round 40+ leaves: the QF-HRD-001 document (LeaveDocumentView).
+   Old-flow records: the first flow's layout, read-only (LegacyDocumentDetail).
    ══════════════════════════════════════════════════════ */
 function DocumentDetail({ id }) {
-  const [leave, setLeave] = useState(null);
+  const [data, setData] = useState(null); // { document } | { leave }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        // Use the single-record endpoint to get all fields including signatures
-        const res = await fetch(`/api/leave/${id}`);
-        const j = await res.json();
-        if (!j.ok) throw new Error(j.message);
-        setLeave(j.leave);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/leave/${id}`, { cache: "no-store" });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.message);
+      setData(j.document ? { document: j.document } : { leave: j.leave });
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading) {
     return (
@@ -345,14 +358,18 @@ function DocumentDetail({ id }) {
     );
   }
 
-  if (error || !leave) {
+  if (error || !data) {
     return (
       <div className="flex items-center justify-center py-24">
-        <p style={{ color: "#991B1B", fontSize: 16 }}>{error || "ไม่พบข้อมูล"}</p>
+        <p style={{ color: "#991B1B", fontSize: 16 }} data-testid="document-error">{error || "ไม่พบข้อมูล"}</p>
       </div>
     );
   }
+  if (data.document) return <LeaveDocumentView doc={data.document} onChanged={load} />;
+  return <LegacyDocumentDetail leave={data.leave} />;
+}
 
+function LegacyDocumentDetail({ leave }) {
   const emp = leave.employeeId || {};
   // Formal document: Thai name with title when complete, else the display name.
   const empName = employeeFullNameTh(emp) || employeeDisplayName(emp) || "-";

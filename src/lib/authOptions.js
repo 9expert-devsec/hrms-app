@@ -169,6 +169,7 @@ export const authOptions = {
         token.pages = user.pages ?? null;
         token.headOfDepartmentIds = user.headOfDepartmentIds ?? [];
         token.isLeaveApprover = user.isLeaveApprover === true;
+        token.isLeaveHrSigner = user.isLeaveHrSigner === true;
         token.employeeId = user.employeeId ?? null;
         token.empAutoId = user.empAutoId ?? null;
         token.department = user.department ?? null;
@@ -204,6 +205,7 @@ export const authOptions = {
       session.user.pages = token.pages ?? null;
       session.user.headOfDepartmentIds = token.headOfDepartmentIds ?? [];
       session.user.isLeaveApprover = token.isLeaveApprover === true;
+      session.user.isLeaveHrSigner = token.isLeaveHrSigner === true;
       session.user.employeeId = token.employeeId ?? null;
       session.user.empAutoId = token.empAutoId ?? null;
       session.user.department = token.department ?? null;

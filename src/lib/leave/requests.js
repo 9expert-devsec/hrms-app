@@ -144,8 +144,10 @@ async function lastApprovedLeave(employeeId, { beforeKey = null, excludeLeaveId 
   const filter = { employeeId: oid(employeeId), status: "approved", leaveTypeId: { $ne: null } };
   if (beforeKey) filter.startDate = { $lt: keyToDate(beforeKey) };
   if (excludeLeaveId) filter._id = { $ne: oid(excludeLeaveId) };
-  const l = await Leave.findOne(filter).sort({ startDate: -1, createdAt: -1 }).select("leaveTypeName startDate endDate totalHours unit").lean();
-  return l ? { leaveTypeName: l.leaveTypeName, startDate: l.startDate, endDate: l.endDate, totalHours: l.totalHours, unit: l.unit } : null;
+  const l = await Leave.findOne(filter).sort({ startDate: -1, createdAt: -1 }).select("leaveTypeName leaveType startDate endDate totalHours unit").lean();
+  return l
+    ? { leaveTypeName: l.leaveTypeName, formCategory: l.leaveType || null, startDate: l.startDate, endDate: l.endDate, totalHours: l.totalHours, unit: l.unit }
+    : null;
 }
 
 /* ── validation shared by submit and resubmit ───────────────── */

@@ -13,9 +13,11 @@ import {
   Inbox,
   Eye,
   Pencil,
+  Undo2,
 } from "lucide-react";
 import { STATUS_CHIPS, WITHDRAWABLE_STATUSES } from "@/lib/leave/flow";
-import { formatLeaveAmount } from "@/lib/leave/format";
+import { formatLeaveAmount, thaiDateRange } from "@/lib/leave/format";
+import CancelRequestDialog from "../../../../../components/leave/CancelRequestDialog";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -64,6 +66,7 @@ export default function LeaveHistoryPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [cancelling, setCancelling] = useState(null);
+  const [cancelFor, setCancelFor] = useState(null); // approved leave → ขอยกเลิกใบลา dialog
 
   async function load() {
     setLoading(true);
@@ -183,6 +186,7 @@ export default function LeaveHistoryPage() {
           <option value="pending">รอ HOD อนุมัติ</option>
           <option value="hod_approved">รอ HR อนุมัติ</option>
           <option value="approved">อนุมัติแล้ว</option>
+          <option value="cancel_requested">ขอยกเลิก</option>
           <option value="rejected">ไม่อนุมัติ</option>
           <option value="cancelled">ยกเลิก</option>
         </select>
@@ -273,6 +277,20 @@ export default function LeaveHistoryPage() {
                       </div>
                     )}
 
+                    {/* Cancel request (round 42) */}
+                    {item.status === "cancel_requested" && item.cancelRequest?.reason && (
+                      <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}>
+                        <MessageSquare size={14} style={{ color: "#B91C1C", marginTop: 2, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: "#B91C1C" }}>ขอยกเลิก — รอฝ่ายบุคคลอนุมัติ: {item.cancelRequest.reason}</span>
+                      </div>
+                    )}
+                    {item.status === "approved" && item.cancelRequest?.decision === "rejected" && (
+                      <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2" style={{ background: "#F8FAFD", border: "1px solid #E3EAF5" }}>
+                        <MessageSquare size={14} style={{ color: SLATE, marginTop: 2, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: SLATE }}>คำขอยกเลิกไม่ได้รับอนุมัติ{item.cancelRequest.note ? `: ${item.cancelRequest.note}` : ""}</span>
+                      </div>
+                    )}
+
                     {/* Returned for editing (round 40) */}
                     {item.status === "returned" && item.returnInfo?.reason && (
                       <div
@@ -297,8 +315,8 @@ export default function LeaveHistoryPage() {
                   </div>
 
                   <div className="flex gap-2 shrink-0">
-                    {/* View document button for approved leaves */}
-                    {(item.status === "approved" || item.status === "hod_approved") && (
+                    {/* View document: every round-40+ leave; old-flow approved ones */}
+                    {(item.leaveTypeId || item.status === "approved" || item.status === "hod_approved") && (
                       <Link
                         href={`/dashboard/leave/document?id=${item._id}`}
                         className="flex items-center gap-1 rounded-lg px-3 py-1.5 transition-colors"
@@ -326,6 +344,19 @@ export default function LeaveHistoryPage() {
                         <Pencil size={14} />
                         แก้ไขและส่งใหม่
                       </Link>
+                    )}
+
+                    {/* Cancel after final approval (round 42): HR decides */}
+                    {item.leaveTypeId && item.status === "approved" && (
+                      <button
+                        onClick={() => setCancelFor(item)}
+                        className="touch-44 flex items-center gap-1 rounded-lg px-3 py-1.5 transition-colors"
+                        style={{ border: "1px solid #F87171", color: "#B91C1C", fontSize: 12, fontWeight: 500, background: "#fff" }}
+                        data-testid="history-cancel-request"
+                      >
+                        <Undo2 size={14} />
+                        ขอยกเลิกใบลา
+                      </button>
                     )}
 
                     {/* Withdraw before final approval (round 40) */}
@@ -370,6 +401,16 @@ export default function LeaveHistoryPage() {
             );
           })}
         </div>
+      )}
+
+      {cancelFor && (
+        <CancelRequestDialog
+          leaveId={cancelFor._id}
+          summary={`${cancelFor.leaveTypeName || "-"} · ${thaiDateRange(cancelFor.startDate, cancelFor.endDate)} · ${amountText(cancelFor)}`}
+          returnText={amountText({ ...cancelFor, unit: undefined })}
+          onClose={() => setCancelFor(null)}
+          onDone={load}
+        />
       )}
     </div>
   );
