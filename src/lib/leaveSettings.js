@@ -10,6 +10,7 @@ import { sortDepartments, compareDepartments } from "@/lib/departmentOrder";
 import { employeeDisplayName, employeeNameSearchText } from "@/lib/employeeName";
 import { normalizePhotoCrop } from "@/lib/photoCrop";
 import { SETTINGS_DEFAULTS, SYSTEM_LEAVE_TYPES, fiscalYearOf, leaveTypeNameKey } from "@/lib/leaveRules";
+import { DEFAULT_WEEKLY_DAYS_OFF } from "@/lib/leave/countLeave";
 
 /**
  * ตั้งค่าการลา — data shared by the settings page and its APIs.
@@ -23,13 +24,21 @@ import { SETTINGS_DEFAULTS, SYSTEM_LEAVE_TYPES, fiscalYearOf, leaveTypeNameKey }
  */
 export async function ensureLeaveSetup() {
   const inserted = { settings: false, types: [] };
-  const s = await LeaveSettings.updateOne({ key: "default" }, { $setOnInsert: { key: "default", ...SETTINGS_DEFAULTS, hrSigners: [] } }, { upsert: true });
+  // timestamps: false — otherwise Mongoose adds `$set: { updatedAt }` and
+  // every page load would touch the documents it only reads.
+  const now = new Date();
+  const stamps = { createdAt: now, updatedAt: now };
+  const s = await LeaveSettings.updateOne(
+    { key: "default" },
+    { $setOnInsert: { key: "default", ...SETTINGS_DEFAULTS, hrSigners: [], ...stamps } },
+    { upsert: true, timestamps: false }
+  );
   inserted.settings = s.upsertedCount > 0;
   for (const t of SYSTEM_LEAVE_TYPES) {
     const r = await LeaveType.updateOne(
       { systemKey: t.systemKey },
-      { $setOnInsert: { ...t, nameKey: leaveTypeNameKey(t.nameTh), isActive: true, isSystem: true } },
-      { upsert: true }
+      { $setOnInsert: { ...t, nameKey: leaveTypeNameKey(t.nameTh), isActive: true, isSystem: true, ...stamps } },
+      { upsert: true, timestamps: false }
     );
     if (r.upsertedCount) inserted.types.push(t.nameTh);
   }
@@ -50,8 +59,12 @@ export function serializeSettings(s) {
     halfDayMorning: s.halfDayMorning,
     halfDayAfternoon: s.halfDayAfternoon,
     hrSigners: (s.hrSigners || []).map(String),
+    weeklyDaysOff: weeklyDaysOffOf(s),
   };
 }
+
+/** The settings' weekly days off (A1 default when never saved), sorted. */
+export const weeklyDaysOffOf = (s) => [...(Array.isArray(s?.weeklyDaysOff) ? s.weeklyDaysOff : DEFAULT_WEEKLY_DAYS_OFF)].sort((a, b) => a - b);
 
 export async function listLeaveTypes() {
   await ensureLeaveSetup();

@@ -7,15 +7,17 @@ import GeneralTab from "./ui/GeneralTab";
 import TypesTab from "./ui/TypesTab";
 import ApproversTab from "./ui/ApproversTab";
 import QuotaTab from "./ui/QuotaTab";
+import HolidaysTab from "./ui/HolidaysTab";
 
 const TABS = [
   { key: "general", label: "ทั่วไป" },
   { key: "types", label: "ประเภทการลา" },
   { key: "approvers", label: "ผู้อนุมัติ" },
   { key: "quota", label: "โควตาวันลา" },
+  { key: "holidays", label: "วันหยุด" },
 ];
 
-/** ตั้งค่าการลา — four tabs; ?tab= keeps the open tab across reloads. */
+/** ตั้งค่าการลา — five tabs; ?tab= keeps the open tab across reloads. */
 export default function LeaveSettingsClient(props) {
   const [tab, setTab] = useState(() => (TABS.some((t) => t.key === props.initialTab) ? props.initialTab : "general"));
   const [settings, setSettings] = useState(props.settings);
@@ -79,6 +81,15 @@ export default function LeaveSettingsClient(props) {
             fiscalYearStartMonth={settings.fiscalYearStartMonth}
             initialEntitlements={props.entitlements}
             {...shared}
+          />
+        )}
+        {tab === "holidays" && (
+          <HolidaysTab
+            initialYear={props.holidayYear}
+            initialHolidays={props.holidays}
+            weeklyDaysOff={settings.weeklyDaysOff}
+            setWeeklyDaysOff={(weeklyDaysOff) => setSettings((s) => ({ ...s, weeklyDaysOff }))}
+            notify={notify}
           />
         )}
       </div>

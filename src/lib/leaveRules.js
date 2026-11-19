@@ -2,6 +2,7 @@
  * Leave settings rules. Pure — browser-safe; the settings page and the
  * leave-settings APIs share them.
  */
+import { parseDateKey } from "./leave/countLeave.js";
 
 export const THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const MONTHS_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -144,6 +145,34 @@ export function validateQuota(v) {
   const n = Number(v);
   if (v === "" || v === undefined || !Number.isFinite(n) || n < 0 || n > 366 || !Number.isInteger(n * 2)) return { error: "โควตาต้องเป็น 0–366 วัน ทีละครึ่งวัน หรือไม่จำกัด" };
   return { value: n };
+}
+
+/* ── holidays (ตั้งค่าการลา › วันหยุด) ─────────────────────────── */
+
+export const HOLIDAY_KINDS = ["public", "company"];
+export const HOLIDAY_KIND_LABELS = { public: "วันหยุดนักขัตฤกษ์", company: "วันหยุดบริษัท" };
+/** Weekday toggles, Monday first: [weekday (0 = Sunday), label]. */
+export const WEEKDAY_TOGGLES = [[1, "จ."], [2, "อ."], [3, "พ."], [4, "พฤ."], [5, "ศ."], [6, "ส."], [0, "อา."]];
+
+/** Validates the add / edit holiday form. Returns { value: { date ("YYYY-MM-DD"), name, kind } } or { error, field }. */
+export function validateHoliday(input) {
+  const v = input || {};
+  const date = parseDateKey(v.date);
+  if (!date) return { error: "กรุณาเลือกวันที่", field: "date" };
+  const name = String(v.name || "").trim();
+  if (!name) return { error: "กรุณาระบุชื่อวันหยุด", field: "name" };
+  if (name.length > 100) return { error: "ชื่อวันหยุดยาวเกิน 100 ตัวอักษร", field: "name" };
+  if (!HOLIDAY_KINDS.includes(v.kind)) return { error: "กรุณาเลือกประเภทวันหยุด", field: "kind" };
+  return { value: { date, name, kind: v.kind } };
+}
+
+/** Weekly days off: distinct integers 0–6, at least one working day left. Returns { value } (sorted) or { error }. */
+export function validateWeeklyDaysOff(v) {
+  if (!Array.isArray(v) || v.some((d) => !Number.isInteger(d) || d < 0 || d > 6) || new Set(v).size !== v.length) {
+    return { error: "วันหยุดประจำสัปดาห์ไม่ถูกต้อง" };
+  }
+  if (v.length > 6) return { error: "ต้องมีวันทำงานอย่างน้อย 1 วันต่อสัปดาห์" };
+  return { value: [...v].sort((a, b) => a - b) };
 }
 
 /* ── per-employee approvers ──────────────────────────────────── */

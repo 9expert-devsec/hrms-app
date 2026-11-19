@@ -18,6 +18,10 @@ const LeaveSettingsSchema = new Schema(
     halfDayMorning: { type: String, default: "09:00–12:00" },
     halfDayAfternoon: { type: String, default: "13:00–18:00" },
     hrSigners: { type: [{ type: Schema.Types.ObjectId, ref: "Employee" }], default: [] },
+    // ตั้งค่าการลา › วันหยุด: weekdays that are always off (0 = Sunday … 6 =
+    // Saturday). Missing on documents from round 39 → DEFAULT_WEEKLY_DAYS_OFF
+    // (lib/leave/countLeave.js, assumption A1).
+    weeklyDaysOff: { type: [{ type: Number, min: 0, max: 6 }], default: undefined },
   },
   { timestamps: true }
 );

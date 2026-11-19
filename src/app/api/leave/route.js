@@ -5,23 +5,8 @@ import { canOpenLeaveApproval, canAccess } from "@/lib/rbac/access";
 import { leaveListEmployeeIds } from "@/lib/rbac/leaveScope";
 import dbConnect from "@/lib/mongoose";
 import Leave from "@/models/Leave";
-import LeaveBalance from "@/models/LeaveBalance";
 import { getOwnEmployee } from "@/lib/rbac/scopeQueries";
-import { signaturePngError } from "@/lib/signaturePng";
-
-/* ---------- helpers ---------- */
-
-// นับวันทำงาน (จันทร์–ศุกร์) ระหว่าง start ถึง end (รวมทั้งสองวัน)
-function countWorkingDays(start, end) {
-  let count = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    const day = cur.getDay(); // 0=Sun, 6=Sat
-    if (day !== 0 && day !== 6) count++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return count;
-}
+import { submitLeave, leaveErrorResponse } from "@/lib/leave/requests";
 
 /* ---------- GET ---------- */
 export async function GET(req) {
@@ -95,89 +80,15 @@ export async function POST(req) {
 
     await dbConnect();
 
-    // TODO: remove this debug log once userId issue is confirmed fixed
-    console.log("POST /api/leave session.user:", JSON.stringify(session.user));
-
-    const userId = session.user.id || session.user._id || session.user.sub;
-    if (!userId) {
-      return NextResponse.json({ ok: false, message: "Session missing userId" }, { status: 401 });
-    }
-
-    // The linked employee only (lib/accountLinks.js) — never an email match.
-    const employee = await getOwnEmployee(session, "_id");
-    if (!employee) {
-      return NextResponse.json({ ok: false, message: "บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน" }, { status: 400 });
-    }
-    const employeeId = employee._id;
-
-    const body = await req.json();
-    const { leaveType, startDate, endDate, reason, attachmentUrl, attachments, employeeSignature } = body;
-
-    if (!leaveType || !startDate || !endDate || !reason) {
-      return NextResponse.json({ ok: false, message: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
-    }
-    // The record's own signature copy: the one accepted format (400×160 PNG, ≤ 300 KB).
-    const sigError = employeeSignature ? signaturePngError(employeeSignature) : null;
-    if (sigError) return NextResponse.json({ ok: false, message: sigError }, { status: 400 });
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (end < start) {
-      return NextResponse.json({ ok: false, message: "วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม" }, { status: 400 });
-    }
-
-    const totalDays = countWorkingDays(start, end);
-    if (totalDays <= 0) {
-      return NextResponse.json({ ok: false, message: "ไม่มีวันทำงานในช่วงที่เลือก" }, { status: 400 });
-    }
-
-    // ตรวจ LeaveBalance เฉพาะประเภทที่มี quota (sick, annual, personal)
-    const countableTypes = ["sick", "annual", "personal"];
-    if (countableTypes.includes(leaveType)) {
-      const currentYear = start.getFullYear();
-      let balance = await LeaveBalance.findOne({
-        employeeId,
-        year: currentYear,
-      });
-
-      // ถ้ายังไม่มี record → สร้าง default
-      if (!balance) {
-        balance = await LeaveBalance.create({
-          employeeId,
-          year: currentYear,
-        });
-      }
-
-      const remaining = balance[leaveType].total - balance[leaveType].used;
-      if (totalDays > remaining) {
-        return NextResponse.json(
-          { ok: false, message: `วันลา${leaveType}คงเหลือไม่เพียงพอ (เหลือ ${remaining} วัน)` },
-          { status: 400 }
-        );
-      }
-    }
-
-    const leave = await Leave.create({
-      employeeId,
-      userId,
-      leaveType,
-      startDate: start,
-      endDate: end,
-      totalDays,
-      reason,
-      attachments: Array.isArray(attachments) && attachments.length > 0
-        ? attachments
-        : attachmentUrl
-          ? [{ url: attachmentUrl, name: "attachment", type: "document", size: 0 }]
-          : [],
-      attachmentUrl: attachmentUrl || undefined,
-      employeeSignature: employeeSignature || undefined,
-      status: "pending",
-    });
-
-    return NextResponse.json({ ok: true, leave }, { status: 201 });
+    // QF-HRD-001 request (lib/leave/requests.js): the server recomputes the
+    // count, checks type, quota (A3), approvers (A4) and signature, and
+    // stores the snapshots. Status: pending_approval, or pending_hr for an
+    // auto-approve employee. No email yet (round 41).
+    const body = await req.json().catch(() => ({}));
+    const leave = await submitLeave(session, body);
+    return NextResponse.json({ ok: true, leave: { _id: String(leave._id), status: leave.status } }, { status: 201 });
   } catch (err) {
-    console.error("POST /api/leave error:", err);
-    return NextResponse.json({ ok: false, message: err.message }, { status: 500 });
+    const { body, status } = leaveErrorResponse(err, "POST /api/leave");
+    return NextResponse.json(body, { status });
   }
 }

@@ -1,6 +1,6 @@
 // /dashboard/leave/settings — ตั้งค่าการลา (leave_settings: hr and the superadmin).
-// Leave types, per-employee approvers, quotas, fiscal year and HR signers —
-// the data the leave flow (round 40) is built on.
+// Leave types, per-employee approvers, quotas, fiscal year, HR signers and
+// holidays — the data the leave flow is built on.
 import { requirePage } from "@/lib/rbac/guard";
 import dbConnect from "@/lib/mongoose";
 import {
@@ -11,6 +11,8 @@ import {
   listLeaveTypes,
   serializeSettings,
 } from "@/lib/leaveSettings";
+import { listHolidaysBetween } from "@/lib/leave/requests";
+import { todayKey } from "@/lib/leave/countLeave";
 import { PAGE, PAGE_BG } from "../../../../../components/hr/hrUi";
 import LeaveSettingsClient from "./LeaveSettingsClient";
 
@@ -22,7 +24,13 @@ export default async function LeaveSettingsPage({ searchParams }) {
   await dbConnect();
   const settings = await getLeaveSettings(); // seeds the singleton and system types if missing
   const fy = currentFiscalYear(settings);
-  const [types, { employees, departments }, entitlements] = await Promise.all([listLeaveTypes(), listLeaveEmployees(), listEntitlements(fy)]);
+  const holidayYear = Number(todayKey().slice(0, 4)); // Bangkok calendar year
+  const [types, { employees, departments }, entitlements, holidays] = await Promise.all([
+    listLeaveTypes(),
+    listLeaveEmployees(),
+    listEntitlements(fy),
+    listHolidaysBetween(`${holidayYear}-01-01`, `${holidayYear}-12-31`),
+  ]);
   const sp = await searchParams;
 
   return (
@@ -36,6 +44,8 @@ export default async function LeaveSettingsPage({ searchParams }) {
           departments={departments}
           currentFiscalYear={fy}
           entitlements={entitlements}
+          holidayYear={holidayYear}
+          holidays={holidays}
         />
       </div>
     </div>

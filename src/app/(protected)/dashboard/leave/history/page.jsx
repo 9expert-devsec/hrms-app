@@ -12,7 +12,10 @@ import {
   Loader2,
   Inbox,
   Eye,
+  Pencil,
 } from "lucide-react";
+import { STATUS_CHIPS, WITHDRAWABLE_STATUSES } from "@/lib/leave/flow";
+import { formatLeaveAmount } from "@/lib/leave/format";
 
 /* ── design tokens ─────────────────────────────────── */
 const NAVY = "#0D1B2A";
@@ -26,13 +29,15 @@ const CARD = {
   boxShadow: "0 2px 8px rgba(13,27,42,0.06)",
 };
 
-const STATUS_BADGE = {
-  pending:      { bg: "#FEF3C7", color: "#92400E", label: "รอ HOD อนุมัติ" },
-  hod_approved: { bg: "#DBEAFE", color: "#1E40AF", label: "รอ HR อนุมัติ" },
-  approved:     { bg: "#D1FAE5", color: "#065F46", label: "อนุมัติแล้ว" },
-  rejected:     { bg: "#FEE2E2", color: "#991B1B", label: "ไม่อนุมัติ" },
-  cancelled:    { bg: "#F1F5F9", color: "#475569", label: "ยกเลิก" },
-};
+// Round-40 statuses plus the legacy ones (lib/leave/flow.js).
+const STATUS_BADGE = STATUS_CHIPS;
+
+// Amount of a leave: hours (round 40) or the legacy day count.
+function amountText(item) {
+  if (typeof item.totalHours !== "number") return `${item.totalDays} day${item.totalDays > 1 ? "s" : ""}`;
+  const hoursPerDay = item.totalDays ? item.totalHours / item.totalDays : undefined;
+  return formatLeaveAmount(item.totalHours, { unit: item.unit, hoursPerDay });
+}
 
 const TYPE_LABELS = {
   sick: "Sick Leave",
@@ -83,11 +88,14 @@ export default function LeaveHistoryPage() {
     return items.filter((i) => i.leaveType === typeFilter);
   }, [items, typeFilter]);
 
-  async function handleCancel(id) {
-    if (!confirm("Are you sure you want to cancel this leave request?")) return;
+  // Legacy "pending" records: DELETE; round-40 statuses: withdraw (→ cancelled).
+  async function handleCancel(id, withdraw = false) {
+    if (!confirm(withdraw ? "ยกเลิกใบลานี้? ใบลาจะเปลี่ยนเป็น “ยกเลิกแล้ว”" : "Are you sure you want to cancel this leave request?")) return;
     setCancelling(id);
     try {
-      const res = await fetch(`/api/leave/${id}`, { method: "DELETE" });
+      const res = withdraw
+        ? await fetch(`/api/leave/${id}/withdraw`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+        : await fetch(`/api/leave/${id}`, { method: "DELETE" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.message || "Error");
       await load();
@@ -169,6 +177,9 @@ export default function LeaveHistoryPage() {
           }}
         >
           <option value="">All Status</option>
+          <option value="pending_approval">รอผู้อนุมัติ</option>
+          <option value="returned">ส่งกลับแก้ไข</option>
+          <option value="pending_hr">รอ HR</option>
           <option value="pending">รอ HOD อนุมัติ</option>
           <option value="hod_approved">รอ HR อนุมัติ</option>
           <option value="approved">อนุมัติแล้ว</option>
@@ -216,7 +227,7 @@ export default function LeaveHistoryPage() {
                   <div className="space-y-1 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span style={{ color: NAVY, fontSize: 15, fontWeight: 600 }}>
-                        {TYPE_LABELS[item.leaveType] || item.leaveType}
+                        {item.leaveTypeName || TYPE_LABELS[item.leaveType] || item.leaveType}
                       </span>
                       <span
                         className="inline-flex rounded-full px-2.5 py-0.5"
@@ -238,7 +249,7 @@ export default function LeaveHistoryPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <FileText size={14} />
-                        {item.totalDays} day{item.totalDays > 1 ? "s" : ""}
+                        {amountText(item)}
                       </span>
                     </div>
 
@@ -259,6 +270,17 @@ export default function LeaveHistoryPage() {
                             <p style={{ fontSize: 13, color: "#991B1B", marginTop: 2 }}>{rejNote}</p>
                           )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Returned for editing (round 40) */}
+                    {item.status === "returned" && item.returnInfo?.reason && (
+                      <div
+                        className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2"
+                        style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}
+                      >
+                        <MessageSquare size={14} style={{ color: "#B91C1C", marginTop: 2, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: "#B91C1C" }}>ส่งกลับแก้ไข: {item.returnInfo.reason}</span>
                       </div>
                     )}
 
@@ -293,7 +315,34 @@ export default function LeaveHistoryPage() {
                       </Link>
                     )}
 
-                    {/* Cancel button for pending */}
+                    {/* Returned: edit and resubmit on the ขอลา page */}
+                    {item.status === "returned" && (
+                      <Link
+                        href={`/dashboard/leave/request?id=${item._id}`}
+                        className="touch-44 flex items-center gap-1 rounded-lg px-3 py-1.5"
+                        style={{ border: `1px solid ${BLUE}20`, color: BLUE, fontSize: 12, fontWeight: 500, background: `${BLUE}08` }}
+                        data-testid="history-edit"
+                      >
+                        <Pencil size={14} />
+                        แก้ไขและส่งใหม่
+                      </Link>
+                    )}
+
+                    {/* Withdraw before final approval (round 40) */}
+                    {WITHDRAWABLE_STATUSES.includes(item.status) && (
+                      <button
+                        onClick={() => handleCancel(item._id, true)}
+                        disabled={cancelling === item._id}
+                        className="touch-44 flex items-center gap-1 rounded-lg px-3 py-1.5 transition-colors"
+                        style={{ border: "1px solid #FEE2E2", color: "#991B1B", fontSize: 12, fontWeight: 500, background: "#FEE2E220" }}
+                        data-testid="history-withdraw"
+                      >
+                        {cancelling === item._id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                        ยกเลิกใบลา
+                      </button>
+                    )}
+
+                    {/* Cancel button for pending (legacy) */}
                     {item.status === "pending" && (
                       <button
                         onClick={() => handleCancel(item._id)}
