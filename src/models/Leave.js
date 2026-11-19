@@ -13,7 +13,15 @@ import { LEAVE_UNITS, HALF_DAY_PERIODS } from "@/lib/leave/countLeave";
  * set `leaveType` to the type's form category for those pages.
  */
 
-/** One approval step (round 41/42 write them; resubmitting clears them). */
+/**
+ * One approval step (lib/leave/approval.js writes them; resubmitting clears
+ * them). The actor is employeeId / userId / name; signature is a PNG copy
+ * of their profile signature taken when they acted.
+ *   step1    — approver (1) or (2): role, decision approved | returned
+ *   step1Ack — the other approver's รับทราบ: expectedBy is set when step 1
+ *              is approved, the actor fields when they acknowledge
+ *   hrStep   — an HR signer: decision, selfApproved (A5)
+ */
 const StepSchema = new Schema(
   {
     employeeId: { type: Schema.Types.ObjectId, ref: "Employee", default: null },
@@ -23,6 +31,11 @@ const StepSchema = new Schema(
     note: { type: String, default: "" },
     at: { type: Date, default: null },
     auto: { type: Boolean, default: false }, // step 1 of an auto-approve employee (A4)
+    role: { type: String, enum: ["approver1", "approver2", "hr"] },
+    decision: { type: String, enum: ["approved", "returned"] },
+    expectedBy: { type: Schema.Types.ObjectId, ref: "Employee", default: null },
+    expectedRole: { type: String, enum: ["approver1", "approver2"] },
+    selfApproved: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -34,6 +47,8 @@ const HistorySchema = new Schema(
     at: { type: Date, default: Date.now },
     note: { type: String, default: "" },
     revision: { type: Number, default: null },
+    step: { type: Number, default: null }, // returned: 1 = approver, 2 = HR
+    selfApproved: { type: Boolean, default: false }, // approved_hr by the requester (A5)
   },
   { _id: false }
 );

@@ -1,4 +1,5 @@
 import "server-only";
+import LeaveSettings from "@/models/LeaveSettings";
 import { canAccess } from "@/lib/rbac/access";
 import { leaveHodScope, canViewLeaveDocument } from "@/lib/rbac/scopes";
 import { departmentIdOf, employeeIdsForScope, isEmployeeInScope } from "@/lib/rbac/scopeQueries";
@@ -48,10 +49,17 @@ export async function leaveListEmployeeIds(user) {
  * this is false, so the endpoint never confirms the document exists.
  * `employee` needs _id plus departmentId and/or department (code).
  */
-export async function canSeeLeaveDocument(session, { ownerUserId, employee }) {
+export async function canSeeLeaveDocument(session, { ownerUserId, employee, leave = null }) {
   const user = session?.user;
   if (!user) return false;
   if (ownerUserId && user.id && String(ownerUserId) === String(user.id)) return true;
+  // Round 41: the people the leave flow names — approver (1)/(2) of this
+  // leave (snapshot) and the HR signers (ตั้งค่าการลา).
+  if (leave && user.employeeId) {
+    const me = String(user.employeeId);
+    if ([leave.approver1Id, leave.approver2Id].some((id) => id && String(id) === me)) return true;
+    if (await LeaveSettings.exists({ key: "default", hrSigners: me })) return true;
+  }
   return canViewLeaveDocument(user, {
     ownerEmployeeId: employee?._id,
     ownerDepartmentId: await departmentIdOf(employee),

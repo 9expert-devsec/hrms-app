@@ -32,7 +32,7 @@ export async function GET(_req, { params }) {
     // Owner, a head of the owner's department, the leave scopes, superadmin.
     // Anyone else gets the same 404 as a missing id.
     const visible =
-      leave && (await canSeeLeaveDocument(session, { ownerUserId: leave.userId, employee: leave.employeeId }));
+      leave && (await canSeeLeaveDocument(session, { ownerUserId: leave.userId, employee: leave.employeeId, leave }));
     if (!visible) return NextResponse.json({ ok: false, message: "ไม่พบรายการลา" }, { status: 404 });
 
     // An approver whose account was deleted (lib/accountLinks.js) populates

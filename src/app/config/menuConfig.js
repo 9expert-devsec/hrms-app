@@ -82,7 +82,7 @@ export const menuConfig = [
     children: [
       // Also shown to department heads: canOpenPage applies
       // canOpenLeaveApproval to this key.
-      link("leave.approve", "อนุมัติการลา", "/dashboard/leave/approve", CheckSquare, "leave_approve"),
+      link("leave.approve", "อนุมัติการลา", "/dashboard/leave/approve", CheckSquare, "leave_approve", { badgeKey: "leave_approvals" }),
     ],
   },
   {

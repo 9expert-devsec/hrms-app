@@ -1,6 +1,8 @@
 import "server-only";
 import Role from "@/models/Role";
 import Department from "@/models/Department";
+import Employee from "@/models/Employee";
+import LeaveSettings from "@/models/LeaveSettings";
 import { SEED_ROLES, FALLBACK_ROLE_KEY } from "@/lib/rbac/seedRoles";
 
 /**
@@ -53,4 +55,18 @@ export async function getHeadOfDepartmentIds(employeeId) {
   if (!employeeId) return [];
   const depts = await Department.find({ headOfDepartment: employeeId }).select("_id").lean();
   return depts.map((d) => String(d._id));
+}
+
+/**
+ * Does the leave flow name this person — approver (1)/(2) of an employee
+ * (round 39 mapping) or an HR signer (ตั้งค่าการลา)? Opens อนุมัติการลา
+ * (access.js canOpenLeaveApproval); a relationship, not a role.
+ */
+export async function isLeaveApproverEmployee(employeeId) {
+  if (!employeeId) return false;
+  const [mapped, signer] = await Promise.all([
+    Employee.exists({ $or: [{ leaveApprover1Id: employeeId }, { leaveApprover2Id: employeeId }] }),
+    LeaveSettings.exists({ key: "default", hrSigners: employeeId }),
+  ]);
+  return !!(mapped || signer);
 }

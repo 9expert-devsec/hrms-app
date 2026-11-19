@@ -36,11 +36,12 @@ export function isAnyHead(user) {
 
 /**
  * Leave approval is the one page a relationship opens: holders of
- * `leave_approve` OR any department head (so a head with the plain employee
- * role can approve their own department). Sidebar, page and API all use this.
+ * `leave_approve`, any department head, OR anyone the leave flow names —
+ * approver (1)/(2) of some employee or an HR signer (`isLeaveApprover`, set
+ * on the token by lib/rbac/sessionPerms.js). Sidebar, page and API all use this.
  */
 export function canOpenLeaveApproval(user) {
-  return canAccess(user, "leave_approve") || isAnyHead(user);
+  return canAccess(user, "leave_approve") || isAnyHead(user) || user?.isLeaveApprover === true;
 }
 
 /** canAccess plus the leave-approval exception. */

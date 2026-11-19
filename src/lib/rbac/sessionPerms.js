@@ -2,7 +2,7 @@ import "server-only";
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
-import { getRoleByKey, getHeadOfDepartmentIds } from "@/lib/rbac/resolveRole";
+import { getRoleByKey, getHeadOfDepartmentIds, isLeaveApproverEmployee } from "@/lib/rbac/resolveRole";
 import { employeeOfUser } from "@/lib/rbac/scopeQueries";
 import { ROLE_REFRESH_MS } from "@/lib/rbac/version";
 
@@ -31,6 +31,8 @@ export async function permissionsFor({ roleKey, employeeId }) {
     // null = superadmin (allow all); never ship the full key list.
     pages: role.isSuperadmin ? null : role.pages,
     headOfDepartmentIds: await getHeadOfDepartmentIds(employeeId),
+    // Opens อนุมัติการลา by relationship (access.js canOpenLeaveApproval).
+    isLeaveApprover: await isLeaveApproverEmployee(employeeId),
   };
 }
 
@@ -58,6 +60,7 @@ function revokedToken(token) {
     isSuperadmin: false,
     pages: [],
     headOfDepartmentIds: [],
+    isLeaveApprover: false,
     mustChangePassword: false,
     permsCheckedAt: Date.now(),
   };

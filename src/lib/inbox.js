@@ -1,9 +1,8 @@
 import "server-only";
-import Leave from "@/models/Leave";
 import OTRequest from "@/lib/models/OTRequest";
 import { badgeCounts } from "@/lib/offsite";
-import { canAccess, canOpenLeaveApproval } from "@/lib/rbac/access";
-import { canActOnHrStep, hodStepScope } from "@/lib/rbac/leaveScope";
+import { approvalCounts } from "@/lib/leave/approval";
+import { canAccess } from "@/lib/rbac/access";
 import { otScope } from "@/lib/rbac/scopes";
 import { employeeIdsForScope } from "@/lib/rbac/scopeQueries";
 
@@ -13,9 +12,8 @@ import { employeeIdsForScope } from "@/lib/rbac/scopeQueries";
  * rules the lists use, never a copy of them:
  *   - off-site invitations / approvals: lib/offsite.js badgeCounts (step 1
  *     for the leader, steps 2–3 for the approver, reconfirms included)
- *   - leave: the HOD step (hodStepScope — headed departments, or all with
- *     scope_leave_all_depts) and the HR step (scope_leave_hr_step), as
- *     GET /api/leave/pending lists them
+ *   - leave: step-1 approvals, open รับทราบ tasks and (HR signers) the HR
+ *     step, as the อนุมัติการลา tabs list them (lib/leave/approval.js)
  *   - OT: pending requests inside otScope, as GET /api/attendance/ot lists
  *     them for ot_approve holders
  * Only countDocuments on small, filtered sets. Only groups with something
@@ -30,15 +28,14 @@ export const INBOX_GROUPS = {
   ot_approvals: { label: "OT ที่รอคุณอนุมัติ", href: "/dashboard/attendance/ot-approve" },
 };
 
-/** Leaves waiting at a step the caller acts on (HOD step + HR step). */
-async function leaveCount(user) {
-  if (!canOpenLeaveApproval(user)) return 0;
-  let n = 0;
-  const hod = await hodStepScope(user);
-  if (hod.all) n += await Leave.countDocuments({ status: "pending" });
-  else if (hod.employeeIds.length) n += await Leave.countDocuments({ status: "pending", employeeId: { $in: hod.employeeIds } });
-  if (canActOnHrStep(user)) n += await Leave.countDocuments({ status: "hod_approved" });
-  return n;
+/**
+ * Leaves waiting on the caller (round 41): step-1 approvals + open รับทราบ
+ * tasks + the HR step for HR signers — the same queries as the อนุมัติการลา
+ * tabs (lib/leave/approval.js). Decided by the leave, not by a role.
+ */
+async function leaveCount(session) {
+  const { approve, acknowledge, hr } = await approvalCounts(session);
+  return approve + acknowledge + hr;
 }
 
 /** Pending OT inside the caller's OT scope (ot_approve holders only). */
@@ -58,7 +55,7 @@ export async function inboxCounts(session) {
     counts.offsite_invites = invites;
     counts.offsite_approvals = approvals;
   }
-  counts.leave_approvals = await leaveCount(user);
+  counts.leave_approvals = await leaveCount(session);
   counts.ot_approvals = await otCount(user);
 
   const items = Object.entries(INBOX_GROUPS)

@@ -23,6 +23,7 @@ import {
   parseDateKey,
 } from "@/lib/leave/countLeave";
 import { formatLeaveAmount } from "@/lib/leave/format";
+import { notifyLeave } from "@/lib/leave/notify";
 import {
   QUOTA_PENDING_STATUSES,
   QUOTA_USED_STATUSES,
@@ -293,6 +294,7 @@ export async function submitLeave(session, body) {
   const { fields, auto } = await prepareLeave(session, body);
   const state = submissionState("submitted", userId, auto, 1);
   const leave = await Leave.create({ ...fields, userId, status: state.status, step1: state.step1, revision: 1, history: state.history });
+  await notifyLeave(leave, "submitted", session);
   return leave.toObject();
 }
 
@@ -315,6 +317,7 @@ export async function resubmitLeave(session, id, body) {
   leave.set({ ...fields, status: state.status, step1: state.step1, step1Ack: null, hrStep: null, returnInfo: null, revision });
   leave.history.push(...state.history);
   await leave.save();
+  await notifyLeave(leave, "submitted", session);
   return leave.toObject();
 }
 

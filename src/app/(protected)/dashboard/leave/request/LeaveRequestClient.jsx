@@ -20,6 +20,7 @@ import MySignaturePicker from "../../../../../components/MySignaturePicker";
 import { saveMySignature } from "../../../../../components/offsite/SignatureConfirm";
 import Dialog from "../settings/ui/Dialog";
 import LeaveAttachments from "./LeaveAttachments";
+import ThaiDatePicker from "../../../../../components/ThaiDatePicker";
 import { fiscalYearLabel, fiscalYearOf } from "@/lib/leaveRules";
 import { UNIT_OF_TYPE_UNIT, calendarDays, countLeave, keyToDate } from "@/lib/leave/countLeave";
 import { formatLeaveAmount, leavePeriodText, thaiDateRange, thaiDateShort, thaiDateTime } from "@/lib/leave/format";
@@ -518,8 +519,7 @@ function DateField({ id, label, value, onChange, min, testid }) {
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-[13px] font-medium" style={{ color: SLATE }}>{label}</label>
-      <input id={id} type="date" value={value} min={min} onChange={(e) => onChange(e.target.value)} className={INPUT} data-testid={testid} />
-      <p className="mt-1 h-4 text-[12px]" style={{ color: SLATE }}>{value ? thaiDateShort(value) : ""}</p>
+      <ThaiDatePicker id={id} value={value} min={min} onChange={onChange} testid={testid} />
     </div>
   );
 }
