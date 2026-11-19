@@ -50,6 +50,7 @@ import {
   MapPin,
   FolderOpen,
   Mail,
+  SlidersHorizontal,
 } from "lucide-react";
 
 const link = (key, label, href, icon, pageKey, extra = {}) => ({ key, type: "link", label, href, icon, pageKey, ...extra });
@@ -95,6 +96,7 @@ export const menuConfig = [
       link("time.offsite-all", "คำขอทำงานนอกสถานที่ทั้งหมด", "/dashboard/offsite/all", FolderOpen, "offsite_hr"),
       link("time.email-log", "บันทึกการส่งอีเมล", "/dashboard/offsite/all/email-log", Mail, "offsite_hr"),
       link("leave.calendar", "ปฏิทินการลา", "/dashboard/leave/calendar", CalendarRange, "leave_calendar"),
+      link("leave.settings", "ตั้งค่าการลา", "/dashboard/leave/settings", SlidersHorizontal, "leave_settings"),
     ],
   },
   {

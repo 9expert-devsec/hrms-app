@@ -76,6 +76,13 @@ const EmployeeSchema = new Schema(
 
     // ผูกกับ user id ถ้ามีการสร้างบัญชีล็อกอิน
     userId: { type: Schema.Types.ObjectId, ref: "User" },
+
+    // Who approves this employee's leave (ตั้งค่าการลา › ผู้อนุมัติ;
+    // lib/leaveRules.js). Both empty → approved automatically (HR still sees
+    // it); one person → that person approves; two different people → either
+    // approves, the other may acknowledge. Approver 2 is never set without 1.
+    leaveApprover1Id: { type: Schema.Types.ObjectId, ref: "Employee", default: null, index: true },
+    leaveApprover2Id: { type: Schema.Types.ObjectId, ref: "Employee", default: null, index: true },
   },
   { timestamps: true }
 );

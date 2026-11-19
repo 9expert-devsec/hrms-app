@@ -54,6 +54,7 @@ export const SEED_ROLES = [
       "holidays",
       "attendance_report",
       "leave_approve",
+      "leave_settings",
       "hod_settings",
       "scope_attendance_all",
       "scope_ot_all",

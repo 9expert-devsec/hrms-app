@@ -75,6 +75,8 @@ export const HRMS_PAGES = [
     group: "การลา",
     pages: [
       { key: "leave_approve", label: "อนุมัติการลา", href: "/dashboard/leave/approve", match: "prefix" },
+      // Leave types, per-employee approvers, quotas, fiscal year, HR signers.
+      { key: "leave_settings", label: "ตั้งค่าการลา", href: "/dashboard/leave/settings", match: "prefix" },
       // Scope keys — widen data, never a route.
       { key: "scope_leave_hr_step", label: "อนุมัติการลาขั้น HR (ขั้นสุดท้าย)", href: null, match: "none" },
       { key: "scope_leave_all_depts", label: "อนุมัติการลาขั้นหัวหน้าได้ทุกแผนก", href: null, match: "none" },
